@@ -285,10 +285,136 @@ function initSchema(db: Database.Database) {
     `ALTER TABLE bookings ADD COLUMN overtime_amount REAL DEFAULT 0`,
     `ALTER TABLE bookings ADD COLUMN portal_token TEXT`,
     `ALTER TABLE booking_equipment ADD COLUMN returned_at TEXT`,
+    `ALTER TABLE clients ADD COLUMN tin TEXT`,
+    `ALTER TABLE clients ADD COLUMN special_notes TEXT`,
+    `ALTER TABLE clients ADD COLUMN vip_no_deposit INTEGER DEFAULT 0`,
+    `ALTER TABLE bookings ADD COLUMN vat_exempt INTEGER DEFAULT 0`,
+    `ALTER TABLE bookings ADD COLUMN no_deposit INTEGER DEFAULT 0`,
+    `ALTER TABLE fixed_costs ADD COLUMN vat_on_top INTEGER DEFAULT 0`,
   ];
   for (const sql of migrations) {
     try { db.exec(sql); } catch { /* column already exists */ }
   }
+
+  // Create newer tables that may not exist in older databases
+  const newTables = [
+    `CREATE TABLE IF NOT EXISTS studio_visits (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      visit_date TEXT NOT NULL,
+      visit_time TEXT,
+      contact_name TEXT NOT NULL,
+      contact_phone TEXT,
+      contact_company TEXT,
+      purpose TEXT DEFAULT 'ocular',
+      notes TEXT,
+      status TEXT DEFAULT 'scheduled',
+      converted_booking_id INTEGER,
+      created_at TEXT DEFAULT (datetime('now'))
+    )`,
+    `CREATE TABLE IF NOT EXISTS activity_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      booking_id INTEGER,
+      action TEXT NOT NULL,
+      description TEXT NOT NULL,
+      meta TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    )`,
+    `CREATE TABLE IF NOT EXISTS booking_crew (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      booking_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      role TEXT NOT NULL,
+      phone TEXT,
+      rate REAL DEFAULT 0
+    )`,
+    `CREATE TABLE IF NOT EXISTS fixed_costs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      amount REAL NOT NULL,
+      category TEXT NOT NULL,
+      frequency TEXT DEFAULT 'monthly',
+      active INTEGER DEFAULT 1,
+      notes TEXT,
+      vat_on_top INTEGER DEFAULT 0
+    )`,
+    `CREATE TABLE IF NOT EXISTS capital_expenses (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      date TEXT NOT NULL,
+      category TEXT NOT NULL,
+      description TEXT NOT NULL,
+      amount REAL NOT NULL,
+      vendor TEXT,
+      notes TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    )`,
+    `CREATE TABLE IF NOT EXISTS historical_sales (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      year INTEGER NOT NULL,
+      month INTEGER NOT NULL,
+      revenue REAL NOT NULL DEFAULT 0,
+      shoot_count INTEGER DEFAULT 0,
+      notes TEXT,
+      UNIQUE(year, month)
+    )`,
+    `CREATE TABLE IF NOT EXISTS historical_shoots (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      shoot_date TEXT NOT NULL,
+      client_name TEXT NOT NULL,
+      revenue REAL DEFAULT 0,
+      notes TEXT,
+      paid INTEGER DEFAULT 1,
+      amount_billed REAL DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now'))
+    )`,
+    `CREATE TABLE IF NOT EXISTS utility_bills (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      year INTEGER NOT NULL,
+      month INTEGER NOT NULL,
+      account TEXT NOT NULL,
+      account_label TEXT,
+      amount REAL NOT NULL,
+      kwh REAL,
+      reference TEXT,
+      notes TEXT
+    )`,
+    `CREATE TABLE IF NOT EXISTS booking_requests (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      company TEXT,
+      phone TEXT NOT NULL,
+      email TEXT,
+      preferred_date TEXT,
+      shoot_type TEXT,
+      studio_rate TEXT,
+      message TEXT,
+      status TEXT DEFAULT 'new',
+      created_at TEXT DEFAULT (datetime('now'))
+    )`,
+    `CREATE TABLE IF NOT EXISTS booking_days (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      booking_id INTEGER NOT NULL,
+      date TEXT NOT NULL,
+      day_type TEXT NOT NULL DEFAULT 'shoot',
+      studio_rate TEXT NOT NULL DEFAULT 'fullday',
+      hours INTEGER DEFAULT 1,
+      subtotal REAL NOT NULL DEFAULT 0
+    )`,
+    `CREATE TABLE IF NOT EXISTS equipment_maintenance (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      equipment_id INTEGER,
+      equipment_name TEXT NOT NULL,
+      type TEXT NOT NULL,
+      description TEXT,
+      cost REAL DEFAULT 0,
+      date TEXT NOT NULL,
+      next_service TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    )`,
+  ];
+  for (const sql of newTables) {
+    try { db.exec(sql); } catch { /* table already exists */ }
+  }
+
 
   const count = (db.prepare('SELECT COUNT(*) as c FROM equipment').get() as { c: number }).c;
   if (count === 0) {
