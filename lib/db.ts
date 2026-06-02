@@ -5,20 +5,37 @@ import fs from 'fs';
 const DB_PATH = path.join(process.cwd(), 'data', 'dogzilla.db');
 
 let db: Database.Database | undefined;
+let dbOpenTime = 0;
+let dbOpenSize = 0;
 
 // Called by restore endpoint to force re-open after replacing the DB file
 export function _resetDb() {
   try { if (db) db.close(); } catch { /* ignore */ }
   db = undefined;
+  dbOpenTime = 0;
+  dbOpenSize = 0;
 }
 
 export function getDb(): Database.Database {
-  if (!db || !db.open) {
+  // Auto-detect if file was replaced (Railway volume mount or restore)
+  if (db && (db as Database.Database).open && fs.existsSync(DB_PATH)) {
+    try {
+      const stat = fs.statSync(DB_PATH);
+      if (stat.size !== dbOpenSize || stat.mtimeMs !== dbOpenTime) {
+        try { (db as Database.Database).close(); } catch { }
+        db = undefined;
+      }
+    } catch { }
+  }
+
+  if (!db || !(db as Database.Database).open) {
     const dir = path.dirname(DB_PATH);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     db = new Database(DB_PATH);
     db.pragma('journal_mode = WAL');
     db.pragma('foreign_keys = ON');
+    // Record file stats so we can detect if file is replaced later
+    try { const s = fs.statSync(DB_PATH); dbOpenSize = s.size; dbOpenTime = s.mtimeMs; } catch { }
     initSchema(db);
   }
   return db;
