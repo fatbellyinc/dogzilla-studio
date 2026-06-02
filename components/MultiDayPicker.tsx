@@ -20,12 +20,16 @@ interface Props {
   pencilDates?: string[];
 }
 
+function toLocalDateString(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 function datesBetween(start: string, end: string): string[] {
   const dates: string[] = [];
   const cur = new Date(start + 'T00:00');
   const last = new Date(end + 'T00:00');
   while (cur <= last) {
-    dates.push(cur.toISOString().slice(0, 10));
+    dates.push(toLocalDateString(cur));
     cur.setDate(cur.getDate() + 1);
   }
   return dates;

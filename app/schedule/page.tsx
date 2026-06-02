@@ -37,8 +37,12 @@ export default function SchedulePage() {
     ]).then(([a, b]) => setBookings([...a, ...b]));
   }, [monthStr, monthStr2]);
 
+  function toLocalDateString(d: Date): string {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+
   function bookingsForDay(date: Date) {
-    const ds = date.toISOString().slice(0, 10);
+    const ds = toLocalDateString(date);
     return bookings.filter(b => b.booking_date === ds && b.status !== 'cancelled');
   }
 
@@ -62,7 +66,7 @@ export default function SchedulePage() {
       {/* Week header */}
       <div className="grid grid-cols-7 gap-2 mb-2">
         {weekDays.map((d, i) => {
-          const isToday = d.toISOString().slice(0, 10) === today.toISOString().slice(0, 10);
+          const isToday = toLocalDateString(d) === toLocalDateString(today);
           const dayBookings = bookingsForDay(d);
           return (
             <div key={i} className={`text-center p-2 rounded-lg ${isToday ? 'bg-[#E32726]/20 border border-[#E32726]/40' : 'bg-[#1a1a1a] border border-[#2a2a2a]'}`}>
@@ -120,7 +124,7 @@ export default function SchedulePage() {
         {weekDays.map(d => {
           const dayBookings = bookingsForDay(d);
           if (!dayBookings.length) return null;
-          const isToday = d.toISOString().slice(0, 10) === today.toISOString().slice(0, 10);
+          const isToday = toLocalDateString(d) === toLocalDateString(today);
           return (
             <div key={d.toISOString()} className="border-b border-[#2a2a2a] last:border-0">
               <div className={`px-4 py-2 text-xs font-semibold ${isToday ? 'text-[#E32726]' : 'text-white/40'}`}>

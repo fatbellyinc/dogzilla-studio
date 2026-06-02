@@ -42,7 +42,7 @@ function RecurringPanel({ recurrence, recurrenceEnd, startDate, onChange }: {
       else if (freq === 'monthly') cur.setMonth(cur.getMonth() + 1);
       else if (freq === 'quarterly') cur.setMonth(cur.getMonth() + 3);
       if (cur > endDate) break;
-      dates.push(cur.toISOString().slice(0, 10));
+      dates.push(`${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}-${String(cur.getDate()).padStart(2, '0')}`);
     }
     return dates;
   }

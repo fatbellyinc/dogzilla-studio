@@ -83,7 +83,7 @@ export default function CalendarPicker({ value, onChange, label, placeholder = '
               if (!day) return <div key={i} />;
               const ds = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
               const isSelected = ds === value;
-              const isToday = ds === today.toISOString().slice(0, 10);
+              const isToday = ds === `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
               const isBooked = bookedDates.includes(ds);
               const isPencil = pencilDates.includes(ds);
               const isBlockout = blockoutDates.includes(ds);
