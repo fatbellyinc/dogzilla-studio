@@ -37,6 +37,7 @@ export function getDb(): Database.Database {
     // Record file stats so we can detect if file is replaced later
     try { const s = fs.statSync(DB_PATH); dbOpenSize = s.size; dbOpenTime = s.mtimeMs; } catch { }
     initSchema(db);
+    seedHistoricalData(db);
   }
   return db;
 }
@@ -615,4 +616,30 @@ function seedEquipment(db: Database.Database) {
   ];
 
   for (const item of items) ins.run(...item);
+}
+
+function seedHistoricalData(db: Database.Database) {
+  // Only seed if no historical data exists yet
+  const existing = (db.prepare('SELECT COUNT(*) as c FROM historical_sales').get() as { c: number }).c;
+  if (existing > 0) return;
+
+  const upsert = db.prepare(`INSERT OR IGNORE INTO historical_sales (year,month,revenue,shoot_count,notes) VALUES (?,?,?,?,?)`);
+  const sales: [number,number,number,number,string][] = [
+    [2023,11,0,0,'Lease started'],[2023,12,0,0,'First month'],
+    [2024,1,0,0,''],[2024,2,53300,1,'Unravel MV'],[2024,3,98800,2,''],[2024,4,225700,7,''],
+    [2024,5,213600,5,''],[2024,6,108100,2,''],[2024,7,182200,1,''],[2024,8,53000,2,''],
+    [2024,9,0,0,''],[2024,10,50000,1,''],[2024,11,335820,8,''],[2024,12,12500,1,''],
+    [2025,1,0,0,''],[2025,2,140000,2,''],[2025,3,321800,3,''],[2025,4,326500,5,''],
+    [2025,5,295500,5,''],[2025,6,348500,4,''],[2025,7,297900,5,''],[2025,8,568950,6,''],
+    [2025,9,663157,6,''],[2025,10,292100,4,''],[2025,11,179300,3,''],[2025,12,134500,3,''],
+    [2026,1,0,0,''],[2026,2,198436,3,''],[2026,3,404300,6,''],[2026,4,183700,3,''],[2026,5,366650,7,''],
+  ];
+  const tx = db.transaction(() => { for (const r of sales) upsert.run(...r); });
+  tx();
+
+  // Rent fixed cost
+  const hasRent = (db.prepare("SELECT COUNT(*) as c FROM fixed_costs WHERE name='Studio Space Rent'").get() as {c:number}).c;
+  if (!hasRent) {
+    db.prepare("INSERT INTO fixed_costs (name,amount,category,frequency,active) VALUES ('Studio Space Rent',90000,'rent','monthly',1)").run();
+  }
 }
