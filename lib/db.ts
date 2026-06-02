@@ -4,10 +4,16 @@ import fs from 'fs';
 
 const DB_PATH = path.join(process.cwd(), 'data', 'dogzilla.db');
 
-let db: Database.Database;
+let db: Database.Database | undefined;
+
+// Called by restore endpoint to force re-open after replacing the DB file
+export function _resetDb() {
+  try { if (db) db.close(); } catch { /* ignore */ }
+  db = undefined;
+}
 
 export function getDb(): Database.Database {
-  if (!db) {
+  if (!db || !db.open) {
     const dir = path.dirname(DB_PATH);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     db = new Database(DB_PATH);

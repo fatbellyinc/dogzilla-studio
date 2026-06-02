@@ -24,9 +24,23 @@ export async function POST(req: NextRequest) {
 
     const buf = Buffer.from(await file.arrayBuffer());
     const dbPath = path.join(dataDir, 'dogzilla.db');
+    const walPath = dbPath + '-wal';
+    const shmPath = dbPath + '-shm';
+
+    // Delete WAL and SHM files FIRST so they don't corrupt the new database
+    try { require('fs').unlinkSync(walPath); } catch { /* ok if not exists */ }
+    try { require('fs').unlinkSync(shmPath); } catch { /* ok if not exists */ }
+
+    // Write the new database
     writeFileSync(dbPath, buf);
 
-    return NextResponse.json({ ok: true, size: buf.length, message: 'Database restored. Restart the service in Railway to apply.' });
+    // Force the db singleton to reset on next request
+    try {
+      const dbModule = require('@/lib/db');
+      if (dbModule._resetDb) dbModule._resetDb();
+    } catch { /* ignore */ }
+
+    return NextResponse.json({ ok: true, size: buf.length, message: 'Database restored + WAL cleared. Restart the Railway service now.' });
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }
