@@ -22,9 +22,9 @@ export async function GET(req: NextRequest) {
       // Revenue from historical_sales table
       const hist = db.prepare('SELECT revenue FROM historical_sales WHERE year=? AND month=?').get(year, month) as { revenue: number } | undefined;
 
-      // Revenue from actual COMPLETED bookings only
+      // Revenue from actual COMPLETED bookings — include overtime charged to client
       const appRevRow = db.prepare(`
-        SELECT COALESCE(SUM(total),0) as rev FROM bookings
+        SELECT COALESCE(SUM(total + COALESCE(overtime_amount, 0)), 0) as rev FROM bookings
         WHERE strftime('%Y-%m', booking_date) = ? AND status = 'completed'
       `).get(mStr) as { rev: number };
 
@@ -47,6 +47,7 @@ export async function GET(req: NextRequest) {
         JOIN bookings b ON b.id=bc.booking_id
         WHERE strftime('%Y-%m', b.booking_date) = ? AND b.status = 'completed'
           AND NOT (bc.type = 'personnel' AND bc.description = 'Studio Crew')
+          AND bc.type != 'overtime'
           AND NOT (
             bc.type = 'electricity'
             AND EXISTS (
