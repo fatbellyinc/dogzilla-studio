@@ -91,20 +91,8 @@ function MonthlySalesTab() {
         }
       }
 
-      // Ensure current year always included even if no historical data
-      if (!byYear[year]) {
-        byYear[year] = { year, total: 0, shoots: 0, source: 'live' };
-      }
-
-      setYearSummaries(prev => {
-        const summaries = Object.values(byYear).sort((a, b) => b.year - a.year);
-        // Preserve any monthly-computed total that was already synced for current year
-        const existing = prev.find(p => p.year === year);
-        if (existing && existing.source === 'live') {
-          return summaries.map(s => s.year === year ? existing : s);
-        }
-        return summaries;
-      });
+      // Always use the fully merged result — live + historical combined
+      setYearSummaries(Object.values(byYear).sort((a, b) => b.year - a.year));
     });
   }, [year]);
 
