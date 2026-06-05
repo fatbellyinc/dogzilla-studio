@@ -2,9 +2,14 @@
 import { use, useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { formatPHP, formatDate, fmt24, calcOT, OT_RATE } from '@/lib/utils';
-import { Booking, BookingEquipment, Quotation, STUDIO_RATES, VAT_RATE, PAYMENT_ACCOUNTS } from '@/lib/types';
+import { Booking, BookingEquipment, Quotation, BookingDay, STUDIO_RATES, VAT_RATE, PAYMENT_ACCOUNTS } from '@/lib/types';
 
-interface BookingDetail { booking: Booking; equipment: BookingEquipment[]; quotation: Quotation | null; }
+interface BookingDetail {
+  booking: Booking;
+  equipment: BookingEquipment[];
+  quotation: Quotation | null;
+  bookingDays: BookingDay[];
+}
 
 function DocView({ bookingId }: { bookingId: string }) {
   const params = useSearchParams();
@@ -17,7 +22,7 @@ function DocView({ bookingId }: { bookingId: string }) {
 
   if (!data) return <div className="p-8 text-gray-500">Loading...</div>;
 
-  const { booking, equipment, quotation } = data;
+  const { booking, equipment, quotation, bookingDays } = data;
   const studioRate = STUDIO_RATES[booking.studio_rate];
   const subtotalExVAT = booking.total;
   const vatExempt = !!booking.vat_exempt;
@@ -25,24 +30,69 @@ function DocView({ bookingId }: { bookingId: string }) {
   const totalIncVAT = subtotalExVAT + vatAmount;
   const depositAmount = booking.deposit_amount;
   const balanceDue = subtotalExVAT - depositAmount;
+  const isMultiDay = bookingDays && bookingDays.length > 1;
 
-  const lines: { code: string; desc: string; qty: number; unit: number; total: number }[] = [
-    {
+  type Line = { code: string; desc: string; qty: number; unit: number; total: number; bold?: boolean; indent?: boolean; comp?: boolean; disc?: number };
+  const lines: Line[] = [];
+
+  if (isMultiDay) {
+    // Multi-day: show each day as a separate studio line
+    bookingDays.forEach((d, i) => {
+      const dayRate = STUDIO_RATES[d.studio_rate as keyof typeof STUDIO_RATES];
+      const dayLabel = d.day_type === 'setup' ? '🔧 Set-Up Day' : '🎬 Shoot Day';
+      const dateStr = new Date(d.date + 'T00:00').toLocaleDateString('en-PH', { weekday: 'short', month: 'short', day: 'numeric' });
+      lines.push({
+        code: d.studio_rate.toUpperCase(),
+        desc: `Day ${i + 1} — ${dayLabel} · ${dateStr} · ${dayRate?.label || d.studio_rate}`,
+        qty: 1,
+        unit: d.subtotal,
+        total: d.subtotal,
+        bold: true,
+      });
+    });
+  } else {
+    // Single day
+    lines.push({
       code: booking.studio_rate.toUpperCase(),
       desc: `Studio — ${studioRate.label}${booking.studio_rate === 'hourly' ? ` (${booking.hours} hrs × ${formatPHP(studioRate.price)}/hr)` : ''}`,
       qty: 1,
       unit: booking.subtotal,
       total: booking.subtotal,
-    },
-    ...equipment.map(e => ({
-      code: '',
-      desc: e.name,
-      qty: e.quantity,
-      unit: e.rate,
-      total: e.is_complimentary ? 0 : e.rate * e.quantity,
-    })),
-  ];
+      bold: true,
+    });
+  }
 
+  // Equipment items
+  if (equipment.length > 0) {
+    equipment.forEach(e => {
+      const comp = !!e.is_complimentary;
+      const disc = e.discount_pct || 0;
+      const lineTotal = comp ? 0 : e.rate * e.quantity * (1 - disc / 100);
+      lines.push({
+        code: '',
+        desc: e.name,
+        qty: e.quantity,
+        unit: e.rate,
+        total: lineTotal,
+        indent: true,
+        comp,
+        disc: disc > 0 ? disc : undefined,
+      });
+    });
+  }
+
+  // Discount on subtotal
+  if (booking.discount_amount > 0) {
+    lines.push({
+      code: 'DISC',
+      desc: `Discount ${booking.discount_type === 'percent' ? `(${booking.discount_value}%)` : '(fixed)'}`,
+      qty: 1,
+      unit: -booking.discount_amount,
+      total: -booking.discount_amount,
+    });
+  }
+
+  // OT
   const otCalc = calcOT(booking.studio_rate, booking.call_time, booking.wrap_time);
   const otHrs = booking.overtime_hours || otCalc.otHrs;
   const otAmount = booking.overtime_amount || otCalc.otAmount;
@@ -58,6 +108,7 @@ function DocView({ bookingId }: { bookingId: string }) {
 
   return (
     <div className="min-h-screen bg-white p-6 md:p-10 max-w-[794px] mx-auto" style={{ color: '#111', fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '13px' }}>
+
       {/* Header */}
       <div className="flex items-start justify-between mb-6 pb-5" style={{ borderBottom: '3px solid #E32726' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
@@ -100,7 +151,11 @@ function DocView({ bookingId }: { bookingId: string }) {
         </div>
         <div>
           <div style={{ fontSize: '10px', fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '6px' }}>Shoot Details</div>
-          <div style={{ fontWeight: 700, fontSize: '15px' }}>{formatDate(booking.booking_date)}{booking.end_date && booking.end_date !== booking.booking_date ? ` – ${formatDate(booking.end_date)}` : ''}</div>
+          <div style={{ fontWeight: 700, fontSize: '15px' }}>
+            {isMultiDay
+              ? `${formatDate(booking.booking_date)} – ${formatDate(booking.end_date || booking.booking_date)} (${bookingDays.length} days)`
+              : formatDate(booking.booking_date)}
+          </div>
           <div style={{ color: '#555', marginTop: '2px' }}>Dogzilla Studio — Cyclorama</div>
           {booking.call_time && (
             <div style={{ color: '#555', fontSize: '12px', marginTop: '3px' }}>
@@ -114,31 +169,55 @@ function DocView({ bookingId }: { bookingId: string }) {
               <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600, background: '#fee2e2', color: '#991b1b' }}>{booking.shoot_type}</span>
             </div>
           )}
-          <div style={{ marginTop: '4px' }}>
-            <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600, background: booking.status === 'confirmed' ? '#dcfce7' : '#fef9c3', color: booking.status === 'confirmed' ? '#166534' : '#854d0e' }}>
-              {booking.status.toUpperCase()}
-            </span>
-          </div>
+          {isMultiDay && (
+            <div style={{ marginTop: '6px', fontSize: '11px', color: '#555' }}>
+              {bookingDays.map((d, i) => (
+                <div key={d.id} style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '2px' }}>
+                  <span style={{ fontWeight: 700, color: '#111' }}>Day {i + 1}</span>
+                  <span style={{ color: d.day_type === 'setup' ? '#b45309' : '#1d4ed8', fontWeight: 600, fontSize: '10px', background: d.day_type === 'setup' ? '#fef3c7' : '#dbeafe', padding: '1px 5px', borderRadius: '3px' }}>
+                    {d.day_type === 'setup' ? '🔧 SET-UP' : '🎬 SHOOT'}
+                  </span>
+                  <span style={{ color: '#888' }}>{new Date(d.date + 'T00:00').toLocaleDateString('en-PH', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Line items */}
+      {/* Line items table */}
       <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '16px' }}>
         <thead>
           <tr style={{ background: '#0f0f0f', color: 'white' }}>
             <th style={{ textAlign: 'left', padding: '8px 10px', fontSize: '11px', fontWeight: 700 }}>Description</th>
-            <th style={{ textAlign: 'center', padding: '8px 10px', fontSize: '11px', fontWeight: 700, width: '50px' }}>Qty</th>
-            <th style={{ textAlign: 'right', padding: '8px 10px', fontSize: '11px', fontWeight: 700, width: '110px' }}>Unit Price</th>
-            <th style={{ textAlign: 'right', padding: '8px 10px', fontSize: '11px', fontWeight: 700, width: '110px' }}>Amount</th>
+            <th style={{ textAlign: 'center', padding: '8px 10px', fontSize: '11px', fontWeight: 700, width: '40px' }}>Qty</th>
+            <th style={{ textAlign: 'right', padding: '8px 10px', fontSize: '11px', fontWeight: 700, width: '90px' }}>Unit Price</th>
+            <th style={{ textAlign: 'right', padding: '8px 10px', fontSize: '11px', fontWeight: 700, width: '60px' }}>Disc.</th>
+            <th style={{ textAlign: 'right', padding: '8px 10px', fontSize: '11px', fontWeight: 700, width: '100px' }}>Amount</th>
           </tr>
         </thead>
         <tbody>
           {lines.map((line, i) => (
-            <tr key={i} style={{ borderBottom: '1px solid #e5e5e5', background: i % 2 === 0 ? '#fff' : '#fafafa' }}>
-              <td style={{ padding: '8px 10px' }}><div>{line.desc}</div></td>
+            <tr key={i} style={{
+              borderBottom: '1px solid #e5e5e5',
+              background: line.bold ? '#f8f8f8' : i % 2 === 0 ? '#fff' : '#fafafa',
+            }}>
+              <td style={{ padding: '8px 10px', paddingLeft: line.indent ? '22px' : '10px' }}>
+                <div style={{ fontWeight: line.bold ? 700 : 400 }}>{line.desc}</div>
+                {line.comp && (
+                  <span style={{ fontSize: '10px', background: '#dcfce7', color: '#166534', padding: '1px 5px', borderRadius: '3px', fontWeight: 700 }}>COMPLIMENTARY</span>
+                )}
+              </td>
               <td style={{ padding: '8px 10px', textAlign: 'center' }}>{line.qty}</td>
-              <td style={{ padding: '8px 10px', textAlign: 'right' }}>{formatPHP(line.unit)}</td>
-              <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 600 }}>{formatPHP(line.total)}</td>
+              <td style={{ padding: '8px 10px', textAlign: 'right' }}>
+                {line.comp ? '—' : formatPHP(line.unit)}
+              </td>
+              <td style={{ padding: '8px 10px', textAlign: 'right', color: '#e07b00' }}>
+                {line.comp ? '100%' : line.disc ? `${line.disc}%` : '—'}
+              </td>
+              <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: line.bold ? 700 : 600, color: line.total < 0 ? '#166534' : '#111' }}>
+                {line.comp ? <span style={{ color: '#166534' }}>₱0</span> : formatPHP(line.total)}
+              </td>
             </tr>
           ))}
         </tbody>
@@ -152,22 +231,33 @@ function DocView({ bookingId }: { bookingId: string }) {
               <td style={{ padding: '4px 10px', color: '#555' }}>Subtotal (VAT-exclusive)</td>
               <td style={{ padding: '4px 10px', textAlign: 'right', fontWeight: 500 }}>{formatPHP(subtotalExVAT)}</td>
             </tr>
-            <tr>
-              <td style={{ padding: '4px 10px', color: '#555' }}>VAT 12% (TRAIN Law, RA 10963)</td>
-              <td style={{ padding: '4px 10px', textAlign: 'right' }}>{formatPHP(vatAmount)}</td>
-            </tr>
+            {vatExempt ? (
+              <tr>
+                <td style={{ padding: '4px 10px', color: '#1d4ed8' }}>VAT Exempt</td>
+                <td style={{ padding: '4px 10px', textAlign: 'right', color: '#1d4ed8' }}>₱0</td>
+              </tr>
+            ) : (
+              <tr>
+                <td style={{ padding: '4px 10px', color: '#555' }}>VAT 12% (TRAIN Law, RA 10963)</td>
+                <td style={{ padding: '4px 10px', textAlign: 'right' }}>{formatPHP(vatAmount)}</td>
+              </tr>
+            )}
             <tr style={{ borderTop: '2px solid #E32726' }}>
               <td style={{ padding: '8px 10px', fontWeight: 700, fontSize: '15px' }}>TOTAL (VAT-inclusive)</td>
               <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 900, fontSize: '15px', color: '#E32726' }}>{formatPHP(totalIncVAT)}</td>
             </tr>
-            <tr style={{ borderTop: '1px solid #e5e5e5' }}>
-              <td style={{ padding: '4px 10px', color: '#e07b00', fontWeight: 600 }}>50% Deposit (non-refundable)</td>
-              <td style={{ padding: '4px 10px', textAlign: 'right', color: '#e07b00', fontWeight: 600 }}>{formatPHP(depositAmount)}</td>
-            </tr>
-            <tr>
-              <td style={{ padding: '4px 10px', color: '#555' }}>Balance due on shoot day</td>
-              <td style={{ padding: '4px 10px', textAlign: 'right' }}>{formatPHP(balanceDue)}</td>
-            </tr>
+            {!booking.no_deposit && (
+              <>
+                <tr style={{ borderTop: '1px solid #e5e5e5' }}>
+                  <td style={{ padding: '4px 10px', color: '#e07b00', fontWeight: 600 }}>50% Deposit (non-refundable)</td>
+                  <td style={{ padding: '4px 10px', textAlign: 'right', color: '#e07b00', fontWeight: 600 }}>{formatPHP(depositAmount)}</td>
+                </tr>
+                <tr>
+                  <td style={{ padding: '4px 10px', color: '#555' }}>Balance due on shoot day</td>
+                  <td style={{ padding: '4px 10px', textAlign: 'right' }}>{formatPHP(balanceDue)}</td>
+                </tr>
+              </>
+            )}
           </tbody>
         </table>
       </div>
@@ -203,7 +293,7 @@ function DocView({ bookingId }: { bookingId: string }) {
             '50% non-refundable deposit required to confirm booking. Balance settled after shoot.',
             'Cancellation: 1-week notice required. Rescheduling: postponement fee applies within 1 month of original date.',
             'Equipment list must be submitted before production day.',
-            'Client supplies generator. No-generator shoots: +₱600/hr electricity charge.',
+            'Client supplies generator. No-generator shoots: +₱750/hr electricity charge.',
             'Overtime billed at ₱3,500/hr. Egress begins at wrap; filming during egress billed as studio time.',
             'Clients are billed for any damage to facility or equipment during their session.',
             'Multi-day bookings: hours are fixed per date, non-transferable across days.',
@@ -249,5 +339,5 @@ function DocView({ bookingId }: { bookingId: string }) {
 
 export default function QuotationByBookingPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  return <Suspense><DocView bookingId={id} /></Suspense>;
+  return <Suspense fallback={<div className="p-8 text-gray-500">Loading...</div>}><DocView bookingId={id} /></Suspense>;
 }
