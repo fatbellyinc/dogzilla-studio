@@ -158,7 +158,7 @@ export interface Quotation {
 }
 
 export const STUDIO_RATES = {
-  setup: { label: 'Set-Up Day', price: 20000, description: 'Up to 14 hrs · Prep only, no filming · No AC · Staff fee ₱1,500/pax' },
+  setup: { label: 'Set-Up Day', price: 22500, description: 'Up to 14 hrs · Prep only, no filming · No AC · Staff fee ₱1,500/pax' },
   fullday: { label: 'Full Day Shoot', price: 45000, description: '14-hr shoot · +1hr free ingress/egress · Air conditioned · OT ₱3,500/hr' },
   hourly: { label: 'Hourly Rate', price: 3500, description: 'Per hour · Min 8 hrs · Staff fee ₱4,500 (3 pax)' },
   event: { label: 'Event / Warehouse', price: 45000, description: 'Main warehouse · Ingress & egress incl. · OT ₱3,500/hr · Client provides generator' },
