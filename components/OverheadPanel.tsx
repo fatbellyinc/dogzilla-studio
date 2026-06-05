@@ -1,45 +1,73 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { formatPHP } from '@/lib/utils';
 import { BookingCost } from '@/lib/types';
-import { PERSONNEL_RATES, AC_PRESETS, ELECTRICITY_RATE, ELECTRICITY_RATE_STUDIO, type PersonnelType, type ACArea } from '@/lib/electricity';
+import { PERSONNEL_RATES, AC_PRESETS, ELECTRICITY_RATE_STUDIO, type PersonnelType, type ACArea } from '@/lib/electricity';
 
 interface Props {
   bookingId: number;
   totalRevenue: number;
   hours?: number;
+  callTime?: string | null;
+  wrapTime?: string | null;
 }
 
 interface WattageItem { name: string; quantity: number; unit_wattage: number; total_wattage: number; category: string; }
 interface WattageData { items: WattageItem[]; totalW: number; }
 
-export default function OverheadPanel({ bookingId, totalRevenue, hours = 10 }: Props) {
+/** Parse "HH:MM" → decimal hours from midnight */
+function parseTime(t: string): number {
+  const [h, m] = t.split(':').map(Number);
+  return h + (m || 0) / 60;
+}
+
+/** Compute shoot duration in hours from call/wrap strings, returns null if either missing */
+function shootDuration(callTime?: string | null, wrapTime?: string | null): number | null {
+  if (!callTime || !wrapTime) return null;
+  const diff = parseTime(wrapTime) - parseTime(callTime);
+  return diff > 0 ? Math.round(diff * 10) / 10 : null;
+}
+
+export default function OverheadPanel({ bookingId, totalRevenue, hours = 10, callTime, wrapTime }: Props) {
   const [costs, setCosts] = useState<BookingCost[]>([]);
   const [wattage, setWattage] = useState<WattageData>({ items: [], totalW: 0 });
   const [tab, setTab] = useState<'personnel' | 'electricity' | 'custom'>('personnel');
+
+  // Inline edit state
+  const [editingCostId, setEditingCostId] = useState<number | null>(null);
+  const [editForm, setEditForm] = useState({ description: '', quantity: '1', unit_cost: '' });
 
   // Personnel form
   const [personnel, setPersonnel] = useState<Record<PersonnelType, number>>({
     admin: 1, crew: 2, maintenance: 1, parking: 1,
   });
 
-  // Electricity form — studio_full is the second studio option (all 5 ACs)
+  // Derive actual shoot hours from times (fallback to prop)
+  const actualHours = shootDuration(callTime, wrapTime) ?? hours;
+
+  // Electricity form — auto-fill from actual shoot hours when times are known
   const [elecHours, setElecHours] = useState({
-    studio: hours, studio_full: 0, holding: 0, admin: hours,
+    studio: actualHours, studio_full: 0, holding: 0, admin: actualHours,
   });
+
+  // Re-sync elecHours when call/wrap times change
+  useEffect(() => {
+    const h = shootDuration(callTime, wrapTime) ?? hours;
+    setElecHours({ studio: h, studio_full: 0, holding: 0, admin: h });
+  }, [callTime, wrapTime, hours]);
 
   // Custom cost
   const [custom, setCustom] = useState({ description: '', quantity: '1', unit_cost: '' });
 
-  const load = () => {
+  const load = useCallback(() => {
     fetch(`/api/booking-costs?booking_id=${bookingId}`).then(r => r.json()).then(setCosts);
     fetch(`/api/wattage?booking_id=${bookingId}`).then(r => r.json()).then(setWattage);
-  };
-  useEffect(() => { load(); }, [bookingId]);
+  }, [bookingId]);
 
-  // Compute equipment electricity cost preview
+  useEffect(() => { load(); }, [load]);
+
   const equipKW = wattage.totalW / 1000;
-  const equipElecCostPerHour = equipKW * ELECTRICITY_RATE;
+  const equipElecCostPerHour = equipKW * ELECTRICITY_RATE_STUDIO;
 
   const totalCosts = costs.reduce((s, c) => s + c.total_cost, 0);
   const profit = totalRevenue - totalCosts;
@@ -65,7 +93,6 @@ export default function OverheadPanel({ bookingId, totalRevenue, hours = 10 }: P
       holding: elecHours.holding,
     };
 
-    // AC costs — each area uses its own rate
     for (const [area, hrs] of Object.entries(areas) as [ACArea, number][]) {
       if (!hrs || hrs <= 0) continue;
       const preset = AC_PRESETS[area];
@@ -80,14 +107,13 @@ export default function OverheadPanel({ bookingId, totalRevenue, hours = 10 }: P
       });
     }
 
-    // Equipment electricity — studio rate (lights, cameras all in studio)
-    if (wattage.totalW > 0 && hours > 0) {
-      const eqCost = equipKW * hours * ELECTRICITY_RATE_STUDIO;
+    if (wattage.totalW > 0 && actualHours > 0) {
+      const eqCost = equipKW * actualHours * ELECTRICITY_RATE_STUDIO;
       await fetch('/api/booking-costs', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           booking_id: bookingId, type: 'electricity',
-          description: `Equipment load (${wattage.totalW >= 1000 ? (wattage.totalW/1000).toFixed(2)+'kW' : wattage.totalW+'W'}) — ${hours}hrs × ₱${ELECTRICITY_RATE_STUDIO}/kWh`,
+          description: `Equipment load (${wattage.totalW >= 1000 ? (wattage.totalW / 1000).toFixed(2) + 'kW' : wattage.totalW + 'W'}) — ${actualHours}hrs × ₱${ELECTRICITY_RATE_STUDIO}/kWh`,
           quantity: 1, unit_cost: eqCost,
         }),
       });
@@ -111,10 +137,22 @@ export default function OverheadPanel({ bookingId, totalRevenue, hours = 10 }: P
     load();
   }
 
+  function startEdit(cost: BookingCost) {
+    setEditingCostId(cost.id);
+    setEditForm({ description: cost.description, quantity: String(cost.quantity), unit_cost: String(cost.unit_cost) });
+  }
+
+  async function saveEdit(id: number) {
+    await fetch('/api/booking-costs', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, description: editForm.description, quantity: Number(editForm.quantity) || 1, unit_cost: Number(editForm.unit_cost) }),
+    });
+    setEditingCostId(null);
+    load();
+  }
+
   const ic = 'bg-[#0f0f0f] border border-[#2a2a2a] rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:border-[#E32726]';
 
-  // Electricity preview
-  // AC electricity preview — each area uses its own rate
   const elecPreview = Object.entries({
     studio: elecHours.studio,
     studio_full: elecHours.studio_full,
@@ -126,6 +164,8 @@ export default function OverheadPanel({ bookingId, totalRevenue, hours = 10 }: P
   }, 0);
 
   const personnelPreview = (Object.entries(personnel) as [PersonnelType, number][]).reduce((sum, [type, qty]) => sum + PERSONNEL_RATES[type].rate * qty, 0);
+
+  const timesKnown = !!(callTime && wrapTime);
 
   return (
     <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4">
@@ -151,15 +191,57 @@ export default function OverheadPanel({ bookingId, totalRevenue, hours = 10 }: P
       {costs.length > 0 && (
         <div className="space-y-1 mb-4">
           {costs.map(c => (
-            <div key={c.id} className="flex items-center justify-between bg-[#0f0f0f] rounded-lg px-3 py-2">
-              <div className="flex-1 min-w-0">
-                <div className="text-xs text-white truncate">{c.description}</div>
-                <div className="text-[10px] text-white/30">{c.type} · qty {c.quantity}</div>
-              </div>
-              <div className="flex items-center gap-2 ml-2 shrink-0">
-                <span className="text-xs text-yellow-400">{formatPHP(c.total_cost)}</span>
-                <button onClick={() => removeCost(c.id)} className="text-white/20 hover:text-red-400 text-xs transition-colors">✕</button>
-              </div>
+            <div key={c.id} className="bg-[#0f0f0f] rounded-lg px-3 py-2">
+              {editingCostId === c.id ? (
+                /* Inline edit form */
+                <div className="space-y-1.5">
+                  <input
+                    value={editForm.description}
+                    onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
+                    className="w-full bg-[#1a1a1a] border border-[#E32726]/50 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-[#E32726]"
+                  />
+                  <div className="flex gap-1.5">
+                    <div className="flex items-center gap-1 flex-1">
+                      <span className="text-[10px] text-white/30">Qty</span>
+                      <input
+                        type="number" min={1}
+                        value={editForm.quantity}
+                        onChange={e => setEditForm(f => ({ ...f, quantity: e.target.value }))}
+                        className="w-12 bg-[#1a1a1a] border border-[#2a2a2a] rounded px-1.5 py-1 text-xs text-white focus:outline-none focus:border-[#E32726]"
+                      />
+                    </div>
+                    <div className="flex items-center gap-1 flex-1">
+                      <span className="text-[10px] text-white/30">₱</span>
+                      <input
+                        type="number"
+                        value={editForm.unit_cost}
+                        onChange={e => setEditForm(f => ({ ...f, unit_cost: e.target.value }))}
+                        className="flex-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded px-1.5 py-1 text-xs text-[#E32726] font-semibold focus:outline-none focus:border-[#E32726]"
+                      />
+                    </div>
+                    <div className="flex gap-1">
+                      <button onClick={() => saveEdit(c.id)} className="bg-[#E32726] text-white text-[10px] px-2 py-1 rounded font-medium">✓</button>
+                      <button onClick={() => setEditingCostId(null)} className="bg-[#2a2a2a] text-white/60 text-[10px] px-2 py-1 rounded">✕</button>
+                    </div>
+                  </div>
+                  <div className="text-[10px] text-white/30">
+                    Total: {formatPHP((Number(editForm.quantity) || 1) * (Number(editForm.unit_cost) || 0))}
+                  </div>
+                </div>
+              ) : (
+                /* Normal row */
+                <div className="flex items-center justify-between">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs text-white truncate">{c.description}</div>
+                    <div className="text-[10px] text-white/30">{c.type}{c.quantity > 1 ? ` · qty ${c.quantity}` : ''}</div>
+                  </div>
+                  <div className="flex items-center gap-2 ml-2 shrink-0">
+                    <span className="text-xs text-yellow-400">{formatPHP(c.total_cost)}</span>
+                    <button onClick={() => startEdit(c)} className="text-white/20 hover:text-white/60 text-xs transition-colors" title="Edit">✏</button>
+                    <button onClick={() => removeCost(c.id)} className="text-white/20 hover:text-red-400 text-xs transition-colors" title="Delete">✕</button>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
           <div className="flex justify-between text-xs text-white/60 px-1 pt-1 border-t border-[#2a2a2a]">
@@ -206,6 +288,17 @@ export default function OverheadPanel({ bookingId, totalRevenue, hours = 10 }: P
 
       {tab === 'electricity' && (
         <div className="space-y-2">
+          {/* Time-based hours indicator */}
+          {timesKnown ? (
+            <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-2 text-[10px] text-green-400">
+              ⏱ Hours auto-calculated from call/wrap time: <strong>{actualHours}hrs</strong> ({callTime} → {wrapTime})
+            </div>
+          ) : (
+            <div className="bg-[#0f0f0f] border border-[#2a2a2a] rounded-lg p-2 text-[10px] text-white/30">
+              💡 Set call &amp; wrap time above to auto-fill electricity hours
+            </div>
+          )}
+
           {/* Equipment wattage from this booking */}
           {wattage.items.filter(i => i.total_wattage > 0).length > 0 && (
             <div className="bg-[#0f0f0f] rounded-lg p-2 border border-yellow-500/20">
@@ -221,7 +314,7 @@ export default function OverheadPanel({ bookingId, totalRevenue, hours = 10 }: P
                 <span>{wattage.totalW >= 1000 ? `${(wattage.totalW / 1000).toFixed(2)} kW` : `${wattage.totalW}W`}</span>
               </div>
               <div className="text-[10px] text-white/30 mt-0.5">
-                At {hours}hr shoot = {formatPHP(equipKW * hours * ELECTRICITY_RATE_STUDIO)} electricity (studio rate ₱{ELECTRICITY_RATE_STUDIO}/kWh)
+                At {actualHours}hr{timesKnown ? ' (from times)' : ''} = {formatPHP(equipKW * actualHours * ELECTRICITY_RATE_STUDIO)} equipment electricity
               </div>
             </div>
           )}
@@ -240,7 +333,7 @@ export default function OverheadPanel({ bookingId, totalRevenue, hours = 10 }: P
           <div className="text-[10px] text-white/40 uppercase tracking-wider mt-1">Aircon Units</div>
           {(Object.entries(AC_PRESETS) as [ACArea, typeof AC_PRESETS[ACArea]][]).map(([key, preset]) => (
             <div key={key} className="bg-[#0f0f0f] rounded-lg p-2">
-              <div className="flex justify-between items-center mb-1">
+              <div className="flex justify-between items-start mb-1">
                 <div>
                   <div className="text-xs text-white font-medium">{preset.label}</div>
                   <div className="text-[10px] text-white/30">
@@ -255,6 +348,12 @@ export default function OverheadPanel({ bookingId, totalRevenue, hours = 10 }: P
                   onChange={e => setElecHours(h => ({ ...h, [key]: Number(e.target.value) }))}
                   className="w-16 bg-[#1a1a1a] border border-[#2a2a2a] rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-[#E32726]" />
                 <span className="text-[10px] text-white/40">= {formatPHP(preset.kw * (elecHours[key] || 0) * preset.rate)}</span>
+                {timesKnown && (
+                  <button onClick={() => setElecHours(h => ({ ...h, [key]: actualHours }))}
+                    className="text-[10px] text-green-400/60 hover:text-green-400 border border-green-500/20 px-1.5 py-0.5 rounded transition-colors">
+                    ↺ {actualHours}h
+                  </button>
+                )}
               </div>
             </div>
           ))}
@@ -267,13 +366,13 @@ export default function OverheadPanel({ bookingId, totalRevenue, hours = 10 }: P
             </div>
             {wattage.totalW > 0 && (
               <div className="flex justify-between text-[10px] text-yellow-400/70">
-                <span>Equipment ({wattage.totalW >= 1000 ? `${(wattage.totalW/1000).toFixed(2)}kW` : `${wattage.totalW}W`} × {hours}hrs @ ₱{ELECTRICITY_RATE_STUDIO}/kWh)</span>
-                <span>{formatPHP(equipKW * hours * ELECTRICITY_RATE_STUDIO)}</span>
+                <span>Equipment ({wattage.totalW >= 1000 ? `${(wattage.totalW / 1000).toFixed(2)}kW` : `${wattage.totalW}W`} × {actualHours}hrs @ ₱{ELECTRICITY_RATE_STUDIO}/kWh)</span>
+                <span>{formatPHP(equipKW * actualHours * ELECTRICITY_RATE_STUDIO)}</span>
               </div>
             )}
             <div className="flex justify-between text-xs font-semibold text-white border-t border-[#2a2a2a] pt-1">
               <span>Total electricity</span>
-              <span className="text-yellow-400">{formatPHP(elecPreview + (equipKW * hours * ELECTRICITY_RATE_STUDIO))}</span>
+              <span className="text-yellow-400">{formatPHP(elecPreview + (equipKW * actualHours * ELECTRICITY_RATE_STUDIO))}</span>
             </div>
           </div>
           <button onClick={addElectricityCosts} className="w-full bg-[#E32726] text-white text-xs py-1.5 rounded font-medium">
