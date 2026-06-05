@@ -116,7 +116,7 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
     const h = Math.max(1, hrs);
     setAddonElecHours(h);
     const total = h * ELEC_RATE;
-    const name = `Electricity (${h}hrs × ₱${ELEC_RATE}/hr)`;
+    const name = `Electricity Charge`;
     setItems(prev => {
       const exists = prev.find(i => isElecItem(i));
       if (exists) return prev.map(i => isElecItem(i) ? { ...i, rate: total, name } : i);

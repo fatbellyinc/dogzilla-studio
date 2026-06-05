@@ -233,7 +233,7 @@ function NewBookingForm() {
       // Electricity is per-hour — quantity = hours, rate = 600/hr
       const isElec = addon.id === 'ADD_ELEC';
       const rate = isElec ? 750 * addonElecHours : addon.price;
-      const name = isElec ? `Electricity (${addonElecHours}hrs × ₱750/hr)` : addon.label;
+      const name = isElec ? `Electricity Charge` : addon.label;
       return [...prev, { key: addon.id, name, rate, quantity: 1, is_package: false }];
     });
   }
@@ -248,12 +248,12 @@ function NewBookingForm() {
       if (exists) {
         return prev.map(e =>
           e.key === 'ADD_ELEC'
-            ? { ...e, quantity: 1, rate: total, name: `Electricity (${h}hrs × ₱750/hr)` }
+            ? { ...e, quantity: 1, rate: total, name: `Electricity Charge` }
             : e
         );
       }
       // Auto-add
-      return [...prev, { key: 'ADD_ELEC', name: `Electricity (${h}hrs × ₱750/hr)`, rate: total, quantity: 1, is_package: false }];
+      return [...prev, { key: 'ADD_ELEC', name: `Electricity Charge`, rate: total, quantity: 1, is_package: false }];
     });
   }
 
