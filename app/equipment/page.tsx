@@ -9,10 +9,14 @@ export default function EquipmentPage() {
   const [editItem, setEditItem] = useState<Equipment | null>(null);
   const [form, setForm] = useState({ name: '', category: 'camera', daily_rate: '', quantity: '1', description: '', wattage: '0' });
   const [saving, setSaving] = useState(false);
-  const [today] = useState(new Date().toISOString().slice(0, 10));
+  const todayStr = (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  })();
+  const [checkDate, setCheckDate] = useState(todayStr);
 
-  const load = () => fetch(`/api/equipment?date=${today}`).then(r => r.json()).then(setEquipment);
-  useEffect(() => { load(); }, [today]);
+  const load = () => fetch(`/api/equipment?date=${checkDate}`).then(r => r.json()).then(setEquipment);
+  useEffect(() => { load(); }, [checkDate]);
 
   function startEdit(item: Equipment) {
     setEditItem(item);
@@ -48,9 +52,23 @@ export default function EquipmentPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-bold text-white">Equipment Inventory</h1>
-          <p className="text-white/40 text-xs mt-0.5">Availability shown for today</p>
+          <p className="text-white/40 text-xs mt-0.5">
+            Only <strong className="text-white/60">pending/confirmed</strong> bookings mark equipment as out.
+            Completed shoots = back in stock.
+          </p>
         </div>
         <button onClick={() => { setEditItem(null); setForm({ name: '', category: 'camera', daily_rate: '', quantity: '1', description: '', wattage: '0' }); setShowForm(!showForm); }} className="px-3 py-2 bg-[#E32726] text-white text-sm font-semibold rounded-lg hover:bg-[#c41f1e] transition-colors">+ Add</button>
+      </div>
+
+      {/* Date availability checker */}
+      <div className="flex items-center gap-3 mb-4 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5">
+        <span className="text-xs text-white/40">Check availability for:</span>
+        <input type="date" value={checkDate} onChange={e => setCheckDate(e.target.value)}
+          className="bg-[#0f0f0f] border border-[#2a2a2a] rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-[#E32726]" />
+        {checkDate !== todayStr && (
+          <button onClick={() => setCheckDate(todayStr)} className="text-xs text-[#E32726] hover:underline">↺ Today</button>
+        )}
+        {checkDate === todayStr && <span className="text-xs text-green-400">Today</span>}
       </div>
 
       {showForm && (

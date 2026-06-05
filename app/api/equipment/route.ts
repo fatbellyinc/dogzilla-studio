@@ -6,17 +6,25 @@ export async function GET(req: NextRequest) {
   const date = req.nextUrl.searchParams.get('date');
 
   if (date) {
-    // Return availability for a given date
+    // Return availability for a given date.
+    // Equipment is "out" only for ACTIVE bookings (pending/confirmed) where the date
+    // falls within booking_date → end_date range. Completed/cancelled = back in stock.
     const equipment = db.prepare(`
       SELECT e.*,
-        COALESCE(SUM(CASE WHEN b.booking_date = ? AND b.status NOT IN ('cancelled') THEN be.quantity ELSE 0 END), 0) as booked_qty
+        COALESCE(SUM(
+          CASE WHEN
+            b.status IN ('pending', 'confirmed')
+            AND b.booking_date <= ?
+            AND (b.end_date IS NULL OR b.end_date >= ?)
+          THEN be.quantity ELSE 0 END
+        ), 0) as booked_qty
       FROM equipment e
       LEFT JOIN booking_equipment be ON be.equipment_id = e.id
       LEFT JOIN bookings b ON b.id = be.booking_id
       WHERE e.active = 1
       GROUP BY e.id
       ORDER BY e.category, e.name
-    `).all(date);
+    `).all(date, date);
     return NextResponse.json(equipment);
   }
 
