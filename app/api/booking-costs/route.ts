@@ -4,6 +4,21 @@ import { getDb } from '@/lib/db';
 export async function GET(req: NextRequest) {
   const db = getDb();
   const bookingId = req.nextUrl.searchParams.get('booking_id');
+  const month = req.nextUrl.searchParams.get('month'); // YYYY-MM
+
+  if (month) {
+    // Return all costs for completed bookings in this month, with client name
+    return NextResponse.json(db.prepare(`
+      SELECT bc.*, b.id as booking_id, c.name as client_name
+      FROM booking_costs bc
+      JOIN bookings b ON b.id = bc.booking_id
+      JOIN clients c ON c.id = b.client_id
+      WHERE strftime('%Y-%m', b.booking_date) = ?
+        AND b.status = 'completed'
+      ORDER BY bc.type, bc.total_cost DESC
+    `).all(month));
+  }
+
   if (!bookingId) return NextResponse.json([]);
   return NextResponse.json(db.prepare('SELECT * FROM booking_costs WHERE booking_id = ?').all(bookingId));
 }

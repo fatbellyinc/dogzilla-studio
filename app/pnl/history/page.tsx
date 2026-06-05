@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { formatPHP } from '@/lib/utils';
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -19,10 +20,20 @@ interface PnLData {
   avgUtils: number;
 }
 
+interface CostItem { id: number; description: string; type: string; quantity: number; unit_cost: number; total_cost: number; booking_id: number; client_name: string; }
+
 export default function PnLHistoryPage() {
   const [data, setData] = useState<PnLData | null>(null);
   const [view, setView] = useState<'summary' | 'detail'>('summary');
   const [filterYear, setFilterYear] = useState<number | 'all'>('all');
+  const [drillMonth, setDrillMonth] = useState<string | null>(null);
+  const [drillCosts, setDrillCosts] = useState<CostItem[]>([]);
+
+  function openDrill(mStr: string) {
+    if (drillMonth === mStr) { setDrillMonth(null); return; }
+    setDrillMonth(mStr);
+    fetch(`/api/booking-costs?month=${mStr}`).then(r => r.json()).then(setDrillCosts);
+  }
 
   useEffect(() => {
     fetch('/api/pnl-history?from=2023&to=2026').then(r => r.json()).then(setData);
@@ -141,7 +152,7 @@ export default function PnLHistoryPage() {
                     <td className="px-3 py-2 text-[#E32726] font-black text-sm" colSpan={view === 'detail' ? 9 : 5}>{year}</td>
                   </tr>,
                   // Month rows
-                  ...yearMonths.map(m => (
+                  ...yearMonths.flatMap(m => [
                     <tr key={m.mStr} className={`border-b border-[#2a2a2a]/50 hover:bg-[#222] transition-colors ${m.netProfit < 0 && m.revenue > 0 ? 'bg-red-500/5' : ''}`}>
                       <td className="px-3 py-2 text-white font-medium">{MONTHS[m.month-1]}</td>
                       <td className="px-3 py-2 text-right text-green-400 font-semibold">{m.revenue > 0 ? formatPHP(m.revenue) : <span className="text-white/20">—</span>}</td>
@@ -153,12 +164,48 @@ export default function PnLHistoryPage() {
                         <td className="px-3 py-2 text-right text-cyan-400/60">{m.water > 0 ? formatPHP(m.water) : '—'}</td>
                       </>}
                       <td className="px-3 py-2 text-right text-yellow-400">{m.totalUtils > 0 ? formatPHP(m.totalUtils) : '—'}</td>
-                      <td className="px-3 py-2 text-right text-white/50">{m.varCosts > 0 ? formatPHP(m.varCosts) : '—'}</td>
+                      <td className="px-3 py-2 text-right">
+                        {m.varCosts > 0 ? (
+                          <button onClick={() => openDrill(m.mStr)}
+                            className={`font-semibold transition-colors hover:text-white ${drillMonth === m.mStr ? 'text-white underline' : 'text-white/50'}`}>
+                            {formatPHP(m.varCosts)} ↓
+                          </button>
+                        ) : <span className="text-white/20">—</span>}
+                      </td>
                       <td className={`px-3 py-2 text-right font-bold ${m.netProfit > 0 ? 'text-green-400' : m.revenue > 0 ? 'text-red-400' : 'text-white/20'}`}>
                         {m.revenue > 0 || m.rent > 0 ? formatPHP(m.netProfit) : '—'}
                       </td>
-                    </tr>
-                  )),
+                    </tr>,
+                    // Drill-down row
+                    drillMonth === m.mStr ? (
+                      <tr key={`drill-${m.mStr}`} className="bg-[#0f0f0f]">
+                        <td colSpan={view === 'detail' ? 9 : 5} className="px-4 py-3">
+                          <div className="text-[10px] text-white/40 uppercase tracking-wider mb-2">Other Costs Breakdown — {MONTHS[m.month-1]} {m.year}</div>
+                          {drillCosts.length === 0 ? (
+                            <div className="text-xs text-white/30">No cost records found</div>
+                          ) : (
+                            <div className="space-y-1">
+                              {drillCosts.map(c => (
+                                <div key={c.id} className="flex items-center justify-between text-xs">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <Link href={`/bookings/${c.booking_id}`} className="text-[#E32726] hover:underline shrink-0">#{c.booking_id}</Link>
+                                    <span className="text-white/30 shrink-0">{c.type}</span>
+                                    <span className="text-white/60 truncate">{c.description}</span>
+                                    {c.quantity > 1 && <span className="text-white/30 shrink-0">×{c.quantity}</span>}
+                                  </div>
+                                  <span className="text-yellow-400 ml-3 shrink-0 font-semibold">{formatPHP(c.total_cost)}</span>
+                                </div>
+                              ))}
+                              <div className="flex justify-between text-xs font-bold border-t border-[#2a2a2a] pt-1 mt-1">
+                                <span className="text-white/40">Total</span>
+                                <span className="text-yellow-400">{formatPHP(drillCosts.reduce((s, c) => s + c.total_cost, 0))}</span>
+                              </div>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ) : null,
+                  ]),
                   // Year total row
                   <tr key={`yt-${year}`} className="bg-[#2a2a2a] font-bold border-b-2 border-[#3a3a3a]">
                     <td className="px-3 py-2.5 text-white text-xs font-black">{year} TOTAL</td>
