@@ -47,8 +47,8 @@ interface Props {
 }
 
 export default function BookingEditor({ bookingId, currentEquipment, currentSubtotal, studioRate, callTime, wrapTime, onSaved, onCancel }: Props) {
-  const [items, setItems] = useState<EditItem[]>(
-    currentEquipment.map(e => ({
+  const [items, setItems] = useState<EditItem[]>(() => {
+    const mapped: EditItem[] = currentEquipment.map(e => ({
       key: `existing-${e.id}`,
       name: e.name,
       rate: e.rate,
@@ -57,12 +57,20 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
       is_complimentary: !!e.is_complimentary,
       discount_pct: e.discount_pct || 0,
       item_type: e.item_type || 'individual',
-    }))
-  );
+    }));
+    // Deduplicate electricity items — keep the one with the highest rate, drop the rest
+    const elecItems = mapped.filter(i => isElecItem(i));
+    if (elecItems.length > 1) {
+      const best = elecItems.reduce((a, b) => a.rate >= b.rate ? a : b);
+      return mapped.filter(i => !isElecItem(i) || i.key === best.key);
+    }
+    return mapped;
+  });
 
-  // Electricity hours — auto-fill from call/wrap times if available
+  // Electricity hours — prefer existing item's hours, then call/wrap times, then 14
   const autoHours = shootHoursFromTimes(callTime, wrapTime);
-  const defaultElecHours = autoHours ?? 14;
+  const existingElec = currentEquipment.find(e => isElecItem({ key: `existing-${e.id}`, name: e.name, rate: e.rate, quantity: e.quantity, equipment_id: undefined, is_complimentary: false, discount_pct: 0, item_type: '' }));
+  const defaultElecHours = existingElec ? Math.round(existingElec.rate / ELEC_RATE) : (autoHours ?? 14);
   const [addonElecHours, setAddonElecHours] = useState(defaultElecHours);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [tab, setTab] = useState<'packages' | 'individual' | 'addons' | 'custom'>('packages');
