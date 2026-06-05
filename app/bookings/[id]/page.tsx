@@ -2,7 +2,7 @@
 import { useEffect, useState, use, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { formatPHP, formatDate, fmt24, calcOT, OT_RATE } from '@/lib/utils';
+import { formatPHP, formatDate, fmt24, calcOT, OT_RATE, SETUP_OT_RATE } from '@/lib/utils';
 import { Booking, BookingEquipment, Payment, Quotation, Invoice, BookingDay, STUDIO_RATES, VAT_RATE } from '@/lib/types';
 import OverheadPanel from '@/components/OverheadPanel';
 import TimePicker from '@/components/TimePicker';
@@ -191,7 +191,7 @@ function ShootTimesPanel({ callTime, wrapTime, studioRate, onSave }: {
           {ot.otHrs > 0 ? (
             <>
               <div className="flex justify-between text-[#E32726] font-semibold border-t border-[#2a2a2a] pt-1.5">
-                <span>Overtime {ot.otHrs.toFixed(2)} hrs × ₱{OT_RATE.toLocaleString()}/hr</span>
+                <span>Overtime {ot.otHrs.toFixed(2)} hrs × ₱{(ot.otRate ?? OT_RATE).toLocaleString()}/hr{studioRate === 'setup' ? ' (setup rate)' : ''}</span>
                 <span>{formatPHP(ot.otAmount)}</span>
               </div>
               <p className="text-[10px] text-white/30">Add this to the invoice as an OT charge</p>
@@ -343,11 +343,12 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
   async function addOvertime() {
     const hrs = Number(otHours) || 0;
     if (!hrs) return;
-    const otAmount = hrs * 3500;
-    // Add as a cost record and also create a payment entry placeholder
+    const isSetup = booking.studio_rate === 'setup';
+    const rate = isSetup ? SETUP_OT_RATE : OT_RATE;
+    const otAmount = hrs * rate;
     await fetch('/api/booking-costs', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ booking_id: Number(id), type: 'overtime', description: `Overtime — ${hrs}hr${hrs > 1 ? 's' : ''} × ₱3,500/hr`, quantity: 1, unit_cost: otAmount }),
+      body: JSON.stringify({ booking_id: Number(id), type: 'overtime', description: `Overtime — ${hrs}hr${hrs > 1 ? 's' : ''} × ₱${rate.toLocaleString()}/hr`, quantity: 1, unit_cost: otAmount }),
     });
     setShowOT(false);
     setOtHours('1');
@@ -533,6 +534,8 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
               currentEquipment={equipment}
               currentSubtotal={booking.subtotal}
               studioRate={booking.studio_rate}
+              callTime={callTime}
+              wrapTime={wrapTime}
               onSaved={() => { setEditingItems(false); load(); }}
               onCancel={() => setEditingItems(false)}
             />
@@ -828,12 +831,12 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                     className="w-12 bg-[#0f0f0f] border border-[#2a2a2a] rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-[#E32726]" />
                 </div>
                 <div className="text-xs text-[#E32726] font-semibold">
-                  {Number(otHours) || 0} hr{Number(otHours) > 1 ? 's' : ''} × ₱3,500 = ₱{((Number(otHours) || 0) * 3500).toLocaleString()}
+                  {Number(otHours) || 0} hr{Number(otHours) > 1 ? 's' : ''} × ₱{(booking.studio_rate === 'setup' ? SETUP_OT_RATE : OT_RATE).toLocaleString()} = ₱{((Number(otHours) || 0) * (booking.studio_rate === 'setup' ? SETUP_OT_RATE : OT_RATE)).toLocaleString()}
                 </div>
                 <button onClick={addOvertime} className="w-full bg-[#E32726] text-white text-xs py-1.5 rounded font-medium">Add to Overhead</button>
               </div>
             )}
-            {!showOT && <p className="text-xs text-white/30">₱3,500/hr after session</p>}
+            {!showOT && <p className="text-xs text-white/30">{booking.studio_rate === 'setup' ? '₱1,500/hr setup OT' : '₱3,500/hr after session'}</p>}
           </div>
 
           {/* Client Portal */}

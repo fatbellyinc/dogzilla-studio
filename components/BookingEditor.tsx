@@ -16,16 +16,37 @@ interface EditItem {
   item_type: string;
 }
 
+const ELEC_RATE = 750; // ₱750/hr
+
+function elecHoursFromItem(item: EditItem): number {
+  // Derive hours from stored rate (rate = hours * 750)
+  return item.rate > 0 ? Math.round(item.rate / ELEC_RATE) : 1;
+}
+
+function isElecItem(item: EditItem): boolean {
+  return item.key === 'ADD_ELEC' || item.name.toLowerCase().includes('electricity');
+}
+
+function shootHoursFromTimes(callTime?: string | null, wrapTime?: string | null): number | null {
+  if (!callTime || !wrapTime) return null;
+  const [ch, cm] = callTime.split(':').map(Number);
+  const [wh, wm] = wrapTime.split(':').map(Number);
+  const diff = (wh * 60 + wm) - (ch * 60 + cm);
+  return diff > 0 ? Math.round(diff / 60 * 10) / 10 : null;
+}
+
 interface Props {
   bookingId: number;
   currentEquipment: BookingEquipment[];
   currentSubtotal: number;
   studioRate: string;
+  callTime?: string | null;
+  wrapTime?: string | null;
   onSaved: () => void;
   onCancel: () => void;
 }
 
-export default function BookingEditor({ bookingId, currentEquipment, currentSubtotal, studioRate, onSaved, onCancel }: Props) {
+export default function BookingEditor({ bookingId, currentEquipment, currentSubtotal, studioRate, callTime, wrapTime, onSaved, onCancel }: Props) {
   const [items, setItems] = useState<EditItem[]>(
     currentEquipment.map(e => ({
       key: `existing-${e.id}`,
@@ -38,6 +59,11 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
       item_type: e.item_type || 'individual',
     }))
   );
+
+  // Electricity hours — auto-fill from call/wrap times if available
+  const autoHours = shootHoursFromTimes(callTime, wrapTime);
+  const defaultElecHours = autoHours ?? 14;
+  const [addonElecHours, setAddonElecHours] = useState(defaultElecHours);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [tab, setTab] = useState<'packages' | 'individual' | 'addons' | 'custom'>('packages');
   const [pkgCat, setPkgCat] = useState<PackageCat>('camera');
@@ -69,9 +95,29 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
 
   function addAddon(addon: typeof ADDON_ITEMS[number]) {
     const key = addon.id;
+    if (addon.id === 'ADD_ELEC') {
+      // Electricity: toggle or update hours; handled via separate UI — skip generic toggle
+      return;
+    }
     const existing = items.find(i => i.key === key);
     if (existing) { setItems(prev => prev.filter(i => i.key !== key)); return; }
     setItems(prev => [...prev, { key, name: addon.label, rate: addon.price, quantity: 1, is_complimentary: false, discount_pct: 0, item_type: 'addon' }]);
+  }
+
+  function updateElecHours(hrs: number) {
+    const h = Math.max(1, hrs);
+    setAddonElecHours(h);
+    const total = h * ELEC_RATE;
+    const name = `Electricity (${h}hrs × ₱${ELEC_RATE}/hr)`;
+    setItems(prev => {
+      const exists = prev.find(i => isElecItem(i));
+      if (exists) return prev.map(i => isElecItem(i) ? { ...i, rate: total, name } : i);
+      return [...prev, { key: 'ADD_ELEC', name, rate: total, quantity: 1, is_complimentary: false, discount_pct: 0, item_type: 'addon' }];
+    });
+  }
+
+  function removeElec() {
+    setItems(prev => prev.filter(i => !isElecItem(i)));
   }
 
   function addCustom() {
@@ -121,6 +167,46 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
           <div className="space-y-1.5">
             {items.map(item => {
               const lineTotal = item.is_complimentary ? 0 : item.rate * item.quantity * (1 - item.discount_pct / 100);
+              const elec = isElecItem(item);
+              const itemElecHours = elecHoursFromItem(item);
+
+              if (elec) {
+                // Special electricity row — hours-based editor
+                return (
+                  <div key={item.key} className="bg-[#0f0f0f] rounded-lg p-2 space-y-1.5 border border-yellow-500/20">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-yellow-400 flex-1 font-medium">⚡ Electricity Charge</span>
+                      <span className="text-xs text-[#E32726] font-bold">{formatPHP(item.rate)}</span>
+                      <button onClick={removeElec} className="text-white/20 hover:text-red-400 text-xs">✕</button>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[10px] text-white/40">Hours:</span>
+                      <button onClick={() => updateElecHours(itemElecHours - 1)} className="w-5 h-5 bg-[#2a2a2a] rounded text-white text-xs">−</button>
+                      <input
+                        type="number" min={1}
+                        value={itemElecHours}
+                        onChange={e => updateElecHours(Number(e.target.value) || 1)}
+                        className="w-12 bg-[#1a1a1a] border border-[#2a2a2a] rounded px-1.5 py-0.5 text-xs text-white text-center focus:outline-none focus:border-[#E32726]"
+                      />
+                      <button onClick={() => updateElecHours(itemElecHours + 1)} className="w-5 h-5 bg-[#2a2a2a] rounded text-white text-xs">+</button>
+                      <span className="text-[10px] text-white/30">× ₱{ELEC_RATE}/hr</span>
+                      {autoHours && (
+                        <button onClick={() => updateElecHours(autoHours)}
+                          className="text-[10px] text-green-400/70 hover:text-green-400 border border-green-500/20 px-1.5 py-0.5 rounded transition-colors">
+                          ↺ {autoHours}h from times
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex gap-1 flex-wrap">
+                      <button type="button" onClick={() => toggleComp(item.key)}
+                        className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${item.is_complimentary ? 'bg-green-500/20 text-green-400 border-green-500/30' : 'text-white/20 border-white/10 hover:text-green-400'}`}>
+                        🎁 Comp
+                      </button>
+                    </div>
+                  </div>
+                );
+              }
+
               return (
                 <div key={item.key} className="bg-[#0f0f0f] rounded-lg p-2 space-y-1.5">
                   <div className="flex items-center gap-2">
@@ -268,17 +354,57 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
         )}
 
         {tab === 'addons' && (
-          <div className="grid grid-cols-2 gap-1.5">
-            {ADDON_ITEMS.map(addon => {
-              const sel = items.find(i => i.key === addon.id);
+          <div className="space-y-1.5">
+            {/* Electricity — special hours-based UI */}
+            {(() => {
+              const hasElec = items.some(i => isElecItem(i));
               return (
-                <button key={addon.id} type="button" onClick={() => addAddon(addon)}
-                  className={`text-left p-2.5 rounded-lg border text-xs transition-all ${sel ? 'border-[#E32726] bg-[#E32726]/10' : 'border-[#2a2a2a] hover:border-[#3a3a3a]'}`}>
-                  <div className="text-white font-medium">{addon.label}</div>
-                  <div className="text-[#E32726] font-bold mt-0.5">{formatPHP(addon.price)}</div>
-                </button>
+                <div className={`p-2.5 rounded-lg border text-xs ${hasElec ? 'border-yellow-500/30 bg-yellow-500/5' : 'border-[#2a2a2a]'}`}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div>
+                      <div className="text-white font-medium">⚡ Electricity Charge</div>
+                      <div className="text-white/30 text-[10px]">₱{ELEC_RATE}/hr — wattage-based</div>
+                    </div>
+                    {hasElec
+                      ? <button onClick={removeElec} className="text-[10px] text-red-400/60 hover:text-red-400 border border-red-500/20 px-2 py-0.5 rounded">Remove</button>
+                      : <button onClick={() => updateElecHours(addonElecHours)} className="text-[10px] bg-[#E32726] text-white px-2 py-1 rounded font-medium">+ Add</button>
+                    }
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[10px] text-white/40">Hours:</span>
+                    <button onClick={() => { setAddonElecHours(h => Math.max(1, h - 1)); if (hasElec) updateElecHours(Math.max(1, addonElecHours - 1)); }} className="w-5 h-5 bg-[#2a2a2a] rounded text-white text-xs">−</button>
+                    <input
+                      type="number" min={1}
+                      value={addonElecHours}
+                      onChange={e => { const h = Number(e.target.value) || 1; setAddonElecHours(h); if (hasElec) updateElecHours(h); }}
+                      className="w-12 bg-[#1a1a1a] border border-[#2a2a2a] rounded px-1.5 py-0.5 text-xs text-white text-center focus:outline-none focus:border-[#E32726]"
+                    />
+                    <button onClick={() => { const h = addonElecHours + 1; setAddonElecHours(h); if (hasElec) updateElecHours(h); }} className="w-5 h-5 bg-[#2a2a2a] rounded text-white text-xs">+</button>
+                    <span className="text-[10px] text-[#E32726] font-bold">{formatPHP(addonElecHours * ELEC_RATE)}</span>
+                    {autoHours && (
+                      <button onClick={() => { setAddonElecHours(autoHours); if (hasElec) updateElecHours(autoHours); }}
+                        className="text-[10px] text-green-400/70 hover:text-green-400 border border-green-500/20 px-1.5 py-0.5 rounded transition-colors">
+                        ↺ {autoHours}h from times
+                      </button>
+                    )}
+                  </div>
+                </div>
               );
-            })}
+            })()}
+
+            {/* Other addons (non-electricity) */}
+            <div className="grid grid-cols-2 gap-1.5">
+              {ADDON_ITEMS.filter(a => a.id !== 'ADD_ELEC').map(addon => {
+                const sel = items.find(i => i.key === addon.id);
+                return (
+                  <button key={addon.id} type="button" onClick={() => addAddon(addon)}
+                    className={`text-left p-2.5 rounded-lg border text-xs transition-all ${sel ? 'border-[#E32726] bg-[#E32726]/10' : 'border-[#2a2a2a] hover:border-[#3a3a3a]'}`}>
+                    <div className="text-white font-medium">{addon.label}</div>
+                    <div className="text-[#E32726] font-bold mt-0.5">{formatPHP(addon.price)}</div>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
 

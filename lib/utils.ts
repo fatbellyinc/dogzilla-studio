@@ -46,6 +46,7 @@ export function fmt24(time: string | null): string {
 
 // OT rate per hour
 export const OT_RATE = 3500;
+export const SETUP_OT_RATE = 1500;
 
 // Shoot hours included per rate type (before OT)
 const SHOOT_HOURS: Record<string, number> = {
@@ -96,7 +97,8 @@ export function calcOT(studioRate: string, callTime: string | null, wrapTime: st
   const shootHrs = Math.max(0, durationHrs - ingressEgressHrs);
   const otHrs = Math.max(0, Math.round((shootHrs - shootIncluded) * 4) / 4); // nearest 15min
 
-  return { durationHrs, ingressEgressHrs, shootHrs, includedShootHrs: shootIncluded, otHrs, otAmount: otHrs * OT_RATE };
+  const otRate = studioRate === 'setup' ? SETUP_OT_RATE : OT_RATE;
+  return { durationHrs, ingressEgressHrs, shootHrs, includedShootHrs: shootIncluded, otHrs, otAmount: otHrs * otRate, otRate };
 }
 
 export function cn(...classes: (string | undefined | false | null)[]): string {
