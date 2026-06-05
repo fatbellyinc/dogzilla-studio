@@ -11,9 +11,9 @@ export async function GET(req: NextRequest) {
     const rows = db.prepare(`
       SELECT
         CAST(strftime('%m', booking_date) AS INTEGER) as month,
-        COUNT(CASE WHEN status NOT IN ('cancelled') THEN 1 END) as shoot_count,
-        COALESCE(SUM(CASE WHEN status NOT IN ('cancelled') THEN total ELSE 0 END), 0) as revenue,
-        COALESCE(SUM(CASE WHEN status NOT IN ('cancelled') THEN total * 0.12 ELSE 0 END), 0) as vat,
+        COUNT(CASE WHEN status = 'completed' THEN 1 END) as shoot_count,
+        COALESCE(SUM(CASE WHEN status = 'completed' THEN total ELSE 0 END), 0) as revenue,
+        COALESCE(SUM(CASE WHEN status = 'completed' THEN total * 0.12 ELSE 0 END), 0) as vat,
         COUNT(CASE WHEN status = 'cancelled' THEN 1 END) as cancelled_count
       FROM bookings
       WHERE strftime('%Y', booking_date) = ?
@@ -32,8 +32,8 @@ export async function GET(req: NextRequest) {
   const years = db.prepare(`
     SELECT
       CAST(strftime('%Y', booking_date) AS INTEGER) as year,
-      COUNT(CASE WHEN status NOT IN ('cancelled') THEN 1 END) as shoot_count,
-      COALESCE(SUM(CASE WHEN status NOT IN ('cancelled') THEN total ELSE 0 END), 0) as revenue
+      COUNT(CASE WHEN status = 'completed' THEN 1 END) as shoot_count,
+      COALESCE(SUM(CASE WHEN status = 'completed' THEN total ELSE 0 END), 0) as revenue
     FROM bookings
     GROUP BY year
     ORDER BY year DESC
