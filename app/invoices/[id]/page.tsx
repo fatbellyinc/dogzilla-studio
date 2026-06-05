@@ -25,13 +25,21 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
   }
 
   useEffect(() => {
-    // id is an invoice ID — look up booking_id first, then fetch booking data
-    fetch(`/api/invoices/${id}`)
-      .then(r => r.json())
-      .then((inv: { booking_id: number }) => {
-        setBookingId(inv.booking_id);
-        loadBooking(inv.booking_id);
-      });
+    // Prefer booking_id from query param (set by booking detail page link)
+    // Fall back to looking up the invoice to get booking_id
+    const searchParams = new URLSearchParams(window.location.search);
+    const bookingIdParam = searchParams.get('booking_id');
+    if (bookingIdParam) {
+      setBookingId(Number(bookingIdParam));
+      loadBooking(Number(bookingIdParam));
+    } else {
+      fetch(`/api/invoices/${id}`)
+        .then(r => r.json())
+        .then((inv: { booking_id: number }) => {
+          setBookingId(inv.booking_id);
+          loadBooking(inv.booking_id);
+        });
+    }
   }, [id]);
 
   async function saveORNumber() {
