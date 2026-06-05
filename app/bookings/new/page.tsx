@@ -303,6 +303,19 @@ function NewBookingForm() {
           recurrence_end: form.recurrence_end || null,
         }),
       });
+
+      if (res.status === 409) {
+        const err = await res.json();
+        // Double booking — warn and allow pencil override only
+        if (!confirm(`⚠️ DOUBLE BOOKING!\n\n${err.message}\n\nTo proceed, mark this as a Pencil booking instead.`)) {
+          setSaving(false);
+          return;
+        }
+        setSaving(false);
+        setError(err.message);
+        return;
+      }
+
       const booking = await res.json();
       router.push(`/bookings/${booking.id}`);
     } catch {

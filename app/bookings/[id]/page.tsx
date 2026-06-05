@@ -688,11 +688,30 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
             <div className="space-y-2">
               {booking.status === 'pending' && (
                 <button onClick={async () => {
-                  // Duplicate date check
-                  const res = await fetch(`/api/bookings?date=${booking.booking_date}`);
-                  const others = await res.json();
-                  const conflicts = others.filter((b: { id: number; status: string }) => b.id !== Number(id) && b.status === 'confirmed');
-                  if (conflicts.length > 0 && !confirm(`⚠️ ${conflicts.length} other confirmed booking(s) on this date. Confirm anyway?`)) return;
+                  // Check all dates in range for conflicts with other confirmed bookings
+                  const monthStart = booking.booking_date.slice(0, 7);
+                  const monthEnd = booking.end_date ? booking.end_date.slice(0, 7) : monthStart;
+                  const months = new Set([monthStart, monthEnd]);
+                  let conflicts: { id: number; booking_date: string; client_name: string }[] = [];
+                  for (const m of months) {
+                    const res = await fetch(`/api/bookings?month=${m}`);
+                    const others: { id: number; status: string; is_pencil: number; booking_date: string; end_date: string; client_name: string }[] = await res.json();
+                    const bookEnd = booking.end_date || booking.booking_date;
+                    for (const o of others) {
+                      if (o.id === Number(id) || o.status !== 'confirmed' || o.is_pencil) continue;
+                      const oEnd = o.end_date || o.booking_date;
+                      // Date range overlap check
+                      if (o.booking_date <= bookEnd && oEnd >= booking.booking_date) {
+                        conflicts.push(o);
+                      }
+                    }
+                  }
+                  // Deduplicate
+                  conflicts = conflicts.filter((c, i, arr) => arr.findIndex(x => x.id === c.id) === i);
+                  if (conflicts.length > 0) {
+                    const names = conflicts.map(c => `${c.client_name} (${c.booking_date})`).join(', ');
+                    if (!confirm(`⚠️ DOUBLE BOOKING CONFLICT!\n\nConfirmed booking(s) already on these dates:\n${names}\n\nConfirm anyway?`)) return;
+                  }
                   updateStatus('confirmed');
                 }} disabled={saving}
                   className="w-full bg-green-500/20 text-green-400 border border-green-500/30 text-sm py-2 rounded-lg hover:bg-green-500/30 transition-colors">

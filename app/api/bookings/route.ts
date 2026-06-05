@@ -14,7 +14,13 @@ export async function GET(req: NextRequest) {
   const args: unknown[] = [];
 
   if (date) { conditions.push(`b.booking_date = ?`); args.push(date); }
-  if (month) { conditions.push(`b.booking_date LIKE ?`); args.push(`${month}%`); }
+  if (month) {
+    // Include bookings that START in this month OR span into this month (multi-day)
+    const monthStart = `${month}-01`;
+    const monthEnd = `${month}-31`;
+    conditions.push(`(b.booking_date LIKE ? OR (b.end_date IS NOT NULL AND b.end_date >= ? AND b.booking_date <= ?))`);
+    args.push(`${month}%`, monthStart, monthEnd);
+  }
   if (status) { conditions.push(`b.status = ?`); args.push(status); }
 
   if (conditions.length) query += ' WHERE ' + conditions.join(' AND ');
@@ -51,6 +57,27 @@ export async function POST(req: NextRequest) {
 
   const total = subtotalBeforeDiscount - discountAmount;
   const deposit = total * 0.5;
+
+  // Double-booking guard — reject if a CONFIRMED booking already exists on any of these dates
+  const allDates = days.map(d => d.date);
+  if (allDates.length > 0) {
+    const placeholders = allDates.map(() => '?').join(',');
+    const conflicts = db.prepare(`
+      SELECT id, booking_date, end_date FROM bookings
+      WHERE status = 'confirmed' AND is_pencil = 0
+        AND (
+          booking_date IN (${placeholders})
+          OR (end_date IS NOT NULL AND end_date >= ? AND booking_date <= ?)
+        )
+    `).all(...allDates, allDates[0], allDates[allDates.length - 1]) as { id: number; booking_date: string; end_date: string }[];
+    if (conflicts.length > 0) {
+      return NextResponse.json({
+        error: 'double_booking',
+        message: `A confirmed booking already exists on ${conflicts.map(c => c.booking_date).join(', ')}. Cannot double-book.`,
+        conflicts,
+      }, { status: 409 });
+    }
+  }
 
   const result = db.prepare(`
     INSERT INTO bookings (client_id, booking_date, end_date, studio_rate, hours, subtotal, equipment_total, total, deposit_amount, discount_type, discount_value, discount_amount, status, notes, project_name, shoot_type, is_pencil, no_deposit, vat_exempt)

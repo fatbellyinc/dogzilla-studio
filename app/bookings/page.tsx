@@ -46,9 +46,28 @@ export default function BookingsPage() {
 
   useEffect(() => { fetchBookings(); }, [fetchBookings]);
 
+  // Expand booking_date → end_date into all individual dates
+  function expandDates(start: string, end: string | null | undefined): string[] {
+    if (!end || end === start) return [start];
+    const result: string[] = [];
+    const cur = new Date(start + 'T00:00');
+    const last = new Date(end + 'T00:00');
+    while (cur <= last) {
+      result.push(`${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}-${String(cur.getDate()).padStart(2,'0')}`);
+      cur.setDate(cur.getDate() + 1);
+    }
+    return result;
+  }
+
   const visitDates = new Set(visits.filter(v => v.purpose !== 'cancelled').map(v => v.visit_date));
-  const confirmedDates = new Set(bookings.filter(b => b.status !== 'cancelled' && !b.is_pencil).map(b => b.booking_date));
-  const pencilDates = new Set(bookings.filter(b => b.status !== 'cancelled' && b.is_pencil).map(b => b.booking_date));
+  const confirmedDates = new Set(
+    bookings.filter(b => b.status !== 'cancelled' && !b.is_pencil)
+      .flatMap(b => expandDates(b.booking_date, b.end_date))
+  );
+  const pencilDates = new Set(
+    bookings.filter(b => b.status !== 'cancelled' && b.is_pencil)
+      .flatMap(b => expandDates(b.booking_date, b.end_date))
+  );
   const bookedDates = new Set([...confirmedDates, ...pencilDates]);
   const blockoutSet = new Set(blockouts.map(b => b.date));
 
@@ -67,7 +86,12 @@ export default function BookingsPage() {
 
   function handleDayClick(dateStr: string) {
     setSelected(dateStr);
-    setSelectedBookings(bookings.filter(b => b.booking_date === dateStr));
+    // Show bookings where dateStr falls within booking_date → end_date range
+    setSelectedBookings(bookings.filter(b => {
+      const start = b.booking_date;
+      const end = b.end_date || b.booking_date;
+      return dateStr >= start && dateStr <= end;
+    }));
   }
 
   // Calendar grid
@@ -247,7 +271,7 @@ export default function BookingsPage() {
                       </div>
                       <div className="text-xs text-white/40 mt-1">{b.studio_rate === 'hourly' ? `${b.hours}hr @ ₱3,500/hr` : b.studio_rate === 'fullday' ? 'Full Day' : 'Setup Rate'}</div>
                       <div className="text-xs text-[#E32726] mt-1 font-medium">{formatPHP(b.total)}</div>
-                      {!b.deposit_paid && <div className="text-xs text-yellow-400 mt-1">⚠️ Deposit pending</div>}
+                      {!b.deposit_paid && !b.no_deposit && b.status !== 'completed' && b.status !== 'cancelled' && <div className="text-xs text-yellow-400 mt-1">⚠️ Deposit pending</div>}
                     </Link>
                   ))}
                 </div>
@@ -304,7 +328,7 @@ export default function BookingsPage() {
                 </div>
                 <div className="flex items-center gap-3">
                   {b.is_pencil && <span className="text-xs text-yellow-400">✏️ pencil</span>}
-                  {!b.deposit_paid && <span className="text-xs text-yellow-400">⚠️ deposit</span>}
+                  {!b.deposit_paid && !b.no_deposit && b.status !== 'completed' && b.status !== 'cancelled' && <span className="text-xs text-yellow-400">⚠️ deposit</span>}
                   <StatusBadge status={b.status} />
                   <div className="text-sm text-white/60 hidden md:block">{formatPHP(b.total)}</div>
                 </div>
