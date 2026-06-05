@@ -74,6 +74,8 @@ export default function OverheadPanel({ bookingId, totalRevenue, hours = 10, cal
   const margin = totalRevenue > 0 ? ((profit / totalRevenue) * 100).toFixed(1) : '0';
 
   async function addPersonnelCosts() {
+    // Clear existing personnel costs first to avoid duplicates
+    await fetch(`/api/booking-costs?booking_id=${bookingId}&type=personnel`, { method: 'DELETE' });
     const entries = (Object.entries(personnel) as [PersonnelType, number][]).filter(([, qty]) => qty > 0);
     for (const [type, qty] of entries) {
       const rate = PERSONNEL_RATES[type];
@@ -86,6 +88,9 @@ export default function OverheadPanel({ bookingId, totalRevenue, hours = 10, cal
   }
 
   async function addElectricityCosts() {
+    // Clear existing electricity costs first — always replace, never append
+    await fetch(`/api/booking-costs?booking_id=${bookingId}&type=electricity`, { method: 'DELETE' });
+
     const areas: Partial<Record<ACArea, number>> = {
       studio: elecHours.studio,
       studio_full: elecHours.studio_full,
@@ -281,7 +286,7 @@ export default function OverheadPanel({ bookingId, totalRevenue, hours = 10, cal
             <span className="text-yellow-400">{formatPHP(personnelPreview)}</span>
           </div>
           <button onClick={addPersonnelCosts} className="w-full bg-[#E32726] text-white text-xs py-1.5 rounded font-medium mt-1">
-            Add Staff Costs
+            {costs.some(c => c.type === 'personnel') ? '↺ Replace Staff Costs' : 'Add Staff Costs'}
           </button>
         </div>
       )}
@@ -376,7 +381,7 @@ export default function OverheadPanel({ bookingId, totalRevenue, hours = 10, cal
             </div>
           </div>
           <button onClick={addElectricityCosts} className="w-full bg-[#E32726] text-white text-xs py-1.5 rounded font-medium">
-            Add Electricity Cost
+            {costs.some(c => c.type === 'electricity') ? '↺ Replace Electricity Costs' : 'Add Electricity Costs'}
           </button>
         </div>
       )}

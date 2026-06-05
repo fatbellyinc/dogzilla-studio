@@ -33,6 +33,10 @@ export async function PUT(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const db = getDb();
   const id = req.nextUrl.searchParams.get('id');
+  const bookingId = req.nextUrl.searchParams.get('booking_id');
+  const type = req.nextUrl.searchParams.get('type');
+  // Delete by id (single row) or by booking_id+type (bulk clear)
   if (id) db.prepare('DELETE FROM booking_costs WHERE id = ?').run(id);
+  else if (bookingId && type) db.prepare('DELETE FROM booking_costs WHERE booking_id = ? AND type = ?').run(bookingId, type);
   return NextResponse.json({ ok: true });
 }
