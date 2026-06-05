@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { formatPHP, formatDateShort } from '@/lib/utils';
 
@@ -8,6 +8,7 @@ interface ReceivableItem {
   total_with_vat: number; client_name: string; client_phone: string;
   client_email: string; project_name: string; shoot_type: string; studio_rate: string;
   total_paid: number; balance_due: number; deposit_paid: number;
+  no_deposit: number; vat_exempt: number;
   daysToShoot: number; daysSinceShoot: number;
   urgency: 'critical' | 'overdue' | 'due_soon' | 'upcoming' | 'completed_unpaid';
 }
@@ -26,12 +27,21 @@ function PaymentRow({ item, onPaid }: { item: ReceivableItem; onPaid: () => void
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
     amount: item.balance_due.toFixed(0),
-    type: item.deposit_paid ? 'balance' : 'deposit',
+    type: (item.deposit_paid || item.no_deposit) ? 'balance' : 'deposit',
     method: 'GCash',
     reference: '',
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+
+  // Sync form when balance changes (e.g. after partial payment)
+  useEffect(() => {
+    setForm(f => ({
+      ...f,
+      amount: item.balance_due.toFixed(0),
+      type: (item.deposit_paid || item.no_deposit) ? 'balance' : 'deposit',
+    }));
+  }, [item.balance_due, item.deposit_paid, item.no_deposit]);
 
   async function record() {
     setSaving(true);
@@ -62,8 +72,14 @@ function PaymentRow({ item, onPaid }: { item: ReceivableItem; onPaid: () => void
             <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold border ${cfg.color}`}>
               {item.daysToShoot > 0 ? `in ${item.daysToShoot}d` : item.daysToShoot < 0 ? `${Math.abs(item.daysToShoot)}d ago` : 'TODAY'}
             </span>
-            {!item.deposit_paid && (
-              <span className="text-[10px] bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 px-2 py-0.5 rounded-full">no deposit</span>
+            {!!item.no_deposit && (
+              <span className="text-[10px] bg-green-500/20 text-green-400 border border-green-500/30 px-2 py-0.5 rounded-full">🤝 no deposit</span>
+            )}
+            {!!item.vat_exempt && (
+              <span className="text-[10px] bg-blue-500/20 text-blue-400 border border-blue-500/30 px-2 py-0.5 rounded-full">VAT exempt</span>
+            )}
+            {!item.deposit_paid && !item.no_deposit && (
+              <span className="text-[10px] bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 px-2 py-0.5 rounded-full">⚠ deposit unpaid</span>
             )}
           </div>
           <div className="text-xs text-white/40">
@@ -71,9 +87,9 @@ function PaymentRow({ item, onPaid }: { item: ReceivableItem; onPaid: () => void
             {item.project_name ? ` · ${item.project_name}` : ''}
           </div>
           <div className="text-xs mt-1.5 flex items-center gap-3 flex-wrap">
-            <span className="text-white/40">Invoice: <span className="text-white/60">{formatPHP(item.total_with_vat)}</span></span>
+            <span className="text-white/40">Invoice: <span className="text-white/60">{formatPHP(item.total_with_vat)}{item.vat_exempt ? ' (VAT-excl.)' : ' (VAT-incl.)'}</span></span>
             <span className="text-white/40">Paid: <span className="text-green-400">{formatPHP(item.total_paid)}</span></span>
-            <span className="font-semibold text-[#E32726]">Owes: {formatPHP(item.balance_due)}</span>
+            <span className="font-semibold text-[#E32726]">Balance: {formatPHP(item.balance_due)}</span>
           </div>
         </div>
 
@@ -111,7 +127,7 @@ function PaymentRow({ item, onPaid }: { item: ReceivableItem; onPaid: () => void
             <div>
               <label className="text-[10px] text-white/30 mb-1 block">Type</label>
               <select value={form.type} onChange={e => setForm(f => ({...f, type: e.target.value}))} className={ic + ' w-full'}>
-                {!item.deposit_paid && <option value="deposit">Deposit</option>}
+                {!item.deposit_paid && !item.no_deposit && <option value="deposit">Deposit</option>}
                 <option value="balance">Balance</option>
                 <option value="full">Full Payment</option>
               </select>
@@ -156,8 +172,8 @@ export default function ReceivablesPage() {
   const [data, setData] = useState<{ items: ReceivableItem[]; totalOwed: number; overdueCount: number } | null>(null);
   const [filter, setFilter] = useState('all');
 
-  const load = () => fetch('/api/receivables').then(r => r.json()).then(setData);
-  useEffect(() => { load(); }, []);
+  const load = useCallback(() => fetch('/api/receivables').then(r => r.json()).then(setData), []);
+  useEffect(() => { load(); }, [load]);
 
   if (!data) return <div className="flex items-center justify-center h-64 text-white/30 pt-14 md:pt-0">Loading...</div>;
 
