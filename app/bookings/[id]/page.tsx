@@ -354,7 +354,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
           const newRate = Math.round(hrs * 750);
           const updatedItems = equipment.map(e =>
             e.name.toLowerCase().includes('electricity')
-              ? { ...e, rate: newRate, name: 'Electricity Charge', quantity: 1 }
+              ? { ...e, rate: newRate, name: 'Power Consumption', quantity: 1 }
               : e
           );
           await fetch(`/api/bookings/${id}/equipment`, {

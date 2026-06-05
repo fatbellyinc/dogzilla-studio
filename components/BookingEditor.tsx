@@ -24,7 +24,7 @@ function elecHoursFromItem(item: EditItem): number {
 }
 
 function isElecItem(item: EditItem): boolean {
-  return item.key === 'ADD_ELEC' || item.name.toLowerCase().includes('electricity');
+  return item.key === 'ADD_ELEC' || item.name.toLowerCase().includes('electricity') || item.name.toLowerCase().includes('power consumption');
 }
 
 function shootHoursFromTimes(callTime?: string | null, wrapTime?: string | null): number | null {
@@ -59,9 +59,9 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
         discount_pct: e.discount_pct || 0,
         item_type: e.item_type || 'individual',
       };
-      // Normalize old electricity name patterns → "Electricity Charge"
-      if (item.name.toLowerCase().includes('electricity')) {
-        item.name = 'Electricity Charge';
+      // Normalize old electricity name patterns → "Power Consumption"
+      if (item.name.toLowerCase().includes('electricity') || item.name === 'Power Consumption') {
+        item.name = 'Power Consumption';
         item.key = 'ADD_ELEC'; // ensure key is canonical so isElecItem catches it
       }
       return item;
@@ -124,7 +124,7 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
     const h = Math.max(1, hrs);
     setAddonElecHours(h);
     const total = h * ELEC_RATE;
-    const name = `Electricity Charge`;
+    const name = `Power Consumption`;
     setItems(prev => {
       const exists = prev.find(i => isElecItem(i));
       if (exists) return prev.map(i => isElecItem(i) ? { ...i, rate: total, name } : i);
@@ -191,7 +191,7 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
                 return (
                   <div key={item.key} className="bg-[#0f0f0f] rounded-lg p-2 space-y-1.5 border border-yellow-500/20">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-yellow-400 flex-1 font-medium">⚡ Electricity Charge</span>
+                      <span className="text-xs text-yellow-400 flex-1 font-medium">⚡ Power Consumption</span>
                       <span className="text-xs text-[#E32726] font-bold">{formatPHP(item.rate)}</span>
                       <button onClick={removeElec} className="text-white/20 hover:text-red-400 text-xs">✕</button>
                     </div>
@@ -378,7 +378,7 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
                 <div className={`p-2.5 rounded-lg border text-xs ${hasElec ? 'border-yellow-500/30 bg-yellow-500/5' : 'border-[#2a2a2a]'}`}>
                   <div className="flex items-center justify-between mb-1.5">
                     <div>
-                      <div className="text-white font-medium">⚡ Electricity Charge</div>
+                      <div className="text-white font-medium">⚡ Power Consumption</div>
                       <div className="text-white/30 text-[10px]">₱{ELEC_RATE}/hr — wattage-based</div>
                     </div>
                     {hasElec
