@@ -38,20 +38,15 @@ function MonthlySalesTab() {
       .then(r => r.json())
       .then((data: Record<number, LiveMonthData>) => {
         setLiveData(data);
-        // Sync year summary total directly from monthly data (source of truth)
-        const total = Object.values(data).reduce((s, d) => s + (d?.revenue || 0), 0);
-        const shoots = Object.values(data).reduce((s, d) => s + (d?.shoot_count || 0), 0);
+        // Sync live portion of this year's total into yearSummaries
+        // The full total (live + manual) is computed in the Promise.all below
+        // Here we just ensure the live portion is up to date
+        const liveTotal = Object.values(data).reduce((s, d) => s + (d?.revenue || 0), 0);
+        const liveShoots = Object.values(data).reduce((s, d) => s + (d?.shoot_count || 0), 0);
         setYearSummaries(prev => {
           const exists = prev.find(ys => ys.year === year);
-          if (exists) {
-            return prev.map(ys => ys.year === year
-              ? { ...ys, total, shoots, source: (total > 0 ? 'live' : ys.source) as YearSummary['source'] }
-              : ys
-            );
-          }
-          // Add year entry if not present yet
-          if (total > 0 || shoots > 0) {
-            return [...prev, { year, total, shoots, source: 'live' as const }].sort((a, b) => b.year - a.year);
+          if (!exists && (liveTotal > 0 || liveShoots > 0)) {
+            return [...prev, { year, total: liveTotal, shoots: liveShoots, source: 'live' as const }].sort((a, b) => b.year - a.year);
           }
           return prev;
         });
@@ -80,17 +75,19 @@ function MonthlySalesTab() {
         byYear[r.year].shoots += r.shoot_count || 0;
       }
 
-      // Live bookings — override historical for years with actual data
+      // Live bookings — ADD to historical for years that have both
       for (const r of liveYears) {
         const rTotal = r.revenue || 0;
         const rShoots = r.shoot_count || 0;
         if (rTotal > 0 || rShoots > 0) {
-          byYear[r.year] = {
-            year: r.year,
-            total: rTotal,
-            shoots: rShoots,
-            source: byYear[r.year] ? 'both' : 'live',
-          };
+          if (byYear[r.year]) {
+            // Year has historical entries — combine totals
+            byYear[r.year].total += rTotal;
+            byYear[r.year].shoots += rShoots;
+            byYear[r.year].source = 'both';
+          } else {
+            byYear[r.year] = { year: r.year, total: rTotal, shoots: rShoots, source: 'live' };
+          }
         }
       }
 
