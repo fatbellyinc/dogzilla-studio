@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const db = getDb();
+  const { id } = await params;
+  const quotation = db.prepare('SELECT * FROM quotations WHERE id = ?').get(id);
+  if (!quotation) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  return NextResponse.json(quotation);
+}
+
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const db = getDb();
   const { id } = await params;

@@ -12,25 +12,36 @@ interface BookingDetail {
 
 export default function InvoicePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const [bookingId, setBookingId] = useState<number | null>(null);
   const [data, setData] = useState<BookingDetail | null>(null);
   const [orNumber, setOrNumber] = useState('');
   const [editingOR, setEditingOR] = useState(false);
 
-  useEffect(() => {
-    fetch(`/api/bookings/${id}`).then(r => r.json()).then((d: BookingDetail) => {
+  function loadBooking(bid: number) {
+    fetch(`/api/bookings/${bid}`).then(r => r.json()).then((d: BookingDetail) => {
       setData(d);
       if (d.invoice?.or_number) setOrNumber(d.invoice.or_number);
     });
+  }
+
+  useEffect(() => {
+    // id is an invoice ID — look up booking_id first, then fetch booking data
+    fetch(`/api/invoices/${id}`)
+      .then(r => r.json())
+      .then((inv: { booking_id: number }) => {
+        setBookingId(inv.booking_id);
+        loadBooking(inv.booking_id);
+      });
   }, [id]);
 
   async function saveORNumber() {
-    if (!data?.invoice) return;
+    if (!data?.invoice || bookingId === null) return;
     await fetch(`/api/invoices/${data.invoice.id}`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ or_number: orNumber }),
     });
     setEditingOR(false);
-    fetch(`/api/bookings/${id}`).then(r => r.json()).then(setData);
+    loadBooking(bookingId);
   }
 
   if (!data) return <div className="p-8 text-gray-400">Loading...</div>;

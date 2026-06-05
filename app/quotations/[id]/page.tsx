@@ -11,7 +11,14 @@ function DocView({ id }: { id: string }) {
   const isInvoice = params.get('invoice') === '1';
   const [data, setData] = useState<BookingDetail | null>(null);
 
-  useEffect(() => { fetch(`/api/bookings/${id}`).then(r => r.json()).then(setData); }, [id]);
+  useEffect(() => {
+    // id is a quotation ID — look up booking_id first, then fetch booking data
+    fetch(`/api/quotations/${id}`)
+      .then(r => r.json())
+      .then((q: { booking_id: number }) => fetch(`/api/bookings/${q.booking_id}`))
+      .then(r => r.json())
+      .then(setData);
+  }, [id]);
 
   if (!data) return <div className="p-8 text-gray-500">Loading...</div>;
 
