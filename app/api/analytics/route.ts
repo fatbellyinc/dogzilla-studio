@@ -22,7 +22,7 @@ export async function GET() {
     FROM booking_costs bc
     JOIN bookings b ON b.id = bc.booking_id
     WHERE b.booking_date >= date('now', '-12 months') AND b.status = 'completed'
-      AND bc.type != 'personnel'
+      AND NOT (bc.type = 'personnel' AND bc.description = 'Studio Crew')
     GROUP BY month ORDER BY month
   `).all() as { month: string; costs: number }[];
 

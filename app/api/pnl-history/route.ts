@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
         SELECT COALESCE(SUM(bc.total_cost),0) as total FROM booking_costs bc
         JOIN bookings b ON b.id=bc.booking_id
         WHERE strftime('%Y-%m', b.booking_date) = ? AND b.status = 'completed'
-          AND bc.type != 'personnel'
+          AND NOT (bc.type = 'personnel' AND bc.description = 'Studio Crew')
       `).get(mStr) as { total: number }).total;
 
       // Rent: ₱90,000/month starting Nov 2023

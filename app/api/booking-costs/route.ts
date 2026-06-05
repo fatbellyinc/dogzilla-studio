@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
       JOIN clients c ON c.id = b.client_id
       WHERE strftime('%Y-%m', b.booking_date) = ?
         AND b.status = 'completed'
-        AND bc.type != 'personnel'
+        AND NOT (bc.type = 'personnel' AND bc.description = 'Studio Crew')
       ORDER BY bc.type, bc.total_cost DESC
     `).all(month));
   }
