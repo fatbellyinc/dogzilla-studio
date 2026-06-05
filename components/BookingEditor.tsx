@@ -48,16 +48,24 @@ interface Props {
 
 export default function BookingEditor({ bookingId, currentEquipment, currentSubtotal, studioRate, callTime, wrapTime, onSaved, onCancel }: Props) {
   const [items, setItems] = useState<EditItem[]>(() => {
-    const mapped: EditItem[] = currentEquipment.map(e => ({
-      key: `existing-${e.id}`,
-      name: e.name,
-      rate: e.rate,
-      quantity: e.quantity,
-      equipment_id: e.equipment_id || undefined,
-      is_complimentary: !!e.is_complimentary,
-      discount_pct: e.discount_pct || 0,
-      item_type: e.item_type || 'individual',
-    }));
+    const mapped: EditItem[] = currentEquipment.map(e => {
+      const item: EditItem = {
+        key: `existing-${e.id}`,
+        name: e.name,
+        rate: e.rate,
+        quantity: e.quantity,
+        equipment_id: e.equipment_id || undefined,
+        is_complimentary: !!e.is_complimentary,
+        discount_pct: e.discount_pct || 0,
+        item_type: e.item_type || 'individual',
+      };
+      // Normalize old electricity name patterns → "Electricity Charge"
+      if (item.name.toLowerCase().includes('electricity')) {
+        item.name = 'Electricity Charge';
+        item.key = 'ADD_ELEC'; // ensure key is canonical so isElecItem catches it
+      }
+      return item;
+    });
     // Deduplicate electricity items — keep the one with the highest rate, drop the rest
     const elecItems = mapped.filter(i => isElecItem(i));
     if (elecItems.length > 1) {
