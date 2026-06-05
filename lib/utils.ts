@@ -86,8 +86,9 @@ export function calcOT(studioRate: string, callTime: string | null, wrapTime: st
   includedShootHrs: number;
   otHrs: number;
   otAmount: number;
+  otRate: number;
 } {
-  const zero = { durationHrs: 0, ingressEgressHrs: 0, shootHrs: 0, includedShootHrs: 0, otHrs: 0, otAmount: 0 };
+  const zero = { durationHrs: 0, ingressEgressHrs: 0, shootHrs: 0, includedShootHrs: 0, otHrs: 0, otAmount: 0, otRate: OT_RATE };
   if (!callTime || !wrapTime) return zero;
   const shootIncluded = SHOOT_HOURS[studioRate] || 0;
   if (shootIncluded === 0) return zero;
