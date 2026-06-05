@@ -130,7 +130,13 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
                     {/* Qty */}
                     <div className="flex items-center gap-1 shrink-0">
                       <button onClick={() => updateQty(item.key, item.quantity - 1)} className="w-5 h-5 bg-[#2a2a2a] rounded text-white text-xs">−</button>
-                      <span className="text-xs text-white w-5 text-center">{item.quantity}</span>
+                      <input
+                        type="number"
+                        min={1}
+                        value={item.quantity}
+                        onChange={e => updateQty(item.key, Number(e.target.value) || 1)}
+                        className="w-8 bg-[#1a1a1a] border border-[#2a2a2a] rounded px-1 py-0.5 text-xs text-white text-center focus:outline-none focus:border-[#E32726]"
+                      />
                       <button onClick={() => updateQty(item.key, item.quantity + 1)} className="w-5 h-5 bg-[#2a2a2a] rounded text-white text-xs">+</button>
                     </div>
                     {/* Custom price */}

@@ -422,11 +422,12 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
               </button>
             </div>
             <div className="space-y-2 text-sm">
-              {(booking.is_pencil || booking.no_deposit || booking.vat_exempt) && (
+              {(booking.is_pencil || booking.no_deposit || booking.vat_exempt || booking.fully_paid) && (
                 <div className="flex items-center gap-2 mb-2 flex-wrap">
                   {booking.is_pencil && <span className="text-xs bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 px-2 py-0.5 rounded font-semibold">✏️ PENCIL</span>}
                   {booking.no_deposit && <span className="text-xs bg-green-500/20 text-green-400 border border-green-500/30 px-2 py-0.5 rounded font-semibold">🤝 NO DEPOSIT</span>}
                   {booking.vat_exempt && <span className="text-xs bg-blue-500/20 text-blue-400 border border-blue-500/30 px-2 py-0.5 rounded font-semibold">🔵 VAT EXEMPT</span>}
+                  {booking.fully_paid && <span className="text-xs bg-green-500/20 text-green-400 border border-green-500/30 px-2 py-0.5 rounded font-semibold">💰 FULLY PAID</span>}
                 </div>
               )}
               {booking.series_id && <SeriesPanel bookingId={Number(id)} seriesId={booking.series_id} />}
@@ -671,6 +672,17 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                 <button onClick={() => updateStatus('completed')} disabled={saving}
                   className="w-full bg-blue-500/20 text-blue-400 border border-blue-500/30 text-sm py-2 rounded-lg hover:bg-blue-500/30 transition-colors">
                   ✓ Mark Completed
+                </button>
+              )}
+              {/* Paid toggle — visible for completed bookings */}
+              {booking.status === 'completed' && (
+                <button onClick={async () => {
+                  setSaving(true);
+                  await fetch(`/api/bookings/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fully_paid: !booking.fully_paid }) });
+                  await load(); setSaving(false);
+                }} disabled={saving}
+                  className={`w-full text-sm py-2 rounded-lg border transition-colors ${booking.fully_paid ? 'bg-green-500/20 text-green-400 border-green-500/30 hover:bg-green-500/30' : 'bg-[#2a2a2a] text-white/60 border-[#2a2a2a] hover:text-green-400 hover:border-green-500/30'}`}>
+                  💰 {booking.fully_paid ? 'Paid in Full ✓ (tap to unmark)' : 'Mark as Fully Paid'}
                 </button>
               )}
               {/* Rebook — always available */}

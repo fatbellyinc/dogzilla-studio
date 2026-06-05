@@ -22,11 +22,12 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   const db = getDb();
   const { id } = await params;
   const body = await req.json();
-  const { status, notes, deposit_paid, discount_type, discount_value, is_pencil, vat_exempt, no_deposit, call_time, wrap_time, overtime_hours, overtime_amount } = body;
+  const { status, notes, deposit_paid, fully_paid, discount_type, discount_value, is_pencil, vat_exempt, no_deposit, call_time, wrap_time, overtime_hours, overtime_amount } = body;
 
   if (status !== undefined) { db.prepare('UPDATE bookings SET status = ? WHERE id = ?').run(status, id); logActivity(Number(id), ACTIONS.STATUS_CHANGED, `Status changed to ${status}`); }
   if (notes !== undefined) db.prepare('UPDATE bookings SET notes = ? WHERE id = ?').run(notes, id);
   if (deposit_paid !== undefined) db.prepare('UPDATE bookings SET deposit_paid = ? WHERE id = ?').run(deposit_paid ? 1 : 0, id);
+  if (fully_paid !== undefined) db.prepare('UPDATE bookings SET fully_paid = ? WHERE id = ?').run(fully_paid ? 1 : 0, id);
   if (vat_exempt !== undefined) db.prepare("UPDATE bookings SET vat_exempt = ? WHERE id = ?").run(vat_exempt ? 1 : 0, id);
   if (no_deposit !== undefined) db.prepare("UPDATE bookings SET no_deposit = ? WHERE id = ?").run(no_deposit ? 1 : 0, id);
   if (is_pencil !== undefined) { db.prepare('UPDATE bookings SET is_pencil = ? WHERE id = ?').run(is_pencil ? 1 : 0, id); logActivity(Number(id), ACTIONS.PENCIL_TOGGLED, is_pencil ? 'Marked as pencil booking' : 'Pencil removed — confirmed'); }

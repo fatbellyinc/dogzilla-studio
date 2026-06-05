@@ -50,6 +50,7 @@ export interface Booking {
   overtime_hours: number;
   overtime_amount: number;
   deposit_paid: number;
+  fully_paid: number;
   discount_type: 'percent' | 'fixed' | null;
   discount_value: number;
   discount_amount: number;
