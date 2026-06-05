@@ -14,94 +14,170 @@ const CAPEX_CATEGORIES = ['Construction','Equipment','Renovation','Furniture','P
 const ic = 'bg-[#0f0f0f] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-[#E32726]';
 
 // ─── MONTHLY SALES TAB ───────────────────────────────────────────────────────
+interface LiveMonthData { revenue: number; shoot_count: number; vat: number; cancelled_count: number; }
+interface HistoricalMonthData { revenue: string; shoots: string; }
+interface YearSummary { year: number; total: number; shoots: number; source: 'live' | 'historical' | 'both'; }
+
 function MonthlySalesTab() {
   const currentYear = new Date().getFullYear();
+  const currentMonth = new Date().getMonth() + 1;
   const [year, setYear] = useState(currentYear);
-  const [grid, setGrid] = useState<Record<number, { revenue: string; shoots: string }>>({});
+
+  // Live data from bookings table (auto, read-only)
+  const [liveData, setLiveData] = useState<Record<number, LiveMonthData>>({});
+  // Historical data (manual, editable — for pre-app records)
+  const [histGrid, setHistGrid] = useState<Record<number, HistoricalMonthData>>({});
+
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [yearTotals, setYearTotals] = useState<{ year: number; total: number; shoots: number }[]>([]);
+  const [yearSummaries, setYearSummaries] = useState<YearSummary[]>([]);
 
   useEffect(() => {
-    // Load this year's data
-    fetch(`/api/historical-sales?year=${year}`).then(r => r.json()).then(rows => {
-      const g: Record<number, { revenue: string; shoots: string }> = {};
-      for (const r of rows) g[r.month] = { revenue: String(r.revenue || ''), shoots: String(r.shoot_count || '') };
-      setGrid(g);
-    });
-    // Load year totals summary
-    fetch('/api/historical-sales').then(r => r.json()).then(all => {
-      const byYear: Record<number, { total: number; shoots: number }> = {};
-      for (const r of all) {
-        if (!byYear[r.year]) byYear[r.year] = { total: 0, shoots: 0 };
+    // Load LIVE booking revenue for this year
+    fetch(`/api/monthly-revenue?year=${year}`)
+      .then(r => r.json())
+      .then((data: Record<number, LiveMonthData>) => setLiveData(data));
+
+    // Load historical (manual) entries for this year
+    fetch(`/api/historical-sales?year=${year}`)
+      .then(r => r.json())
+      .then((rows: { month: number; revenue: number; shoot_count: number }[]) => {
+        const g: Record<number, HistoricalMonthData> = {};
+        for (const r of rows) g[r.month] = { revenue: String(r.revenue || ''), shoots: String(r.shoot_count || '') };
+        setHistGrid(g);
+      });
+
+    // Load all-years summary — merge live + historical
+    Promise.all([
+      fetch('/api/monthly-revenue').then(r => r.json()) as Promise<{ year: number; revenue: number; shoot_count: number }[]>,
+      fetch('/api/historical-sales').then(r => r.json()) as Promise<{ year: number; month: number; revenue: number; shoot_count: number }[]>,
+    ]).then(([liveYears, histAll]) => {
+      const byYear: Record<number, YearSummary> = {};
+
+      // Historical entries
+      for (const r of histAll) {
+        if (!byYear[r.year]) byYear[r.year] = { year: r.year, total: 0, shoots: 0, source: 'historical' };
         byYear[r.year].total += r.revenue || 0;
         byYear[r.year].shoots += r.shoot_count || 0;
       }
-      setYearTotals(Object.entries(byYear).map(([y, v]) => ({ year: Number(y), ...v })).sort((a, b) => b.year - a.year));
+
+      // Live bookings — override historical for years with actual data
+      for (const r of liveYears) {
+        if (r.revenue > 0 || r.shoot_count > 0) {
+          if (byYear[r.year]) {
+            // Year exists in historical too — mark as 'both', use live for totals
+            byYear[r.year] = { year: r.year, total: r.revenue, shoots: r.shoot_count, source: 'both' };
+          } else {
+            byYear[r.year] = { year: r.year, total: r.revenue, shoots: r.shoot_count, source: 'live' };
+          }
+        }
+      }
+
+      setYearSummaries(Object.values(byYear).sort((a, b) => b.year - a.year));
     });
   }, [year]);
 
-  async function save() {
+  async function saveHistorical() {
     setSaving(true);
-    const rows = Object.entries(grid).map(([m, v]) => ({ year, month: Number(m), revenue: Number(v.revenue) || 0, shoot_count: Number(v.shoots) || 0 })).filter(r => r.revenue > 0 || r.shoot_count > 0);
+    const rows = Object.entries(histGrid)
+      .map(([m, v]) => ({ year, month: Number(m), revenue: Number(v.revenue) || 0, shoot_count: Number(v.shoots) || 0 }))
+      .filter(r => r.revenue > 0 || r.shoot_count > 0);
     await fetch('/api/historical-sales', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(rows) });
     setSaving(false); setSaved(true); setTimeout(() => setSaved(false), 2000);
   }
 
-  const yearTotal = Object.values(grid).reduce((s, v) => s + (Number(v.revenue) || 0), 0);
+  const liveYearTotal = Object.values(liveData).reduce((s, d) => s + (d?.revenue || 0), 0);
+  const hasLiveData = liveYearTotal > 0;
 
   return (
     <div className="space-y-4">
+      {/* Year nav */}
       <div className="flex items-center gap-3">
         <button onClick={() => setYear(y => y - 1)} className="w-8 h-8 bg-[#2a2a2a] rounded text-white/60 hover:text-white">‹</button>
         <span className="text-white font-bold text-lg w-16 text-center">{year}</span>
         <button onClick={() => setYear(y => y + 1)} className="w-8 h-8 bg-[#2a2a2a] rounded text-white/60 hover:text-white">›</button>
-        <span className="text-xs text-white/40 ml-2">Enter monthly revenue and shoot count</span>
-        {yearTotal > 0 && <span className="ml-auto text-sm font-bold text-[#E32726]">Year total: {formatPHP(yearTotal)}</span>}
+        {hasLiveData && (
+          <span className="text-xs bg-green-500/20 text-green-400 border border-green-500/30 px-2 py-0.5 rounded font-semibold">
+            🟢 LIVE · {formatPHP(liveYearTotal)}
+          </span>
+        )}
+        {!hasLiveData && (
+          <span className="text-xs text-white/30 ml-2">No bookings in app for {year} — enter manually below</span>
+        )}
       </div>
 
       {/* 12-month grid */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
         {MONTHS_SHORT.map((m, i) => {
           const month = i + 1;
-          const val = grid[month] || { revenue: '', shoots: '' };
+          const live = liveData[month];
+          const hist = histGrid[month] || { revenue: '', shoots: '' };
+          const isFuture = year > currentYear || (year === currentYear && month > currentMonth);
+          const hasLive = live && (live.revenue > 0 || live.shoot_count > 0);
+
           return (
-            <div key={month} className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-3">
-              <div className="text-xs text-white/40 mb-2 font-semibold">{m} {year}</div>
-              <div className="space-y-1.5">
-                <div>
-                  <label className="text-[10px] text-white/30">Revenue (₱)</label>
-                  <input type="number" value={val.revenue} placeholder="0" min="0"
-                    onChange={e => setGrid(g => ({ ...g, [month]: { ...val, revenue: e.target.value } }))}
-                    className="w-full bg-[#0f0f0f] border border-[#2a2a2a] rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-[#E32726]" />
-                </div>
-                <div>
-                  <label className="text-[10px] text-white/30">Shoots</label>
-                  <input type="number" value={val.shoots} placeholder="0" min="0"
-                    onChange={e => setGrid(g => ({ ...g, [month]: { ...val, shoots: e.target.value } }))}
-                    className="w-full bg-[#0f0f0f] border border-[#2a2a2a] rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-[#E32726]" />
-                </div>
+            <div key={month} className={`rounded-xl p-3 border ${hasLive ? 'bg-green-500/5 border-green-500/20' : 'bg-[#1a1a1a] border-[#2a2a2a]'}`}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-xs text-white/40 font-semibold">{m} {year}</div>
+                {hasLive && <span className="text-[9px] text-green-400 font-bold">LIVE</span>}
               </div>
-              {val.revenue && <div className="text-xs text-[#E32726] font-semibold mt-1">{formatPHP(Number(val.revenue))}</div>}
+
+              {/* Live data (auto) */}
+              {hasLive ? (
+                <div className="space-y-0.5 mb-2">
+                  <div className="text-sm font-bold text-green-400">{formatPHP(live.revenue)}</div>
+                  <div className="text-[10px] text-white/40">{live.shoot_count} shoot{live.shoot_count !== 1 ? 's' : ''}</div>
+                  {live.vat > 0 && <div className="text-[10px] text-white/30">+{formatPHP(live.vat)} VAT</div>}
+                  {live.cancelled_count > 0 && <div className="text-[10px] text-red-400/60">{live.cancelled_count} cancelled</div>}
+                </div>
+              ) : !isFuture ? (
+                /* Manual entry for months with no live data */
+                <div className="space-y-1.5">
+                  <div>
+                    <label className="text-[10px] text-white/30">Revenue (₱)</label>
+                    <input type="number" value={hist.revenue} placeholder="0" min="0"
+                      onChange={e => setHistGrid(g => ({ ...g, [month]: { ...hist, revenue: e.target.value } }))}
+                      className="w-full bg-[#0f0f0f] border border-[#2a2a2a] rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-[#E32726]" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-white/30">Shoots</label>
+                    <input type="number" value={hist.shoots} placeholder="0" min="0"
+                      onChange={e => setHistGrid(g => ({ ...g, [month]: { ...hist, shoots: e.target.value } }))}
+                      className="w-full bg-[#0f0f0f] border border-[#2a2a2a] rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-[#E32726]" />
+                  </div>
+                  {hist.revenue && <div className="text-xs text-[#E32726]/80 font-semibold">{formatPHP(Number(hist.revenue))}</div>}
+                </div>
+              ) : (
+                <div className="text-[10px] text-white/15 italic">—</div>
+              )}
             </div>
           );
         })}
       </div>
 
-      <button onClick={save} disabled={saving} className="w-full bg-[#E32726] text-white py-2.5 rounded-lg font-semibold text-sm disabled:opacity-50">
-        {saved ? '✓ Saved!' : saving ? 'Saving...' : `Save ${year} Data`}
-      </button>
+      {/* Save button — only shown if there are manual (historical) entries to save */}
+      {Object.keys(histGrid).length > 0 && (
+        <button onClick={saveHistorical} disabled={saving} className="w-full bg-[#E32726] text-white py-2.5 rounded-lg font-semibold text-sm disabled:opacity-50">
+          {saved ? '✓ Saved!' : saving ? 'Saving...' : `Save ${year} Historical Data`}
+        </button>
+      )}
 
       {/* All years summary */}
-      {yearTotals.length > 0 && (
+      {yearSummaries.length > 0 && (
         <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl">
           <div className="p-3 border-b border-[#2a2a2a] text-xs text-white/40 uppercase tracking-wider">All Years Summary</div>
-          <div className="divide-y divide-[#2a2a2a] max-h-64 overflow-y-auto">
-            {yearTotals.map(yt => (
-              <button key={yt.year} onClick={() => setYear(yt.year)} className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-[#222] transition-colors text-left">
-                <span className={`text-sm font-semibold ${yt.year === year ? 'text-[#E32726]' : 'text-white'}`}>{yt.year}</span>
+          <div className="divide-y divide-[#2a2a2a] max-h-72 overflow-y-auto">
+            {yearSummaries.map(yt => (
+              <button key={yt.year} onClick={() => setYear(yt.year)}
+                className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-[#222] transition-colors text-left">
+                <div className="flex items-center gap-2">
+                  <span className={`text-sm font-semibold ${yt.year === year ? 'text-[#E32726]' : 'text-white'}`}>{yt.year}</span>
+                  {yt.source === 'live' && <span className="text-[9px] text-green-400 border border-green-500/30 px-1 rounded">LIVE</span>}
+                  {yt.source === 'historical' && <span className="text-[9px] text-white/30 border border-white/10 px-1 rounded">manual</span>}
+                  {yt.source === 'both' && <span className="text-[9px] text-green-400 border border-green-500/30 px-1 rounded">LIVE</span>}
+                </div>
                 <div className="text-right">
-                  <div className="text-sm text-white">{formatPHP(yt.total)}</div>
+                  <div className={`text-sm font-bold ${yt.source !== 'historical' ? 'text-green-400' : 'text-white'}`}>{formatPHP(yt.total)}</div>
                   <div className="text-xs text-white/40">{yt.shoots} shoots</div>
                 </div>
               </button>
@@ -109,7 +185,7 @@ function MonthlySalesTab() {
           </div>
           <div className="p-3 border-t border-[#2a2a2a] flex justify-between text-sm font-bold text-white">
             <span>All-time total</span>
-            <span className="text-[#E32726]">{formatPHP(yearTotals.reduce((s, y) => s + y.total, 0))}</span>
+            <span className="text-[#E32726]">{formatPHP(yearSummaries.reduce((s, y) => s + y.total, 0))}</span>
           </div>
         </div>
       )}
