@@ -23,6 +23,15 @@ export async function GET() {
     JOIN bookings b ON b.id = bc.booking_id
     WHERE b.booking_date >= date('now', '-12 months') AND b.status = 'completed'
       AND NOT (bc.type = 'personnel' AND bc.description = 'Studio Crew')
+      AND NOT (
+        bc.type = 'electricity'
+        AND EXISTS (
+          SELECT 1 FROM booking_equipment be
+          WHERE be.booking_id = bc.booking_id
+            AND be.is_complimentary = 0
+            AND LOWER(be.name) LIKE '%power consumption%'
+        )
+      )
     GROUP BY month ORDER BY month
   `).all() as { month: string; costs: number }[];
 

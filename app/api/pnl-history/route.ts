@@ -47,6 +47,15 @@ export async function GET(req: NextRequest) {
         JOIN bookings b ON b.id=bc.booking_id
         WHERE strftime('%Y-%m', b.booking_date) = ? AND b.status = 'completed'
           AND NOT (bc.type = 'personnel' AND bc.description = 'Studio Crew')
+          AND NOT (
+            bc.type = 'electricity'
+            AND EXISTS (
+              SELECT 1 FROM booking_equipment be
+              WHERE be.booking_id = bc.booking_id
+                AND be.is_complimentary = 0
+                AND LOWER(be.name) LIKE '%power consumption%'
+            )
+          )
       `).get(mStr) as { total: number }).total;
 
       // Rent: ₱90,000/month starting Nov 2023

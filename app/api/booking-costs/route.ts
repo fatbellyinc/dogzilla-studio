@@ -16,6 +16,15 @@ export async function GET(req: NextRequest) {
       WHERE strftime('%Y-%m', b.booking_date) = ?
         AND b.status = 'completed'
         AND NOT (bc.type = 'personnel' AND bc.description = 'Studio Crew')
+        AND NOT (
+          bc.type = 'electricity'
+          AND EXISTS (
+            SELECT 1 FROM booking_equipment be
+            WHERE be.booking_id = bc.booking_id
+              AND be.is_complimentary = 0
+              AND LOWER(be.name) LIKE '%power consumption%'
+          )
+        )
       ORDER BY bc.type, bc.total_cost DESC
     `).all(month));
   }
