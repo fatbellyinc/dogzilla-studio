@@ -205,8 +205,13 @@ function ShootTimesPanel({ callTime, wrapTime, studioRate, onSave }: {
         </div>
       )}
 
+      {ct && wt && ot.durationHrs > 0 && (
+        <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg px-3 py-2 text-[10px] text-yellow-400">
+          ⚡ Electricity auto-update: {ot.durationHrs.toFixed(1)}hrs × ₱750 = <strong>{formatPHP(Math.round(ot.durationHrs * 750))}</strong> — saved when you click Save Times
+        </div>
+      )}
       {(!ct || !wt) && (
-        <p className="text-xs text-white/30">Set call and wrap time to automatically calculate overtime</p>
+        <p className="text-xs text-white/30">Set call and wrap time to auto-calculate overtime and electricity</p>
       )}
     </div>
   );
@@ -337,6 +342,29 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ call_time: ct, wrap_time: wt, overtime_hours: ot.otHrs, overtime_amount: ot.otAmount }),
     });
+
+    // Auto-update electricity item if one exists in booking equipment
+    if (ct && wt && equipment.length > 0) {
+      const [ch, cm] = ct.split(':').map(Number);
+      const [wh, wm] = wt.split(':').map(Number);
+      const hrs = Math.max(0, (wh * 60 + wm - (ch * 60 + cm)) / 60);
+      if (hrs > 0) {
+        const hasElec = equipment.some(e => e.name.toLowerCase().includes('electricity'));
+        if (hasElec) {
+          const newRate = Math.round(hrs * 750);
+          const updatedItems = equipment.map(e =>
+            e.name.toLowerCase().includes('electricity')
+              ? { ...e, rate: newRate, name: 'Electricity Charge', quantity: 1 }
+              : e
+          );
+          await fetch(`/api/bookings/${id}/equipment`, {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ equipment_items: updatedItems }),
+          });
+        }
+      }
+    }
+
     await load();
   }
 
