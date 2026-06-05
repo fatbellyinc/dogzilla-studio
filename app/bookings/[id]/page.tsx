@@ -742,7 +742,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
               {/* Quotation */}
               <div className="flex gap-1.5">
                 {quotation ? (
-                  <Link href={`/quotations/${quotation.id}?booking_id=${booking.id}`} target="_blank"
+                  <Link href={`/quotations/booking/${booking.id}`} target="_blank"
                     className="flex-1 text-center bg-[#2a2a2a] text-white/80 text-sm py-2 rounded-lg hover:bg-[#333] transition-colors">
                     📄 View Quote
                   </Link>
@@ -763,7 +763,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
               {/* Invoice */}
               <div className="flex gap-1.5">
                 {invoice ? (
-                  <Link href={`/invoices/${invoice.id}?booking_id=${booking.id}`} target="_blank"
+                  <Link href={`/invoices/booking/${booking.id}`} target="_blank"
                     className="flex-1 text-center bg-[#E32726]/20 text-[#E32726] border border-[#E32726]/30 text-sm py-2 rounded-lg hover:bg-[#E32726]/30 transition-colors font-semibold">
                     🧾 {invoice.invoice_number}
                   </Link>
