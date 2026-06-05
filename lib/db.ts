@@ -321,6 +321,16 @@ function initSchema(db: Database.Database) {
     try { db.exec(sql); } catch { /* column already exists */ }
   }
 
+  // Equipment upserts — add new items to existing databases
+  const equipmentUpserts: [string, string, string, number, number, string, number][] = [
+    ['LED-032', 'Rectangular Softbox', 'lighting', 500, 2, 'Passive modifier', 0],
+  ];
+  for (const [code, name, category, daily_rate, quantity, description, wattage] of equipmentUpserts) {
+    try {
+      db.prepare(`INSERT INTO equipment (code, name, category, daily_rate, quantity, description, wattage) SELECT ?, ?, ?, ?, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM equipment WHERE code = ?)`).run(code, name, category, daily_rate, quantity, description, wattage, code);
+    } catch { /* ignore */ }
+  }
+
   // Create newer tables that may not exist in older databases
   const newTables = [
     `CREATE TABLE IF NOT EXISTS studio_visits (
@@ -508,6 +518,7 @@ function seedEquipment(db: Database.Database) {
     ['LED-029', 'Dracast Yoga Bicolor 2-Panel', 'lighting', 750, 2, '', 100],
     ['LED-030', 'RGB Light Tube 4ft', 'lighting', 1000, 4, '', 30],
     ['LED-031', 'RGB Flex Lights LED', 'lighting', 3500, 2, '', 50],
+    ['LED-032', 'Rectangular Softbox', 'lighting', 500, 2, 'Passive modifier', 0],
 
     // LIGHTS — OLD SCHOOL (tungsten/HMI draw more power)
     ['OLD-001', '2K Fresnel Strand', 'lighting_old', 650, 4, 'Tungsten 2,000W each', 2000],
