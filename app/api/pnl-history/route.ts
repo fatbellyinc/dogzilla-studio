@@ -22,15 +22,16 @@ export async function GET(req: NextRequest) {
       // Revenue from historical_sales table
       const hist = db.prepare('SELECT revenue FROM historical_sales WHERE year=? AND month=?').get(year, month) as { revenue: number } | undefined;
 
-      // Revenue from actual bookings (for when app was in use)
+      // Revenue from actual COMPLETED bookings only
       const appRevRow = db.prepare(`
         SELECT COALESCE(SUM(total),0) as rev FROM bookings
-        WHERE strftime('%Y-%m', booking_date) = ? AND status NOT IN ('cancelled')
+        WHERE strftime('%Y-%m', booking_date) = ? AND status = 'completed'
       `).get(mStr) as { rev: number };
 
-      // Use historical if it has data, otherwise use app bookings
-      // If both have data, use the larger (shouldn't overlap but just in case)
-      const revenue = Math.max(hist?.revenue || 0, appRevRow?.rev || 0);
+      // Use completed app revenue if available; fall back to historical/manual entry
+      const appRevenue = appRevRow?.rev || 0;
+      const histRevenue = hist?.revenue || 0;
+      const revenue = appRevenue > 0 ? appRevenue : histRevenue;
 
       // Utility bills this month
       const utils = db.prepare('SELECT account, SUM(amount) as total FROM utility_bills WHERE year=? AND month=? GROUP BY account').all(year, month) as { account: string; total: number }[];
@@ -44,7 +45,7 @@ export async function GET(req: NextRequest) {
       const varCosts = (db.prepare(`
         SELECT COALESCE(SUM(bc.total_cost),0) as total FROM booking_costs bc
         JOIN bookings b ON b.id=bc.booking_id
-        WHERE strftime('%Y-%m', b.booking_date) = ? AND b.status != 'cancelled'
+        WHERE strftime('%Y-%m', b.booking_date) = ? AND b.status = 'completed'
       `).get(mStr) as { total: number }).total;
 
       // Rent: ₱90,000/month starting Nov 2023

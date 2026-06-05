@@ -8,8 +8,8 @@ export async function GET() {
   const monthlyRevenue = db.prepare(`
     SELECT strftime('%Y-%m', booking_date) as month,
       COUNT(*) as booking_count,
-      SUM(CASE WHEN status != 'cancelled' THEN total ELSE 0 END) as revenue,
-      SUM(CASE WHEN status != 'cancelled' THEN total * 0.12 ELSE 0 END) as vat
+      SUM(CASE WHEN status = 'completed' THEN total ELSE 0 END) as revenue,
+      SUM(CASE WHEN status = 'completed' THEN total * 0.12 ELSE 0 END) as vat
     FROM bookings
     WHERE booking_date >= date('now', '-18 months')
     GROUP BY month ORDER BY month
@@ -21,7 +21,7 @@ export async function GET() {
       SUM(bc.total_cost) as costs
     FROM booking_costs bc
     JOIN bookings b ON b.id = bc.booking_id
-    WHERE b.booking_date >= date('now', '-12 months') AND b.status != 'cancelled'
+    WHERE b.booking_date >= date('now', '-12 months') AND b.status = 'completed'
     GROUP BY month ORDER BY month
   `).all() as { month: string; costs: number }[];
 

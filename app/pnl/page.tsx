@@ -33,12 +33,13 @@ export default function PnLPage() {
       // Also fetch historical sales for this month
       fetch(`/api/historical-sales?year=${y}`).then(r => r.json()),
     ]).then(([bookings, utilities, analytics, historicalSales]) => {
-      const activeBookings = bookings.filter((b: { status: string }) => b.status !== 'cancelled');
-      const appRevenue = activeBookings.reduce((s: number, b: { total: number }) => s + b.total, 0);
-      // Use historical sales if no app bookings, otherwise use the larger value
+      // Only completed bookings count as realised revenue
+      const completedBookings = bookings.filter((b: { status: string }) => b.status === 'completed');
+      const appRevenue = completedBookings.reduce((s: number, b: { total: number }) => s + b.total, 0);
+      // Fall back to historical/manual entry only when no completed app bookings exist for the month
       const histRow = historicalSales.find((h: { month: number }) => h.month === parseInt(m));
       const histRevenue = histRow?.revenue || 0;
-      const revenue = Math.max(appRevenue, histRevenue);
+      const revenue = appRevenue > 0 ? appRevenue : histRevenue;
       const vatLiability = revenue * 0.12;
       const netRevenue = revenue;
 
