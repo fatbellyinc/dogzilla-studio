@@ -33,10 +33,29 @@ function MonthlySalesTab() {
   const [yearSummaries, setYearSummaries] = useState<YearSummary[]>([]);
 
   useEffect(() => {
-    // Load LIVE booking revenue for this year
+    // Load LIVE booking revenue month-by-month for this year
     fetch(`/api/monthly-revenue?year=${year}`)
       .then(r => r.json())
-      .then((data: Record<number, LiveMonthData>) => setLiveData(data));
+      .then((data: Record<number, LiveMonthData>) => {
+        setLiveData(data);
+        // Sync year summary total directly from monthly data (source of truth)
+        const total = Object.values(data).reduce((s, d) => s + (d?.revenue || 0), 0);
+        const shoots = Object.values(data).reduce((s, d) => s + (d?.shoot_count || 0), 0);
+        setYearSummaries(prev => {
+          const exists = prev.find(ys => ys.year === year);
+          if (exists) {
+            return prev.map(ys => ys.year === year
+              ? { ...ys, total, shoots, source: (total > 0 ? 'live' : ys.source) as YearSummary['source'] }
+              : ys
+            );
+          }
+          // Add year entry if not present yet
+          if (total > 0 || shoots > 0) {
+            return [...prev, { year, total, shoots, source: 'live' as const }].sort((a, b) => b.year - a.year);
+          }
+          return prev;
+        });
+      });
 
     // Load historical (manual) entries for this year
     fetch(`/api/historical-sales?year=${year}`)
@@ -47,7 +66,7 @@ function MonthlySalesTab() {
         setHistGrid(g);
       });
 
-    // Load all-years summary — merge live + historical
+    // Load all-years summary — merge live + historical (initial population)
     Promise.all([
       fetch('/api/monthly-revenue').then(r => r.json()) as Promise<{ year: number; revenue: number; shoot_count: number }[]>,
       fetch('/api/historical-sales').then(r => r.json()) as Promise<{ year: number; month: number; revenue: number; shoot_count: number }[]>,
@@ -63,17 +82,32 @@ function MonthlySalesTab() {
 
       // Live bookings — override historical for years with actual data
       for (const r of liveYears) {
-        if (r.revenue > 0 || r.shoot_count > 0) {
-          if (byYear[r.year]) {
-            // Year exists in historical too — mark as 'both', use live for totals
-            byYear[r.year] = { year: r.year, total: r.revenue, shoots: r.shoot_count, source: 'both' };
-          } else {
-            byYear[r.year] = { year: r.year, total: r.revenue, shoots: r.shoot_count, source: 'live' };
-          }
+        const rTotal = r.revenue || 0;
+        const rShoots = r.shoot_count || 0;
+        if (rTotal > 0 || rShoots > 0) {
+          byYear[r.year] = {
+            year: r.year,
+            total: rTotal,
+            shoots: rShoots,
+            source: byYear[r.year] ? 'both' : 'live',
+          };
         }
       }
 
-      setYearSummaries(Object.values(byYear).sort((a, b) => b.year - a.year));
+      // Ensure current year always included even if no historical data
+      if (!byYear[year]) {
+        byYear[year] = { year, total: 0, shoots: 0, source: 'live' };
+      }
+
+      setYearSummaries(prev => {
+        const summaries = Object.values(byYear).sort((a, b) => b.year - a.year);
+        // Preserve any monthly-computed total that was already synced for current year
+        const existing = prev.find(p => p.year === year);
+        if (existing && existing.source === 'live') {
+          return summaries.map(s => s.year === year ? existing : s);
+        }
+        return summaries;
+      });
     });
   }, [year]);
 
