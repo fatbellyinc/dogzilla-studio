@@ -756,10 +756,20 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                   ✕ Cancel Booking
                 </button>
               ) : (
-                <button onClick={() => updateStatus('pending')} disabled={saving}
-                  className="w-full bg-yellow-500/10 text-yellow-400 border border-yellow-500/30 text-sm py-2 rounded-lg hover:bg-yellow-500/20 transition-colors">
-                  ↩ Restore Booking
-                </button>
+                <>
+                  <button onClick={() => updateStatus('pending')} disabled={saving}
+                    className="w-full bg-yellow-500/10 text-yellow-400 border border-yellow-500/30 text-sm py-2 rounded-lg hover:bg-yellow-500/20 transition-colors">
+                    ↩ Restore Booking
+                  </button>
+                  <button onClick={async () => {
+                    if (!confirm('⚠️ PERMANENTLY DELETE this booking?\n\nThis removes all records — payments, invoices, quotations, equipment. This CANNOT be undone.')) return;
+                    await fetch(`/api/bookings/${id}`, { method: 'DELETE' });
+                    router.push('/bookings');
+                  }} disabled={saving}
+                    className="w-full bg-red-900/30 text-red-400 border border-red-500/40 text-sm py-2 rounded-lg hover:bg-red-900/50 transition-colors font-semibold">
+                    🗑 Permanently Delete
+                  </button>
+                </>
               )}
             </div>
           </div>

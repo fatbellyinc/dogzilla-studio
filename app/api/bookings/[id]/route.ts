@@ -58,6 +58,10 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const db = getDb();
   const { id } = await params;
+  // Manually delete quotations and invoices (no CASCADE on those tables)
+  db.prepare('DELETE FROM quotations WHERE booking_id = ?').run(id);
+  db.prepare('DELETE FROM invoices WHERE booking_id = ?').run(id);
+  // Delete booking (cascades to equipment, payments, costs, crew, days, activity_log)
   db.prepare('DELETE FROM bookings WHERE id = ?').run(id);
   return NextResponse.json({ ok: true });
 }
