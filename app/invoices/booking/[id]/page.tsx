@@ -89,7 +89,7 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
   const waLink = `https://wa.me/${STUDIO_WHATSAPP.replace(/\D/g, '')}`;
 
   return (
-    <div className="min-h-screen bg-white p-6 md:p-10 max-w-[794px] mx-auto" style={{ color: '#111', fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '13px' }}>
+    <div className="min-h-screen bg-white p-6 md:p-10 max-w-[794px] mx-auto" style={{ color: '#111', fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '13px', paddingTop: '24px' }}>
 
       {/* Header */}
       <div className="flex items-start justify-between mb-6 pb-5" style={{ borderBottom: '3px solid #E32726' }}>

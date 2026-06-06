@@ -27,3 +27,8 @@ body {
   body { background: white !important; color: black !important; }
   .print-white { background: white !important; color: black !important; }
 }
+
+@page {
+  margin: 12mm 10mm 10mm 10mm;
+  size: A4;
+}
