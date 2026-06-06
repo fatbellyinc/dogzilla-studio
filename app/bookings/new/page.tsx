@@ -646,6 +646,58 @@ function NewBookingForm() {
               </div>
             </div>
 
+            {/* Manpower / Crew — billable line items */}
+            <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="font-semibold text-white text-sm">👥 Manpower / Crew</h2>
+                <span className="text-[10px] text-white/30">Added as billable items on invoice</span>
+              </div>
+              <div className="space-y-2">
+                {[
+                  { key: 'MP_CREW', label: 'Studio Crew', rate: 1500, desc: '₱1,500/pax/day' },
+                  { key: 'MP_ADMIN', label: 'Admin', rate: 3000, desc: '₱3,000/pax/day' },
+                  { key: 'MP_MAINTENANCE', label: 'Maintenance', rate: 1500, desc: '₱1,500/pax/day' },
+                  { key: 'MP_PARKING', label: 'Parking Boy', rate: 800, desc: '₱800/pax/day' },
+                ].map(mp => {
+                  const sel = selectedItems.find(i => i.key === mp.key);
+                  return (
+                    <div key={mp.key} className={`flex items-center justify-between p-2.5 rounded-lg border transition-all ${sel ? 'border-[#E32726]/40 bg-[#E32726]/5' : 'border-[#2a2a2a]'}`}>
+                      <div>
+                        <div className="text-xs text-white font-medium">{mp.label}</div>
+                        <div className="text-[10px] text-white/30">{mp.desc}</div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {sel && (
+                          <>
+                            <button type="button" onClick={() => {
+                              const newQty = (sel.quantity || 1) - 1;
+                              if (newQty <= 0) setSelectedItems(prev => prev.filter(i => i.key !== mp.key));
+                              else setSelectedItems(prev => prev.map(i => i.key === mp.key ? { ...i, quantity: newQty } : i));
+                            }} className="w-6 h-6 bg-[#2a2a2a] rounded text-white text-xs">−</button>
+                            <span className="text-sm text-white w-5 text-center font-bold">{sel.quantity}</span>
+                            <button type="button" onClick={() => setSelectedItems(prev => prev.map(i => i.key === mp.key ? { ...i, quantity: (i.quantity || 1) + 1 } : i))}
+                              className="w-6 h-6 bg-[#2a2a2a] rounded text-white text-xs">+</button>
+                            <span className="text-xs text-[#E32726] font-bold w-16 text-right">{formatPHP(mp.rate * (sel.quantity || 1))}</span>
+                          </>
+                        )}
+                        {!sel && (
+                          <button type="button" onClick={() => setSelectedItems(prev => [...prev, { key: mp.key, name: mp.label, rate: mp.rate, quantity: 1, is_package: false, is_complimentary: false, discount_pct: 0 }])}
+                            className="text-xs text-[#E32726] border border-[#E32726]/40 px-2.5 py-1 rounded hover:bg-[#E32726]/10 transition-colors">
+                            + Add
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+                {/* Custom crew */}
+                <button type="button" onClick={() => setSelectedItems(prev => [...prev, { key: `mp-custom-${Date.now()}`, name: 'Custom Crew', rate: 1500, quantity: 1, is_package: false, is_complimentary: false, discount_pct: 0 }])}
+                  className="w-full text-xs text-white/40 border border-dashed border-[#2a2a2a] rounded-lg py-2 hover:border-[#E32726]/40 hover:text-white/60 transition-colors">
+                  + Add Custom Crew / Manpower
+                </button>
+              </div>
+            </div>
+
             {/* Discount */}
             <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4">
               <h2 className="font-semibold text-white text-sm mb-3">Discount / Promo</h2>

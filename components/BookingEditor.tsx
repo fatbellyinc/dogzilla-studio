@@ -81,7 +81,7 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
   const defaultElecHours = existingElec ? Math.round(existingElec.rate / ELEC_RATE) : (autoHours ?? 14);
   const [addonElecHours, setAddonElecHours] = useState(defaultElecHours);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
-  const [tab, setTab] = useState<'packages' | 'individual' | 'addons' | 'custom'>('packages');
+  const [tab, setTab] = useState<'packages' | 'individual' | 'addons' | 'manpower' | 'custom'>('packages');
   const [pkgCat, setPkgCat] = useState<PackageCat>('camera');
   const [indCat, setIndCat] = useState('camera');
   const [search, setSearch] = useState('');
@@ -283,11 +283,11 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
       {/* Add items */}
       <div>
         <div className="text-xs text-white/40 uppercase tracking-wider mb-2">Add Items</div>
-        <div className="flex gap-1 mb-3">
-          {(['packages', 'individual', 'addons', 'custom'] as const).map(t => (
-            <button key={t} type="button" onClick={() => { setTab(t); setSearch(''); if (t === 'custom') setShowCustom(true); else setShowCustom(false); }}
+        <div className="flex gap-1 mb-3 flex-wrap">
+          {(['packages', 'individual', 'addons', 'manpower', 'custom'] as const).map(t => (
+            <button key={t} type="button" onClick={() => { setTab(t as typeof tab); setSearch(''); if (t === 'custom') setShowCustom(true); else setShowCustom(false); }}
               className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${tab === t ? 'bg-[#E32726] text-white' : 'bg-[#0f0f0f] text-white/40 hover:text-white'}`}>
-              {t === 'packages' ? 'Packages' : t === 'individual' ? 'Equipment' : t === 'addons' ? 'Add-ons' : '+ Custom'}
+              {t === 'packages' ? 'Packages' : t === 'individual' ? 'Equipment' : t === 'addons' ? 'Add-ons' : t === 'manpower' ? '👥 Manpower' : '+ Custom'}
             </button>
           ))}
         </div>
@@ -421,6 +421,48 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
                 );
               })}
             </div>
+          </div>
+        )}
+
+        {tab === 'manpower' && (
+          <div className="space-y-1.5">
+            {[
+              { key: 'MP_CREW', label: 'Studio Crew', rate: 1500, desc: '₱1,500/pax/day' },
+              { key: 'MP_ADMIN', label: 'Admin', rate: 3000, desc: '₱3,000/pax/day' },
+              { key: 'MP_MAINTENANCE', label: 'Maintenance', rate: 1500, desc: '₱1,500/pax/day' },
+              { key: 'MP_PARKING', label: 'Parking Boy', rate: 800, desc: '₱800/pax/day' },
+            ].map(mp => {
+              const sel = items.find(i => i.key === mp.key);
+              return (
+                <div key={mp.key} className={`flex items-center justify-between p-2.5 rounded-lg border transition-all ${sel ? 'border-[#E32726]/40 bg-[#E32726]/5' : 'border-[#2a2a2a]'}`}>
+                  <div>
+                    <div className="text-xs text-white font-medium">{mp.label}</div>
+                    <div className="text-[10px] text-white/30">{mp.desc}</div>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {sel ? (
+                      <>
+                        <button onClick={() => {
+                          const newQty = (sel.quantity || 1) - 1;
+                          if (newQty <= 0) setItems(prev => prev.filter(i => i.key !== mp.key));
+                          else setItems(prev => prev.map(i => i.key === mp.key ? { ...i, quantity: newQty } : i));
+                        }} className="w-5 h-5 bg-[#2a2a2a] rounded text-white text-xs">−</button>
+                        <span className="text-xs text-white w-4 text-center font-bold">{sel.quantity}</span>
+                        <button onClick={() => setItems(prev => prev.map(i => i.key === mp.key ? { ...i, quantity: (i.quantity || 1) + 1 } : i))}
+                          className="w-5 h-5 bg-[#2a2a2a] rounded text-white text-xs">+</button>
+                        <span className="text-xs text-[#E32726] font-bold w-14 text-right">{formatPHP(mp.rate * (sel.quantity || 1))}</span>
+                        <button onClick={() => setItems(prev => prev.filter(i => i.key !== mp.key))} className="text-white/20 hover:text-red-400 text-xs ml-1">✕</button>
+                      </>
+                    ) : (
+                      <button onClick={() => setItems(prev => [...prev, { key: mp.key, name: mp.label, rate: mp.rate, quantity: 1, is_complimentary: false, discount_pct: 0, item_type: 'manpower' }])}
+                        className="text-xs text-[#E32726] border border-[#E32726]/40 px-2 py-1 rounded hover:bg-[#E32726]/10 transition-colors">
+                        + Add
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
 
