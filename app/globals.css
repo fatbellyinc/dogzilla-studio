@@ -26,6 +26,7 @@ body {
   .no-print { display: none !important; }
   body { background: white !important; color: black !important; }
   .print-white { background: white !important; color: black !important; }
+  img { display: block !important; break-inside: avoid; page-break-inside: avoid; }
 }
 
 @page {

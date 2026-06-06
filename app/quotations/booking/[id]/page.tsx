@@ -110,10 +110,10 @@ function DocView({ bookingId }: { bookingId: string }) {
     <div className="min-h-screen bg-white p-6 md:p-10 max-w-[794px] mx-auto" style={{ color: '#111', fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '13px', paddingTop: '24px' }}>
 
       {/* Header */}
-      <div className="flex items-start justify-between mb-6 pb-5" style={{ borderBottom: '3px solid #E32726' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', borderBottom: '3px solid #E32726', marginBottom: '24px', paddingBottom: '20px', breakInside: 'avoid', pageBreakInside: 'avoid' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="Dogzilla Studio" style={{ width: '90px', height: '90px', objectFit: 'contain' }} />
+          <img src="/logo.png" alt="Dogzilla Studio" style={{ width: '90px', height: '90px', objectFit: 'contain', display: 'block', flexShrink: 0 }} />
           <div>
             <div style={{ fontSize: '26px', fontWeight: 900, letterSpacing: '-1px', color: '#E32726', lineHeight: 1 }}>DOGZILLA</div>
             <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '4px', color: '#888', marginTop: '2px' }}>STUDIO</div>
