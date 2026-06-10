@@ -72,7 +72,7 @@ export default function Sidebar() {
   return (
     <>
       {/* Mobile top bar */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 py-2 bg-[#1a1a1a] border-b border-[#2a2a2a]">
+      <div className="no-print md:hidden fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 py-2 bg-[#1a1a1a] border-b border-[#2a2a2a]">
         <div className="flex items-center gap-2">
           <Image src="/logo.png" alt="Dogzilla Studio" width={40} height={40} className="object-contain" />
           <div>
@@ -122,7 +122,7 @@ export default function Sidebar() {
       )}
 
       {/* Desktop sidebar — grouped */}
-      <aside className="hidden md:flex flex-col w-56 bg-[#1a1a1a] border-r border-[#2a2a2a] min-h-screen shrink-0">
+      <aside className="no-print hidden md:flex flex-col w-56 bg-[#1a1a1a] border-r border-[#2a2a2a] min-h-screen shrink-0">
         <Link href="/" className="flex flex-col items-center px-4 pt-5 pb-3 border-b border-[#2a2a2a] hover:opacity-90 transition-opacity">
           <Image src="/logo.png" alt="Dogzilla Studio" width={90} height={90} className="object-contain drop-shadow-lg" />
           <div className="text-[10px] text-white/30 tracking-widest mt-1.5 uppercase">Management System</div>
@@ -165,7 +165,7 @@ export default function Sidebar() {
       </aside>
 
       {/* Mobile top spacer */}
-      <div className="md:hidden h-12 w-full fixed" />
+      <div className="no-print md:hidden h-12 w-full fixed" />
     </>
   );
 }

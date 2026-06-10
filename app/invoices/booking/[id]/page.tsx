@@ -89,7 +89,7 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
   const waLink = `https://wa.me/${STUDIO_WHATSAPP.replace(/\D/g, '')}`;
 
   return (
-    <div className="min-h-screen bg-white p-6 md:p-10 max-w-[794px] mx-auto" style={{ color: '#111', fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '13px', paddingTop: '24px' }}>
+    <div className="doc-page min-h-screen bg-white p-6 md:p-10 max-w-[794px] mx-auto" style={{ color: '#111', fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '13px', paddingTop: '24px' }}>
 
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', borderBottom: '3px solid #E32726', marginBottom: '24px', paddingBottom: '20px', breakInside: 'avoid', pageBreakInside: 'avoid' }}>
@@ -280,7 +280,7 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
               <tr key={i}>
                 <td style={{ padding: '2px 6px', fontWeight: 600, width: '180px' }}>{acc.bank}</td>
                 <td style={{ padding: '2px 6px', color: '#333' }}>{acc.name}</td>
-                <td style={{ padding: '2px 6px', fontFamily: 'monospace' }}>{acc.number}</td>
+                <td style={{ padding: '2px 6px', fontWeight: 600, letterSpacing: '0.5px' }}>{acc.number}</td>
               </tr>
             ))}
           </tbody>

@@ -757,11 +757,18 @@ function NewBookingForm() {
                     </div>
                   </div>
                 ) : bookingDays.map((d, i) => (
-                  <div key={d.date} className="flex justify-between text-white/60 text-xs">
+                  <div key={d.date} className="flex justify-between items-center text-white/60 text-xs">
                     <span className={d.day_type === 'setup' ? 'text-yellow-400' : ''}>
                       Day {i + 1} {d.day_type === 'setup' ? '🔧' : '🎬'} {STUDIO_RATES[d.studio_rate as keyof typeof STUDIO_RATES]?.label}
                     </span>
-                    <span>{formatPHP(d.subtotal)}</span>
+                    <div className="flex items-center gap-1 bg-[#0f0f0f] rounded px-1.5 py-0.5 border border-[#2a2a2a]">
+                      <span className="text-[10px] text-white/30">₱</span>
+                      <input type="number"
+                        value={d.subtotal}
+                        onChange={e => setBookingDays(prev => prev.map((day, idx) => idx === i ? { ...day, subtotal: Number(e.target.value) || 0 } : day))}
+                        className="w-20 bg-transparent text-xs text-[#E32726] font-bold focus:outline-none text-right"
+                        title="Custom day price" />
+                    </div>
                   </div>
                 ))}
                 {selectedItems.map(e => {
@@ -797,6 +804,18 @@ function NewBookingForm() {
                             {pct}%
                           </button>
                         ))}
+                        {/* Custom % discount */}
+                        <div className="flex items-center gap-0.5 border border-white/10 rounded px-1 py-0.5">
+                          <input
+                            type="number" min={0} max={100}
+                            value={e.discount_pct || ''}
+                            onChange={ev => setItemDiscount(e.key, Math.min(100, Math.max(0, Number(ev.target.value) || 0)))}
+                            placeholder="%"
+                            className="w-8 bg-transparent text-[10px] text-yellow-400 text-center focus:outline-none placeholder:text-white/20"
+                            title="Custom discount %"
+                          />
+                          <span className="text-[10px] text-white/20">%</span>
+                        </div>
                       </div>
                     </div>
                   );

@@ -6,7 +6,12 @@ import { logActivity, ACTIONS } from '@/lib/activity';
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const db = getDb();
   const { id } = await params;
-  const { equipment_items } = await req.json();
+  const { equipment_items, studio_subtotal } = await req.json();
+
+  // Optional: update the studio price (custom price override)
+  if (studio_subtotal !== undefined && studio_subtotal !== null) {
+    db.prepare('UPDATE bookings SET subtotal = ? WHERE id = ?').run(Number(studio_subtotal) || 0, id);
+  }
 
   // Replace all equipment for this booking
   db.prepare('DELETE FROM booking_equipment WHERE booking_id = ?').run(id);

@@ -88,13 +88,15 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
   const [saving, setSaving] = useState(false);
   const [customItem, setCustomItem] = useState({ name: '', rate: '', quantity: '1' });
   const [showCustom, setShowCustom] = useState(false);
+  // Editable studio price — custom override (discount or bloat)
+  const [studioSubtotal, setStudioSubtotal] = useState(currentSubtotal);
 
   useEffect(() => {
     fetch('/api/equipment').then(r => r.json()).then(setEquipment);
   }, []);
 
   const eqTotal = items.reduce((s, e) => s + (e.is_complimentary ? 0 : e.rate * e.quantity * (1 - e.discount_pct / 100)), 0);
-  const newTotal = currentSubtotal + eqTotal;
+  const newTotal = studioSubtotal + eqTotal;
 
   function addPackage(pkg: (typeof EQUIPMENT_PACKAGES)[PackageCat][number]) {
     const existing = items.find(i => i.key === pkg.id);
@@ -159,7 +161,7 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
       is_complimentary: i.is_complimentary,
       discount_pct: i.discount_pct,
     }));
-    await fetch(`/api/bookings/${bookingId}/equipment`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ equipment_items }) });
+    await fetch(`/api/bookings/${bookingId}/equipment`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ equipment_items, studio_subtotal: studioSubtotal }) });
     setSaving(false);
     onSaved();
   }
@@ -179,6 +181,23 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
       {/* Current items */}
       <div>
         <div className="text-xs text-white/40 uppercase tracking-wider mb-2">Current Items</div>
+        {/* Studio price — editable custom price */}
+        <div className="bg-[#0f0f0f] rounded-lg p-2 mb-1.5 flex items-center gap-2 border border-[#2a2a2a]">
+          <span className="text-xs text-white flex-1 font-medium">🏢 Studio — {STUDIO_RATES[studioRate as keyof typeof STUDIO_RATES]?.label || studioRate}</span>
+          <div className="flex items-center gap-1 shrink-0">
+            <span className="text-white/30 text-xs">₱</span>
+            <input
+              type="number"
+              value={studioSubtotal}
+              onChange={e => setStudioSubtotal(Number(e.target.value) || 0)}
+              className="w-24 bg-[#1a1a1a] border border-[#2a2a2a] rounded px-1.5 py-0.5 text-xs text-[#E32726] font-semibold focus:outline-none focus:border-[#E32726] text-right"
+              title="Custom studio price — type any amount"
+            />
+          </div>
+          {studioSubtotal !== currentSubtotal && (
+            <button onClick={() => setStudioSubtotal(currentSubtotal)} className="text-[10px] text-white/30 hover:text-white border border-white/10 px-1.5 py-0.5 rounded" title="Reset to original">↺</button>
+          )}
+        </div>
         {items.length === 0 ? <p className="text-white/30 text-xs py-2">No equipment — studio only</p> : (
           <div className="space-y-1.5">
             {items.map(item => {
@@ -257,13 +276,28 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
                     <button onClick={() => removeItem(item.key)} className="text-white/20 hover:text-red-400 text-xs">✕</button>
                   </div>
                   {/* Discount + comp row */}
-                  <div className="flex gap-1 flex-wrap">
+                  <div className="flex gap-1 flex-wrap items-center">
                     {[10, 20, 30, 50].map(p => (
                       <button key={p} type="button" onClick={() => setDisc(item.key, p)}
                         className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${item.discount_pct === p ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' : 'text-white/20 border-white/10 hover:text-yellow-400'}`}>
                         {p}%
                       </button>
                     ))}
+                    {/* Custom % discount */}
+                    <div className="flex items-center gap-0.5 border border-white/10 rounded px-1 py-0.5">
+                      <input
+                        type="number" min={0} max={100}
+                        value={item.discount_pct && ![10, 20, 30, 50].includes(item.discount_pct) ? item.discount_pct : (item.discount_pct === 0 ? '' : item.discount_pct)}
+                        onChange={e => {
+                          const pct = Math.min(100, Math.max(0, Number(e.target.value) || 0));
+                          setItems(prev => prev.map(i => i.key === item.key ? { ...i, discount_pct: pct, is_complimentary: false } : i));
+                        }}
+                        placeholder="%"
+                        className="w-9 bg-transparent text-[10px] text-yellow-400 text-center focus:outline-none placeholder:text-white/20"
+                        title="Custom discount %"
+                      />
+                      <span className="text-[10px] text-white/20">%</span>
+                    </div>
                     <button type="button" onClick={() => toggleComp(item.key)}
                       className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${item.is_complimentary ? 'bg-green-500/20 text-green-400 border-green-500/30' : 'text-white/20 border-white/10 hover:text-green-400'}`}>
                       🎁 Comp

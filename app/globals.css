@@ -27,9 +27,19 @@ body {
   body { background: white !important; color: black !important; }
   .print-white { background: white !important; color: black !important; }
   img { display: block !important; break-inside: avoid; page-break-inside: avoid; }
+  /* Hide all app chrome (sidebar, mobile topbar, overlays) */
+  aside, nav { display: none !important; }
+  /* A4-safe document width: full printable area, no screen padding quirks */
+  .doc-page {
+    max-width: 100% !important;
+    width: 100% !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
 }
 
 @page {
   margin: 12mm 10mm 10mm 10mm;
-  size: A4;
+  size: A4 portrait;
 }
