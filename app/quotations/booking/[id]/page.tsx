@@ -2,7 +2,7 @@
 import { use, useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { formatPHP, formatDate, fmt24, calcOT, OT_RATE } from '@/lib/utils';
-import { Booking, BookingEquipment, Quotation, BookingDay, STUDIO_RATES, VAT_RATE, PAYMENT_ACCOUNTS } from '@/lib/types';
+import { Booking, BookingEquipment, Quotation, BookingDay, Payment, STUDIO_RATES, VAT_RATE, PAYMENT_ACCOUNTS } from '@/lib/types';
 import ShareDocBar from '@/components/ShareDocBar';
 
 interface BookingDetail {
@@ -10,6 +10,7 @@ interface BookingDetail {
   equipment: BookingEquipment[];
   quotation: Quotation | null;
   bookingDays: BookingDay[];
+  payments: Payment[];
 }
 
 function DocView({ bookingId }: { bookingId: string }) {
@@ -21,9 +22,18 @@ function DocView({ bookingId }: { bookingId: string }) {
     fetch(`/api/bookings/${bookingId}`).then(r => r.json()).then(setData);
   }, [bookingId]);
 
+  // Filename convention for Save-as-PDF: Dogzilla_Quotation_<no>_<client>_<date>
+  useEffect(() => {
+    if (!data) return;
+    const num = data.quotation?.quote_number || `DZB-${String(data.booking.id).padStart(4, '0')}`;
+    const client = (data.booking.client_name || 'Client').replace(/[^a-zA-Z0-9]+/g, '-');
+    document.title = `Dogzilla_Quotation_${num}_${client}_${data.booking.booking_date}`;
+  }, [data]);
+
   if (!data) return <div className="p-8 text-gray-500">Loading...</div>;
 
-  const { booking, equipment, quotation, bookingDays } = data;
+  const { booking, equipment, quotation, bookingDays, payments } = data;
+  const totalPaid = (payments || []).reduce((s, p) => s + p.amount, 0);
   const studioRate = STUDIO_RATES[booking.studio_rate];
   const subtotalExVAT = booking.total;
   const vatExempt = !!booking.vat_exempt;
@@ -256,6 +266,21 @@ function DocView({ bookingId }: { bookingId: string }) {
                 <tr>
                   <td style={{ padding: '4px 10px', color: '#555' }}>Balance due on shoot day</td>
                   <td style={{ padding: '4px 10px', textAlign: 'right' }}>{formatPHP(balanceDue)}</td>
+                </tr>
+              </>
+            )}
+            {/* Actual payments received — deposit / partial payments */}
+            {totalPaid > 0 && (
+              <>
+                <tr style={{ borderTop: '1px solid #e5e5e5' }}>
+                  <td style={{ padding: '4px 10px', color: '#166534', fontWeight: 700 }}>✓ Paid to date</td>
+                  <td style={{ padding: '4px 10px', textAlign: 'right', color: '#166534', fontWeight: 700 }}>−{formatPHP(totalPaid)}</td>
+                </tr>
+                <tr style={{ background: '#fef9c3' }}>
+                  <td style={{ padding: '6px 10px', fontWeight: 900 }}>REMAINING BALANCE</td>
+                  <td style={{ padding: '6px 10px', textAlign: 'right', fontWeight: 900, color: totalIncVAT - totalPaid <= 0.01 ? '#166534' : '#E32726' }}>
+                    {totalIncVAT - totalPaid <= 0.01 ? 'PAID IN FULL ✓' : formatPHP(totalIncVAT - totalPaid)}
+                  </td>
                 </tr>
               </>
             )}

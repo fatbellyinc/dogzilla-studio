@@ -19,8 +19,9 @@ function parseHours(callTime?: string | null, wrapTime?: string | null): number 
   if (!callTime || !wrapTime) return null;
   const [ch, cm] = callTime.split(':').map(Number);
   const [wh, wm] = wrapTime.split(':').map(Number);
-  const diff = (wh * 60 + wm) - (ch * 60 + cm);
-  return diff > 0 ? Math.round(diff / 60 * 10) / 10 : null;
+  let diff = (wh * 60 + wm) - (ch * 60 + cm);
+  if (diff <= 0) diff += 24 * 60; // shoot wraps past midnight (next day)
+  return Math.round(diff / 60 * 10) / 10;
 }
 
 const AC_AREA_KEYS = Object.keys(AC_PRESETS) as ACArea[];

@@ -28,6 +28,7 @@ export async function GET() {
     WHERE b.booking_date = ? AND b.deposit_paid = 0 AND b.status != 'cancelled'
       AND COALESCE(b.no_deposit, 0) = 0
       AND COALESCE(b.fully_paid, 0) = 0
+      AND (SELECT COALESCE(SUM(p.amount), 0) FROM payments p WHERE p.booking_id = b.id) < b.deposit_amount - 0.01
   `).all(tomorrow) as { id: number; name: string }[];
 
   for (const b of urgentDeposits) {

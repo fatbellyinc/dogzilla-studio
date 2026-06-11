@@ -31,8 +31,9 @@ function shootHoursFromTimes(callTime?: string | null, wrapTime?: string | null)
   if (!callTime || !wrapTime) return null;
   const [ch, cm] = callTime.split(':').map(Number);
   const [wh, wm] = wrapTime.split(':').map(Number);
-  const diff = (wh * 60 + wm) - (ch * 60 + cm);
-  return diff > 0 ? Math.round(diff / 60 * 10) / 10 : null;
+  let diff = (wh * 60 + wm) - (ch * 60 + cm);
+  if (diff <= 0) diff += 24 * 60; // wraps past midnight (next day)
+  return Math.round(diff / 60 * 10) / 10;
 }
 
 interface Props {

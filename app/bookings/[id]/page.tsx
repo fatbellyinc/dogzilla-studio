@@ -128,9 +128,9 @@ function WeatherWidget({ date }: { date: string }) {
   );
 }
 
-function ShootTimesPanel({ callTime, wrapTime, studioRate, onSave }: {
+function ShootTimesPanel({ callTime, wrapTime, studioRate, bookingDate, onSave }: {
   callTime: string | null; wrapTime: string | null;
-  studioRate: string; onSave: (c: string | null, w: string | null) => void;
+  studioRate: string; bookingDate: string; onSave: (c: string | null, w: string | null) => void;
 }) {
   const [ct, setCt] = useState<string | null>(callTime);
   const [wt, setWt] = useState<string | null>(wrapTime);
@@ -163,10 +163,25 @@ function ShootTimesPanel({ callTime, wrapTime, studioRate, onSave }: {
 
       {ct && wt && (
         <div className="bg-[#0f0f0f] rounded-lg p-3 space-y-1.5 text-sm">
-          <div className="flex justify-between text-white/60">
-            <span>Call → Wrap</span>
-            <span className="text-white font-medium">{fmt24(ct)} → {fmt24(wt)}</span>
-          </div>
+          {(() => {
+            // Detect overnight wrap: wrap time earlier than (or equal to) call time = next day
+            const [ch, cm] = ct.split(':').map(Number);
+            const [wh, wm] = wt.split(':').map(Number);
+            const overnight = (wh * 60 + wm) <= (ch * 60 + cm);
+            const callDate = new Date(bookingDate + 'T00:00');
+            const wrapDate = new Date(callDate);
+            if (overnight) wrapDate.setDate(wrapDate.getDate() + 1);
+            const fmtD = (d: Date) => d.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
+            return (
+              <div className="flex justify-between text-white/60">
+                <span>Call → Wrap</span>
+                <span className="text-white font-medium">
+                  {fmtD(callDate)} {fmt24(ct)} → {fmtD(wrapDate)} {fmt24(wt)}
+                  {overnight && <span className="text-yellow-400 text-xs ml-1">(next day)</span>}
+                </span>
+              </div>
+            );
+          })()}
           <div className="flex justify-between text-white/60">
             <span>Total duration</span>
             <span className="text-white">{ot.durationHrs.toFixed(2)} hrs</span>
@@ -350,7 +365,9 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
     if (ct && wt && equipment.length > 0) {
       const [ch, cm] = ct.split(':').map(Number);
       const [wh, wm] = wt.split(':').map(Number);
-      const hrs = Math.max(0, (wh * 60 + wm - (ch * 60 + cm)) / 60);
+      let mins = wh * 60 + wm - (ch * 60 + cm);
+      if (mins <= 0) mins += 24 * 60; // wrap past midnight
+      const hrs = mins / 60;
       if (hrs > 0) {
         const hasElec = equipment.some(e => e.name.toLowerCase().includes('electricity'));
         if (hasElec) {
@@ -655,6 +672,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
             callTime={callTime}
             wrapTime={wrapTime}
             studioRate={booking.studio_rate}
+            bookingDate={booking.booking_date}
             onSave={saveTimes}
           />
 
@@ -683,7 +701,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                       <span>{p.type}{p.method ? ` - ${p.method}` : ''}{p.reference ? ` (${p.reference})` : ''}</span>
                       <div className="flex items-center gap-2">
                         <span>{formatPHP(p.amount)}</span>
-                        <Link href={`/print/receipt/${p.id}`} target="_blank" className="text-[10px] text-white/30 hover:text-white border border-white/10 px-1.5 py-0.5 rounded hover:border-white/30 transition-colors">OR</Link>
+                        <Link href={`/print/receipt/${p.id}`} target="_blank" className="text-[10px] text-white/30 hover:text-white border border-white/10 px-1.5 py-0.5 rounded hover:border-white/30 transition-colors">{p.type === 'deposit' ? 'AR' : 'OR'}</Link>
                       </div>
                     </div>
                   ))}

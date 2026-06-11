@@ -137,6 +137,12 @@ export default function BIRInvoicePage({ params }: { params: Promise<{ id: strin
 
   const { booking } = data;
 
+  // Filename convention for Save-as-PDF
+  if (typeof document !== 'undefined') {
+    const client = (booking.client_name || 'Client').replace(/[^a-zA-Z0-9]+/g, '-');
+    document.title = `Dogzilla_${docType === 'ack' ? 'AcknowledgementReceipt' : 'BIR-ServiceInvoice'}${invoiceNo ? `_${invoiceNo}` : ''}_${client}`;
+  }
+
   // Calculate totals from lines
   const grossTotal = lines.reduce((s, l) => {
     const qty = parseFloat(l.qty) || 0;

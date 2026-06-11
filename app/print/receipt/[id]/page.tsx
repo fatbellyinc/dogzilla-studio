@@ -17,6 +17,14 @@ export default function ReceiptPage({ params }: { params: Promise<{ id: string }
     fetch(`/api/receipts/${id}`).then(r => r.json()).then(setData);
   }, [id]);
 
+  // Filename convention for Save-as-PDF
+  useEffect(() => {
+    if (!data) return;
+    const prefix = data.payment.type === 'deposit' ? 'AR' : 'OR';
+    const client = (data.booking.client_name || 'Client').replace(/[^a-zA-Z0-9]+/g, '-');
+    document.title = `Dogzilla_${prefix}_${String(data.payment.id).padStart(5, '0')}_${client}`;
+  }, [data]);
+
   if (!data) return (
     <div style={{ background: 'white', padding: '40px', fontFamily: 'Arial, sans-serif', textAlign: 'center', color: '#888' }}>
       Loading receipt...
@@ -24,7 +32,11 @@ export default function ReceiptPage({ params }: { params: Promise<{ id: string }
   );
 
   const { payment, booking } = data;
-  const receiptNo = `OR-${new Date(payment.paid_at).getFullYear()}-${String(payment.id).padStart(5, '0')}`;
+  // Deposits get an Acknowledgement Receipt (AR); full/balance payments get an Official Receipt (OR)
+  const isDeposit = payment.type === 'deposit';
+  const receiptPrefix = isDeposit ? 'AR' : 'OR';
+  const receiptTitle = isDeposit ? 'ACKNOWLEDGEMENT RECEIPT' : 'OFFICIAL RECEIPT';
+  const receiptNo = `${receiptPrefix}-${new Date(payment.paid_at).getFullYear()}-${String(payment.id).padStart(5, '0')}`;
 
   return (
     <div style={{ background: 'white', color: '#111', fontFamily: 'Arial, sans-serif', fontSize: '13px', padding: '32px', maxWidth: '400px', margin: '40px auto', border: '1px solid #ddd', borderRadius: '8px' }}>
@@ -34,7 +46,7 @@ export default function ReceiptPage({ params }: { params: Promise<{ id: string }
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logo.png" alt="Dogzilla" style={{ width: '80px', height: '80px', objectFit: 'contain', margin: '0 auto 8px' }} />
         <div style={{ fontSize: '18px', fontWeight: 900, color: '#E32726' }}>DOGZILLA STUDIO</div>
-        <div style={{ fontSize: '10px', color: '#888', letterSpacing: '2px' }}>OFFICIAL RECEIPT</div>
+        <div style={{ fontSize: '10px', color: '#888', letterSpacing: '2px' }}>{receiptTitle}</div>
         <div style={{ fontSize: '11px', color: '#555', marginTop: '4px' }}>102 7th St Grace Park, Caloocan City</div>
         <div style={{ fontSize: '11px', color: '#555' }}>{STUDIO_WHATSAPP} · dogzillastudiorental@gmail.com</div>
       </div>
@@ -42,7 +54,7 @@ export default function ReceiptPage({ params }: { params: Promise<{ id: string }
       {/* Receipt number & date */}
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
         <div>
-          <div style={{ fontSize: '10px', color: '#888' }}>OR No.</div>
+          <div style={{ fontSize: '10px', color: '#888' }}>{receiptPrefix} No.</div>
           <div style={{ fontWeight: 700, color: '#E32726' }}>{receiptNo}</div>
         </div>
         <div style={{ textAlign: 'right' }}>

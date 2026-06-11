@@ -197,8 +197,9 @@ export default function Dashboard() {
                   </div>
                   {/* One-click: mark deposit received */}
                   <button onClick={async () => {
-                    if (!confirm(`Mark ${b.client_name}'s deposit of ${formatPHP(b.deposit_amount)} as PAID?`)) return;
-                    await fetch(`/api/bookings/${b.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ deposit_paid: true }) });
+                    if (!confirm(`Record ${b.client_name}'s deposit of ${formatPHP(b.deposit_amount)} as PAID?\n\nThis creates a payment record so Receivables update too.`)) return;
+                    // Record an actual payment — updates receivables, balance, and deposit flag
+                    await fetch('/api/payments', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ booking_id: b.id, amount: b.deposit_amount, type: 'deposit', method: 'GCash' }) });
                     fetch('/api/dashboard').then(r => r.json()).then(setData);
                   }}
                     title="Mark deposit as paid"

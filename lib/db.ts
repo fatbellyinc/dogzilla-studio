@@ -337,6 +337,19 @@ function initSchema(db: Database.Database) {
     `);
   } catch { /* ignore */ }
 
+  // Data sync: flag deposit_paid when recorded payments cover the deposit amount
+  try {
+    db.exec(`
+      UPDATE bookings SET deposit_paid = 1
+      WHERE COALESCE(deposit_paid, 0) = 0
+        AND status != 'cancelled'
+        AND deposit_amount > 0
+        AND (
+          SELECT COALESCE(SUM(p.amount), 0) FROM payments p WHERE p.booking_id = bookings.id
+        ) >= deposit_amount - 0.01
+    `);
+  } catch { /* ignore */ }
+
   // Equipment upserts — add new items to existing databases
   const equipmentUpserts: [string, string, string, number, number, string, number][] = [
     ['LED-032', 'Rectangular Softbox', 'lighting', 500, 2, 'Passive modifier', 0],

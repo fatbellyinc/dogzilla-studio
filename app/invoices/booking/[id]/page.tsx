@@ -27,6 +27,14 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
 
   useEffect(() => { loadBooking(); }, [id]);
 
+  // Filename convention for Save-as-PDF: Dogzilla_Invoice_<no>_<client>_<date>
+  useEffect(() => {
+    if (!data) return;
+    const num = data.invoice?.invoice_number || `DZI-${String(data.booking.id).padStart(4, '0')}`;
+    const client = (data.booking.client_name || 'Client').replace(/[^a-zA-Z0-9]+/g, '-');
+    document.title = `Dogzilla_Invoice_${num}_${client}_${data.booking.booking_date}`;
+  }, [data]);
+
   async function saveORNumber() {
     if (!data?.invoice) return;
     await fetch(`/api/invoices/${data.invoice.id}`, {

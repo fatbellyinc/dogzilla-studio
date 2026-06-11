@@ -7,7 +7,7 @@ export async function GET() {
   // Monthly revenue — last 18 months (app bookings)
   const monthlyRevenue = db.prepare(`
     SELECT strftime('%Y-%m', booking_date) as month,
-      COUNT(*) as booking_count,
+      COUNT(CASE WHEN status != 'cancelled' THEN 1 END) as booking_count,
       SUM(CASE WHEN status = 'completed' THEN total + COALESCE(overtime_amount, 0) ELSE 0 END) as revenue,
       SUM(CASE WHEN status = 'completed' THEN (total + COALESCE(overtime_amount, 0)) * 0.12 ELSE 0 END) as vat
     FROM bookings
@@ -38,9 +38,9 @@ export async function GET() {
 
   // Studio rate breakdown
   const rateBreakdown = db.prepare(`
-    SELECT studio_rate, COUNT(*) as count,
+    SELECT studio_rate, COUNT(CASE WHEN status != 'cancelled' THEN 1 END) as count,
       SUM(CASE WHEN status != 'cancelled' THEN total ELSE 0 END) as revenue
-    FROM bookings GROUP BY studio_rate ORDER BY revenue DESC
+    FROM bookings WHERE status != 'cancelled' GROUP BY studio_rate ORDER BY revenue DESC
   `).all();
 
   // Top clients
@@ -54,7 +54,7 @@ export async function GET() {
   // Totals
   const totals = db.prepare(`
     SELECT
-      COUNT(*) as total_bookings,
+      COUNT(CASE WHEN status != 'cancelled' THEN 1 END) as total_bookings,
       COUNT(CASE WHEN status = 'confirmed' THEN 1 END) as confirmed,
       COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed,
       COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending,
