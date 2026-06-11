@@ -96,5 +96,17 @@ export async function GET(req: NextRequest) {
     netProfit: acc.netProfit + m.netProfit,
   }), { revenue: 0, totalUtils: 0, varCosts: 0, rent: 0, netProfit: 0 });
 
-  return NextResponse.json({ months, totals, monthlyFixed, breakEven, avgUtils });
+  // ─── Business break-even: has cumulative profit recovered the capital invested? ───
+  const capexTotal = (db.prepare('SELECT COALESCE(SUM(amount),0) as t FROM capital_expenses').get() as { t: number }).t;
+  const cumulativeNetProfit = totals.netProfit;
+  const capexRemaining = capexTotal - cumulativeNetProfit;
+  const businessBreakEven = {
+    capexTotal,                                   // total capital invested (construction, equipment...)
+    cumulativeNetProfit,                          // all-time operating profit after rent/utilities/costs
+    capexRemaining: Math.max(0, capexRemaining),  // how much more profit needed to recover capital
+    recoveredPct: capexTotal > 0 ? Math.min(100, (cumulativeNetProfit / capexTotal) * 100) : 0,
+    isProfitable: capexRemaining <= 0,            // true once capital is fully recovered
+  };
+
+  return NextResponse.json({ months, totals, monthlyFixed, breakEven, avgUtils, businessBreakEven });
 }

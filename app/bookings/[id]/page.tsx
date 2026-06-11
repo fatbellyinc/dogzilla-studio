@@ -2,6 +2,7 @@
 import { useEffect, useState, use, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import toast from 'react-hot-toast';
 import { formatPHP, formatDate, fmt24, calcOT, OT_RATE, SETUP_OT_RATE } from '@/lib/utils';
 import { Booking, BookingEquipment, Payment, Quotation, Invoice, BookingDay, STUDIO_RATES, VAT_RATE } from '@/lib/types';
 import OverheadPanel from '@/components/OverheadPanel';
@@ -249,6 +250,8 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
   const [callTime, setCallTime] = useState<string | null>(null);
   const [wrapTime, setWrapTime] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [showClientChange, setShowClientChange] = useState(false);
+  const [allClients, setAllClients] = useState<{ id: number; name: string; company?: string }[]>([]);
 
   const loadCrew = useCallback(() => { fetch(`/api/bookings/${id}/crew`).then(r => r.json()).then(setCrew); }, [id]);
   const load = () => fetch(`/api/bookings/${id}`).then(r => r.json()).then((d: BookingDetail) => {
@@ -397,6 +400,25 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
     router.push(`/bookings/new?${params.toString()}`);
   }
 
+  function logMessageSent(channel: string) {
+    fetch('/api/activity-log', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ booking_id: Number(id), action: 'message_sent', description: `${channel} message sent to ${booking.client_name}` }),
+    }).catch(() => {});
+    toast.success(`${channel} opened — send logged ✓`);
+  }
+
+  async function changeClient(newClientId: number) {
+    setSaving(true);
+    await fetch(`/api/bookings/${id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_id: newClientId }),
+    });
+    setShowClientChange(false);
+    await load(); setSaving(false);
+    toast.success('Client updated');
+  }
+
   async function applyDiscount() {
     setSaving(true);
     await fetch(`/api/bookings/${id}`, {
@@ -421,7 +443,26 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
 
           {/* Client */}
           <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4">
-            <h2 className="text-xs text-white/40 uppercase tracking-wider mb-3">Client</h2>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-xs text-white/40 uppercase tracking-wider">Client</h2>
+              <button onClick={() => {
+                if (!showClientChange && allClients.length === 0) fetch('/api/clients').then(r => r.json()).then(setAllClients);
+                setShowClientChange(!showClientChange);
+              }} className="text-xs text-[#E32726] hover:underline">
+                {showClientChange ? '✕ Cancel' : '↔ Change Client'}
+              </button>
+            </div>
+            {showClientChange && (
+              <div className="mb-3 p-2 bg-[#0f0f0f] rounded-lg">
+                <select defaultValue="" onChange={e => { const v = Number(e.target.value); if (v) changeClient(v); }} disabled={saving}
+                  className="w-full bg-[#1a1a1a] border border-[#E32726]/40 rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:border-[#E32726]">
+                  <option value="" disabled>Select new client...</option>
+                  {allClients.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}{c.company ? ` — ${c.company}` : ''}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div className="text-lg font-semibold text-white">{booking.client_name}</div>
             {(booking as Booking & { client_company?: string }).client_company && (
               <div className="text-sm text-white/50 mt-0.5">{(booking as Booking & { client_company?: string }).client_company}</div>
@@ -451,14 +492,20 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
               </button>
             </div>
             <div className="space-y-2 text-sm">
-              {(booking.is_pencil || booking.no_deposit || booking.vat_exempt || booking.fully_paid) && (
+              {(booking.is_pencil || booking.no_deposit || booking.vat_exempt || booking.fully_paid || booking.deposit_paid) ? (
                 <div className="flex items-center gap-2 mb-2 flex-wrap">
-                  {booking.is_pencil && <span className="text-xs bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 px-2 py-0.5 rounded font-semibold">✏️ PENCIL</span>}
-                  {booking.no_deposit && <span className="text-xs bg-green-500/20 text-green-400 border border-green-500/30 px-2 py-0.5 rounded font-semibold">🤝 NO DEPOSIT</span>}
-                  {booking.vat_exempt && <span className="text-xs bg-blue-500/20 text-blue-400 border border-blue-500/30 px-2 py-0.5 rounded font-semibold">🔵 VAT EXEMPT</span>}
-                  {booking.fully_paid && <span className="text-xs bg-green-500/20 text-green-400 border border-green-500/30 px-2 py-0.5 rounded font-semibold">💰 FULLY PAID</span>}
+                  {booking.is_pencil ? <span className="text-xs bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 px-2 py-0.5 rounded font-semibold">✏️ PENCIL</span> : null}
+                  {booking.no_deposit ? <span className="text-xs bg-green-500/20 text-green-400 border border-green-500/30 px-2 py-0.5 rounded font-semibold">🤝 NO DEPOSIT</span> : null}
+                  {booking.vat_exempt ? <span className="text-xs bg-blue-500/20 text-blue-400 border border-blue-500/30 px-2 py-0.5 rounded font-semibold">🔵 VAT EXEMPT</span> : null}
+                  {booking.fully_paid ? <span className="text-xs bg-green-500/20 text-green-400 border border-green-500/30 px-2 py-0.5 rounded font-semibold">💰 FULLY PAID</span> : null}
+                  {!booking.fully_paid && booking.deposit_paid ? <span className="text-xs bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded font-semibold">✓ DEPOSIT PAID</span> : null}
                 </div>
-              )}
+              ) : null}
+              {booking.project_name ? (
+                <div className="flex justify-between"><span className="text-white/40">Project</span>
+                  <span className="text-white font-medium">{booking.project_name}</span>
+                </div>
+              ) : null}
               {booking.series_id && <SeriesPanel bookingId={Number(id)} seriesId={booking.series_id} />}
               <div className="flex justify-between"><span className="text-white/40">Date</span>
                 <span className="text-white">{formatDate(booking.booking_date)}{booking.end_date && booking.end_date !== booking.booking_date ? ` – ${formatDate(booking.end_date)}` : ''}</span>
@@ -858,6 +905,11 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                 className="block w-full text-center bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 text-sm py-2 rounded-lg hover:bg-yellow-500/30 transition-colors">
                 🧾 BIR Service Invoice
               </Link>
+              {/* Acknowledgement Receipt — for VAT-exempt / no-invoice clients */}
+              <Link href={`/print/bir/${id}?type=ack`} target="_blank"
+                className="block w-full text-center bg-[#2a2a2a] text-white/80 text-sm py-2 rounded-lg hover:bg-[#333] transition-colors">
+                📄 Acknowledgement Receipt
+              </Link>
               <a href={`/api/gcal?id=${id}`} download="booking.ics"
                 className="block w-full text-center bg-[#2a2a2a] text-white/80 text-sm py-2 rounded-lg hover:bg-[#333] transition-colors">
                 📅 Add to Google Calendar
@@ -915,21 +967,24 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
             <h2 className="text-xs text-white/40 uppercase tracking-wider mb-3">Message Client</h2>
             <div className="space-y-1.5">
               <Link href={`/whatsapp?booking=${id}`}
+                onClick={() => logMessageSent('WhatsApp')}
                 className="block w-full text-center bg-[#25D366]/20 text-[#25D366] border border-[#25D366]/30 text-sm py-2 rounded-lg hover:bg-[#25D366]/30 transition-colors">
                 💬 WhatsApp Template
               </Link>
               {booking.client_phone && (
                 <a href={`viber://chat?number=%2B${booking.client_phone.replace(/\D/g,'').replace(/^0/,'63')}`}
+                  onClick={() => logMessageSent('Viber')}
                   className="block w-full text-center bg-[#7360F2]/20 text-[#7360F2] border border-[#7360F2]/30 text-sm py-2 rounded-lg hover:bg-[#7360F2]/30 transition-colors">
                   📱 Viber
                 </a>
               )}
-              <button onClick={() => window.open('https://www.messenger.com','_blank')}
+              <button onClick={() => { logMessageSent('Messenger'); window.open('https://www.messenger.com','_blank'); }}
                 className="w-full text-center text-white text-sm py-2 rounded-lg transition-colors"
                 style={{background:'linear-gradient(135deg,rgba(0,153,255,0.2),rgba(160,51,255,0.2))',border:'1px solid rgba(115,96,242,0.4)'}}>
                 💙 FB Messenger
               </button>
             </div>
+            <p className="text-[10px] text-white/30 mt-2">Each send is logged in the Activity Log below</p>
           </div>
         </div>
       </div>

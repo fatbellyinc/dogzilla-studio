@@ -5,7 +5,7 @@ import { Client } from '@/lib/types';
 import { formatDate } from '@/lib/utils';
 
 export default function ClientsPage() {
-  const [clients, setClients] = useState<(Client & { booking_count: number })[]>([]);
+  const [clients, setClients] = useState<(Client & { booking_count: number; is_vip?: number })[]>([]);
   const [search, setSearch] = useState('');
   const [form, setForm] = useState({ name: '', company: '', tin: '', phone: '', email: '', address: '', notes: '' });
   const [showForm, setShowForm] = useState(false);
@@ -67,8 +67,17 @@ export default function ClientsPage() {
                 <div>
                   <div className="flex items-center gap-2">
                     <div className="text-sm font-medium text-white">{c.name}</div>
-                    {c.booking_count >= 3 && <span className="text-[10px] bg-[#E32726]/20 text-[#E32726] px-1.5 py-0.5 rounded font-semibold">⭐ VIP</span>}
-                    {c.booking_count === 2 && <span className="text-[10px] bg-purple-500/20 text-purple-400 px-1.5 py-0.5 rounded">Repeat</span>}
+                    {/* Manual VIP tag — click to toggle */}
+                    <button
+                      onClick={e => {
+                        e.preventDefault(); e.stopPropagation();
+                        fetch(`/api/clients/${c.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ is_vip: !c.is_vip }) }).then(load);
+                      }}
+                      title={c.is_vip ? 'Remove VIP tag' : 'Tag as VIP'}
+                      className={`text-[10px] px-1.5 py-0.5 rounded font-semibold border transition-colors ${c.is_vip ? 'bg-[#E32726]/20 text-[#E32726] border-[#E32726]/30' : 'text-white/15 border-white/10 hover:text-[#E32726] hover:border-[#E32726]/30'}`}>
+                      ⭐ {c.is_vip ? 'VIP' : 'VIP?'}
+                    </button>
+                    {!c.is_vip && c.booking_count >= 2 && <span className="text-[10px] bg-purple-500/20 text-purple-400 px-1.5 py-0.5 rounded">Repeat</span>}
                   </div>
                   {c.company && <div className="text-xs text-white/50">{c.company}</div>}
                   <div className="text-xs text-white/40">{c.phone || c.email || 'No contact info'}</div>

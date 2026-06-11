@@ -26,6 +26,7 @@ export const ACTIONS = {
   CREW_ADDED: 'crew_added',
   CREW_REMOVED: 'crew_removed',
   EMAIL_SENT: 'email_sent',
+  MESSAGE_SENT: 'message_sent',
   OR_SET: 'or_set',
   OT_LOGGED: 'ot_logged',
 } as const;

@@ -9,6 +9,7 @@ export const viewport: Viewport = {
 import './globals.css';
 import Sidebar from '@/components/Sidebar';
 import PinLock from '@/components/PinLock';
+import { Toaster } from 'react-hot-toast';
 
 export const metadata: Metadata = {
   title: 'Dogzilla Studio',
@@ -27,6 +28,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <main className="flex-1 overflow-y-auto bg-[#0f0f0f]">
             {children}
           </main>
+          <Toaster position="bottom-center" toastOptions={{ style: { background: '#1a1a1a', color: '#fff', border: '1px solid #2a2a2a' } }} />
         </PinLock>
       </body>
     </html>

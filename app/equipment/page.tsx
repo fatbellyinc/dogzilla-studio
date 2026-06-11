@@ -45,7 +45,10 @@ export default function EquipmentPage() {
     load();
   }
 
-  const categories = ['camera', 'lighting', 'beauty', 'vtr'] as const;
+  // Derive categories from actual data so nothing is hidden
+  const categories = [...new Set(equipment.map(e => e.category))].sort(
+    (a, b) => (CATEGORY_LABELS[a] || a).localeCompare(CATEGORY_LABELS[b] || b)
+  );
 
   return (
     <div className="pt-14 md:pt-0 p-4 md:p-6 max-w-4xl">
@@ -77,7 +80,7 @@ export default function EquipmentPage() {
           <div className="grid grid-cols-2 gap-3">
             <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Equipment name *" className="col-span-2 bg-[#0f0f0f] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-[#E32726]" />
             <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} className="bg-[#0f0f0f] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#E32726]">
-              {categories.map(c => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
+              {Object.keys(CATEGORY_LABELS).map(c => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
             </select>
             <input value={form.daily_rate} onChange={e => setForm(f => ({ ...f, daily_rate: e.target.value }))} placeholder="Daily rate (₱)" type="number" className="bg-[#0f0f0f] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-[#E32726]" />
             <input value={form.quantity} onChange={e => setForm(f => ({ ...f, quantity: e.target.value }))} placeholder="Qty" type="number" min="1" className="bg-[#0f0f0f] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-[#E32726]" />

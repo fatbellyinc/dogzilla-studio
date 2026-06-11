@@ -2,6 +2,7 @@
 import { use, useEffect, useState } from 'react';
 import { formatPHP, formatDate, STUDIO_WHATSAPP, fmt24, calcOT, OT_RATE } from '@/lib/utils';
 import { Booking, BookingEquipment, Payment, Invoice, STUDIO_RATES, VAT_RATE, PAYMENT_ACCOUNTS } from '@/lib/types';
+import ShareDocBar from '@/components/ShareDocBar';
 
 interface BookingDetail {
   booking: Booking;
@@ -101,7 +102,7 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
             <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '4px', color: '#888', marginTop: '2px' }}>STUDIO</div>
             <div style={{ fontSize: '11px', color: '#555', marginTop: '8px', lineHeight: '1.6' }}>
               <div>102 7th St, Grace Park, Caloocan City</div>
-              <div>info@dogzillafilms.com · {STUDIO_WHATSAPP}</div>
+              <div>dogzillastudiorental@gmail.com · {STUDIO_WHATSAPP}</div>
               <div>www.dogzillafilms.com</div>
             </div>
           </div>
@@ -311,16 +312,14 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
 
       {/* Footer */}
       <div style={{ borderTop: '1px solid #e5e5e5', paddingTop: '8px', marginTop: '16px', textAlign: 'center', fontSize: '10px', color: '#aaa' }}>
-        <div>DOGZILLA STUDIO · info@dogzillafilms.com · {STUDIO_WHATSAPP} · 102 7th St, Grace Park, Caloocan City · www.dogzillafilms.com</div>
+        <div>DOGZILLA STUDIO · dogzillastudiorental@gmail.com · {STUDIO_WHATSAPP} · 102 7th St, Grace Park, Caloocan City · www.dogzillafilms.com</div>
+        <div style={{ marginTop: '2px' }}>📘 facebook.com/dogzillastudioph · 📸 Instagram @dogzillastudioph</div>
         <div style={{ marginTop: '3px' }}>© Alberto Monteras II · Dogzilla Films · All rights reserved.</div>
       </div>
 
-      {/* Print button — hidden when printing */}
+      {/* Share + print — hidden when printing */}
+      <ShareDocBar bookingId={booking.id} docType="invoice" clientName={booking.client_name || ''} clientPhone={booking.client_phone} clientEmail={booking.client_email} docNumber={invoiceNumber} />
       <div className="no-print fixed bottom-6 right-6 flex gap-2">
-        <a href={waLink} target="_blank" rel="noreferrer"
-          className="flex items-center gap-2 bg-[#25D366] text-white px-4 py-2.5 rounded-lg font-semibold shadow-xl hover:bg-[#20b558] transition-colors text-sm">
-          💬 WhatsApp
-        </a>
         <button onClick={() => window.print()}
           className="bg-[#E32726] text-white px-5 py-2.5 rounded-lg font-semibold shadow-xl hover:bg-[#c41f1e] transition-colors text-sm">
           🖨️ Print / PDF

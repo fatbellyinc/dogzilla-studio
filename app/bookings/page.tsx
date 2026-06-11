@@ -270,6 +270,11 @@ export default function BookingsPage() {
                         <StatusBadge status={b.status} />
                       </div>
                       <div className="text-xs text-white/40 mt-1">{b.studio_rate === 'hourly' ? `${b.hours}hr @ ₱3,500/hr` : b.studio_rate === 'fullday' ? 'Full Day' : 'Setup Rate'}</div>
+                      {b.end_date && b.end_date !== b.booking_date && (
+                        <div className="text-[10px] text-[#E32726]/80 font-medium mt-0.5">
+                          📅 {new Date(b.booking_date + 'T00:00').toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })} – {new Date(b.end_date + 'T00:00').toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}
+                        </div>
+                      )}
                       <div className="text-xs text-[#E32726] mt-1 font-medium">{formatPHP(b.total)}</div>
                       {!b.deposit_paid && !b.no_deposit && b.status !== 'completed' && b.status !== 'cancelled' && <div className="text-xs text-yellow-400 mt-1">⚠️ Deposit pending</div>}
                     </Link>
@@ -288,7 +293,10 @@ export default function BookingsPage() {
         <div className="p-4 border-b border-[#2a2a2a] flex flex-col md:flex-row md:items-center gap-2">
           <div className="flex items-center justify-between flex-1">
             <h2 className="font-semibold text-white text-sm">All Bookings — {MONTHS[viewMonth]} {viewYear}</h2>
-            <span className="text-xs text-white/30">{bookings.length} bookings</span>
+            <span className="text-xs text-white/30">
+              {bookings.filter(b => b.status !== 'cancelled').length} bookings
+              {bookings.some(b => b.status === 'cancelled') && <span className="text-red-400/50"> · {bookings.filter(b => b.status === 'cancelled').length} cancelled</span>}
+            </span>
           </div>
           <input
             placeholder="Search client, project..."
@@ -324,11 +332,20 @@ export default function BookingsPage() {
                       {b.studio_rate === 'hourly' ? `${b.hours}hr` : b.studio_rate}
                       {b.project_name ? ` · ${b.project_name}` : ''}
                     </div>
+                    {/* Always show full date range so overlaps are obvious */}
+                    <div className="text-[10px] text-[#E32726]/80 font-medium">
+                      {new Date(b.booking_date + 'T00:00').toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}
+                      {b.end_date && b.end_date !== b.booking_date
+                        ? ` – ${new Date(b.end_date + 'T00:00').toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })} (${Math.round((new Date(b.end_date + 'T00:00').getTime() - new Date(b.booking_date + 'T00:00').getTime()) / 86400000) + 1} days)`
+                        : ''}
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
                   {b.is_pencil && <span className="text-xs text-yellow-400">✏️ pencil</span>}
                   {!b.deposit_paid && !b.no_deposit && b.status !== 'completed' && b.status !== 'cancelled' && <span className="text-xs text-yellow-400">⚠️ deposit</span>}
+                  {!!b.deposit_paid && !b.fully_paid && b.status !== 'cancelled' && <span className="text-xs text-emerald-400">✓ deposit</span>}
+                  {!!b.fully_paid && <span className="text-xs text-green-400">💰 paid</span>}
                   <StatusBadge status={b.status} />
                   <div className="text-sm text-white/60 hidden md:block">{formatPHP(b.total)}</div>
                 </div>

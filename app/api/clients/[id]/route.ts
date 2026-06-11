@@ -14,8 +14,15 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   const db = getDb();
   const { id } = await params;
   const body = await req.json();
-  const { name, company, tin, email, phone, address, notes, special_notes } = body;
-  db.prepare(`UPDATE clients SET name=?, company=?, tin=?, email=?, phone=?, address=?, notes=?, special_notes=? WHERE id=?`).run(name, company || null, tin || null, email || null, phone || null, address || null, notes || null, special_notes || null, id);
+  const { name, company, tin, email, phone, address, notes, special_notes, is_vip } = body;
+  // Partial update: VIP tag toggle (doesn't touch other fields)
+  if (is_vip !== undefined) {
+    db.prepare('UPDATE clients SET is_vip = ? WHERE id = ?').run(is_vip ? 1 : 0, id);
+  }
+  // Full profile update only when name is provided
+  if (name !== undefined) {
+    db.prepare(`UPDATE clients SET name=?, company=?, tin=?, email=?, phone=?, address=?, notes=?, special_notes=? WHERE id=?`).run(name, company || null, tin || null, email || null, phone || null, address || null, notes || null, special_notes || null, id);
+  }
   return NextResponse.json(db.prepare('SELECT * FROM clients WHERE id = ?').get(id));
 }
 

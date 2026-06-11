@@ -117,7 +117,7 @@ We'd love to see your finished work — feel free to tag us!
 If you need to rebook or have any other productions coming up, we're always here!
 
 📞 _+63 939 933 8732_
-📧 _info@dogzillafilms.com_
+📧 _dogzillastudiorental@gmail.com_
 
 – Dogzilla Studio Team 🦖`,
   },

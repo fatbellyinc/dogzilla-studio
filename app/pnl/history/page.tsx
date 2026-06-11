@@ -18,6 +18,13 @@ interface PnLData {
   monthlyFixed: number;
   breakEven: number;
   avgUtils: number;
+  businessBreakEven?: {
+    capexTotal: number;
+    cumulativeNetProfit: number;
+    capexRemaining: number;
+    recoveredPct: number;
+    isProfitable: boolean;
+  };
 }
 
 interface CostItem { id: number; description: string; type: string; quantity: number; unit_cost: number; total_cost: number; booking_id: number; client_name: string; }
@@ -41,7 +48,7 @@ export default function PnLHistoryPage() {
 
   if (!data) return <div className="flex items-center justify-center h-64 text-white/30 pt-14 md:pt-0">Loading P&L data...</div>;
 
-  const { months, totals, monthlyFixed, breakEven, avgUtils } = data;
+  const { months, totals, monthlyFixed, breakEven, avgUtils, businessBreakEven: bbe } = data;
   const years = [...new Set(months.map(m => m.year))].sort();
   const filtered = filterYear === 'all' ? months : months.filter(m => m.year === filterYear);
 
@@ -62,6 +69,34 @@ export default function PnLHistoryPage() {
           <a href="/api/export?type=revenue" target="_blank" className="text-xs border border-[#2a2a2a] text-white/50 hover:text-white px-3 py-1.5 rounded-lg no-print">⬇ CSV</a>
         </div>
       </div>
+
+      {/* Business break-even: capital recovery */}
+      {bbe && bbe.capexTotal > 0 && (
+        <div className={`rounded-xl p-4 mb-4 border ${bbe.isProfitable ? 'bg-green-500/10 border-green-500/30' : 'bg-[#1a1a1a] border-[#2a2a2a]'}`}>
+          <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+            <h2 className="text-sm font-bold text-white">
+              {bbe.isProfitable ? '🎉 Business is PROFITABLE — capital fully recovered!' : '🏗️ Road to Break-Even (Capital Recovery)'}
+            </h2>
+            <span className={`text-lg font-black ${bbe.isProfitable ? 'text-green-400' : 'text-[#E32726]'}`}>
+              {bbe.isProfitable ? `+${formatPHP(bbe.cumulativeNetProfit - bbe.capexTotal)} net` : `${formatPHP(bbe.capexRemaining)} to go`}
+            </span>
+          </div>
+          {/* Progress bar */}
+          <div className="h-3 bg-[#0f0f0f] rounded-full overflow-hidden mb-2">
+            <div className={`h-full rounded-full transition-all ${bbe.isProfitable ? 'bg-green-500' : bbe.recoveredPct > 50 ? 'bg-yellow-400' : 'bg-[#E32726]'}`}
+              style={{ width: `${Math.max(2, bbe.recoveredPct)}%` }} />
+          </div>
+          <div className="flex justify-between text-xs flex-wrap gap-2">
+            <span className="text-white/40">Capital invested: <span className="text-white font-semibold">{formatPHP(bbe.capexTotal)}</span></span>
+            <span className="text-white/40">Operating profit recovered: <span className={`font-semibold ${bbe.cumulativeNetProfit >= 0 ? 'text-green-400' : 'text-red-400'}`}>{formatPHP(bbe.cumulativeNetProfit)}</span> ({bbe.recoveredPct.toFixed(1)}%)</span>
+            {!bbe.isProfitable && avgMonthlyRevenue > breakEven && (
+              <span className="text-white/40">
+                At current pace: ~<span className="text-yellow-400 font-semibold">{Math.ceil(bbe.capexRemaining / Math.max(1, avgMonthlyRevenue - breakEven))} months</span> to break even
+              </span>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* All-time KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">

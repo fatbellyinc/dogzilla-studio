@@ -22,7 +22,15 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   const db = getDb();
   const { id } = await params;
   const body = await req.json();
-  const { status, notes, deposit_paid, fully_paid, discount_type, discount_value, is_pencil, vat_exempt, no_deposit, call_time, wrap_time, overtime_hours, overtime_amount } = body;
+  const { status, notes, deposit_paid, fully_paid, discount_type, discount_value, is_pencil, vat_exempt, no_deposit, call_time, wrap_time, overtime_hours, overtime_amount, client_id } = body;
+
+  if (client_id !== undefined) {
+    const newClient = db.prepare('SELECT name FROM clients WHERE id = ?').get(client_id) as { name: string } | undefined;
+    if (newClient) {
+      db.prepare('UPDATE bookings SET client_id = ? WHERE id = ?').run(client_id, id);
+      logActivity(Number(id), ACTIONS.STATUS_CHANGED, `Client changed to ${newClient.name}`);
+    }
+  }
 
   if (status !== undefined) { db.prepare('UPDATE bookings SET status = ? WHERE id = ?').run(status, id); logActivity(Number(id), ACTIONS.STATUS_CHANGED, `Status changed to ${status}`); }
   if (notes !== undefined) db.prepare('UPDATE bookings SET notes = ? WHERE id = ?').run(notes, id);

@@ -86,7 +86,7 @@ export default function SettingsPage() {
           <div>
             <label className="text-xs text-white/40 mb-1 block">Gmail Address</label>
             <input value={settings.smtp_user || ''} onChange={e => set('smtp_user', e.target.value)}
-              placeholder="info@dogzillafilms.com" type="email" className={ic} />
+              placeholder="dogzillastudiorental@gmail.com" type="email" className={ic} />
           </div>
           <div>
             <label className="text-xs text-white/40 mb-1 block">App Password (16-character, no spaces)</label>

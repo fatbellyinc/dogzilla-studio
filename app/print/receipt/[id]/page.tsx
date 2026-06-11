@@ -36,7 +36,7 @@ export default function ReceiptPage({ params }: { params: Promise<{ id: string }
         <div style={{ fontSize: '18px', fontWeight: 900, color: '#E32726' }}>DOGZILLA STUDIO</div>
         <div style={{ fontSize: '10px', color: '#888', letterSpacing: '2px' }}>OFFICIAL RECEIPT</div>
         <div style={{ fontSize: '11px', color: '#555', marginTop: '4px' }}>102 7th St Grace Park, Caloocan City</div>
-        <div style={{ fontSize: '11px', color: '#555' }}>{STUDIO_WHATSAPP} · info@dogzillafilms.com</div>
+        <div style={{ fontSize: '11px', color: '#555' }}>{STUDIO_WHATSAPP} · dogzillastudiorental@gmail.com</div>
       </div>
 
       {/* Receipt number & date */}

@@ -156,7 +156,7 @@ export default function ClientPortalPage({ params }: { params: Promise<{ token: 
       {/* Contact */}
       <div className="text-center text-white/30 text-xs space-y-1">
         <div>Questions? Contact us anytime</div>
-        <div>📞 +63 939 933 8732 · ✉ info@dogzillafilms.com</div>
+        <div>📞 +63 939 933 8732 · ✉ dogzillastudiorental@gmail.com</div>
         <div>📍 102 7th St Grace Park, Caloocan City</div>
       </div>
     </div>

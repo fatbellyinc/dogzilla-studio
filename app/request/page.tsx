@@ -27,7 +27,7 @@ export default function BookingRequestPage() {
         <div className="text-2xl mb-2">🎬</div>
         <h2 className="text-white text-xl font-bold mb-2">Request Received!</h2>
         <p className="text-white/50 text-sm">We&apos;ll get back to you within 1 business day to confirm availability and send your quotation.</p>
-        <p className="text-white/30 text-xs mt-4">+63 939 933 8732 · info@dogzillafilms.com</p>
+        <p className="text-white/30 text-xs mt-4">+63 939 933 8732 · dogzillastudiorental@gmail.com</p>
       </div>
     </div>
   );

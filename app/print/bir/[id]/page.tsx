@@ -2,6 +2,7 @@
 import { use, useEffect, useState } from 'react';
 import { formatDate } from '@/lib/utils';
 import { Booking, BookingEquipment, STUDIO_RATES } from '@/lib/types';
+import ShareDocBar from '@/components/ShareDocBar';
 
 interface BIRData {
   booking: Booking & { client_tin?: string; client_company?: string; client_address?: string };
@@ -102,6 +103,8 @@ export default function BIRInvoicePage({ params }: { params: Promise<{ id: strin
   const [lines, setLines] = useState<{ qty: string; unit: string; desc: string; unitCost: string }[]>([]);
 
   useEffect(() => {
+    // Open directly as Acknowledgement Receipt via ?type=ack
+    if (new URLSearchParams(window.location.search).get('type') === 'ack') setDocType('ack');
     fetch(`/api/bookings/${id}`).then(r => r.json()).then((d: BIRData) => {
       setData(d);
       setVatExempt(!!d.booking.vat_exempt);
@@ -492,6 +495,11 @@ export default function BIRInvoicePage({ params }: { params: Promise<{ id: strin
         Booking #{id} · {booking.client_name} · {fmtDate}
         {booking.project_name && ` · ${booking.project_name}`}
       </div>
+
+      {/* Share — no-print */}
+      {docType === 'ack' && (
+        <ShareDocBar bookingId={Number(id)} docType="ack" clientName={booking.client_name || ''} clientPhone={booking.client_phone} clientEmail={booking.client_email} docNumber={invoiceNo ? `No. ${invoiceNo}` : undefined} />
+      )}
     </div>
   );
 }

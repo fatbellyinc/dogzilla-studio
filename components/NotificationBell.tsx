@@ -71,7 +71,7 @@ export default function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-1 w-72 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl shadow-2xl z-50">
+        <div className="fixed md:absolute left-2 right-2 md:left-auto md:right-0 top-12 md:top-full mt-1 md:w-72 max-h-[70vh] overflow-y-auto bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl shadow-2xl z-[60]">
           <div className="flex items-center justify-between px-3 py-2.5 border-b border-[#2a2a2a]">
             <span className="text-xs text-white/40 uppercase tracking-wider">Notifications</span>
             {permission !== 'granted' && (

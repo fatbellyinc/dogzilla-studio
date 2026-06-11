@@ -293,21 +293,35 @@ function UtilityBillsTab() {
         ))}
       </div>
 
-      {/* Bills list */}
-      <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl divide-y divide-[#2a2a2a] max-h-80 overflow-y-auto">
+      {/* Bills list — grouped by month, newest first */}
+      <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl overflow-hidden max-h-[480px] overflow-y-auto">
         {bills.length === 0 ? <p className="text-white/30 text-sm p-4 text-center">No utility bills for {year}</p> :
-          bills.map(b => {
-            const acc = UTILITY_ACCOUNTS.find(a => a.id === b.account);
+          [...new Set(bills.map(b => b.month))].sort((a, b) => b - a).map(month => {
+            const monthBills = bills
+              .filter(b => b.month === month)
+              .sort((a, b) => UTILITY_ACCOUNTS.findIndex(u => u.id === a.account) - UTILITY_ACCOUNTS.findIndex(u => u.id === b.account));
+            const monthTotal = monthBills.reduce((s, b) => s + b.amount, 0);
             return (
-              <div key={b.id} className="flex items-center justify-between px-4 py-2.5">
-                <div>
-                  <div className={`text-xs font-semibold ${acc?.color}`}>{acc?.label || b.account}</div>
-                  <div className="text-[10px] text-white/40">{MONTHS_SHORT[b.month - 1]} {b.year}{b.kwh ? ` · ${b.kwh} kWh` : ''}{b.reference ? ` · ${b.reference}` : ''}</div>
+              <div key={month}>
+                <div className="flex items-center justify-between px-4 py-2 bg-[#0f0f0f] border-y border-[#2a2a2a] sticky top-0">
+                  <span className="text-xs font-bold text-white">{MONTHS_SHORT[month - 1]} {year}</span>
+                  <span className="text-xs font-bold text-yellow-400">{formatPHP(monthTotal)}</span>
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-sm text-white font-semibold">{formatPHP(b.amount)}</span>
-                  <button onClick={() => remove(b.id)} className="text-white/20 hover:text-red-400 text-xs">✕</button>
-                </div>
+                {monthBills.map(b => {
+                  const acc = UTILITY_ACCOUNTS.find(a => a.id === b.account);
+                  return (
+                    <div key={b.id} className="flex items-center justify-between px-4 py-2 border-b border-[#2a2a2a]/50">
+                      <div>
+                        <div className={`text-xs font-semibold ${acc?.color}`}>{acc?.label || b.account}</div>
+                        <div className="text-[10px] text-white/40">{b.kwh ? `${b.kwh} kWh` : ''}{b.kwh && b.reference ? ' · ' : ''}{b.reference || ''}</div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm text-white font-semibold">{formatPHP(b.amount)}</span>
+                        <button onClick={() => remove(b.id)} className="text-white/20 hover:text-red-400 text-xs">✕</button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             );
           })}
@@ -385,20 +399,35 @@ function CapexTab() {
         ))}
       </div>
 
-      <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl divide-y divide-[#2a2a2a] max-h-96 overflow-y-auto">
+      {/* Expenses — grouped by year (newest first), sorted by date within each year */}
+      <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl overflow-hidden max-h-[520px] overflow-y-auto">
         {filtered.length === 0 ? <p className="text-white/30 text-sm p-4 text-center">No entries yet</p> :
-          filtered.map(e => (
-            <div key={e.id} className="flex items-center justify-between px-4 py-2.5">
-              <div>
-                <div className="text-sm text-white">{e.description}</div>
-                <div className="text-xs text-white/40">{e.date} · {e.category}{e.vendor ? ` · ${e.vendor}` : ''}</div>
+          [...new Set(filtered.map(e => e.date.slice(0, 4)))].sort((a, b) => b.localeCompare(a)).map(yr => {
+            const yearExpenses = filtered
+              .filter(e => e.date.startsWith(yr))
+              .sort((a, b) => b.date.localeCompare(a.date) || a.category.localeCompare(b.category));
+            const yearTotal = yearExpenses.reduce((s, e) => s + e.amount, 0);
+            return (
+              <div key={yr}>
+                <div className="flex items-center justify-between px-4 py-2 bg-[#0f0f0f] border-y border-[#2a2a2a] sticky top-0">
+                  <span className="text-xs font-bold text-white">{yr}</span>
+                  <span className="text-xs font-bold text-[#E32726]">{formatPHP(yearTotal)} · {yearExpenses.length} item{yearExpenses.length !== 1 ? 's' : ''}</span>
+                </div>
+                {yearExpenses.map(e => (
+                  <div key={e.id} className="flex items-center justify-between px-4 py-2 border-b border-[#2a2a2a]/50">
+                    <div>
+                      <div className="text-sm text-white">{e.description}</div>
+                      <div className="text-xs text-white/40">{e.date} · <span className="text-white/60">{e.category}</span>{e.vendor ? ` · ${e.vendor}` : ''}</div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-semibold text-white">{formatPHP(e.amount)}</span>
+                      <button onClick={async () => { await fetch(`/api/capital-expenses?id=${e.id}`, { method: 'DELETE' }); load(); }} className="text-white/20 hover:text-red-400 text-xs">✕</button>
+                    </div>
+                  </div>
+                ))}
               </div>
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-semibold text-white">{formatPHP(e.amount)}</span>
-                <button onClick={async () => { await fetch(`/api/capital-expenses?id=${e.id}`, { method: 'DELETE' }); load(); }} className="text-white/20 hover:text-red-400 text-xs">✕</button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
       </div>
     </div>
   );

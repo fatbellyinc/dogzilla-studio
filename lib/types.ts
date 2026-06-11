@@ -161,7 +161,7 @@ export const STUDIO_RATES = {
   setup: { label: 'Set-Up Day', price: 22500, description: 'Up to 14 hrs · Prep only, no filming · No AC · Staff fee ₱1,500/pax' },
   fullday: { label: 'Full Day Shoot', price: 45000, description: '14-hr shoot · +1hr free ingress/egress · Air conditioned · OT ₱3,500/hr' },
   hourly: { label: 'Hourly Rate', price: 3500, description: 'Per hour · Min 8 hrs · Staff fee ₱4,500 (3 pax)' },
-  event: { label: 'Event / Warehouse', price: 45000, description: 'Main warehouse · Ingress & egress incl. · OT ₱3,500/hr · Client provides generator' },
+  event: { label: 'Event / Warehouse', price: 55000, description: 'Main warehouse · Ingress & egress incl. · OT ₱3,500/hr · Client provides generator' },
   equipment_only: { label: 'Equipment Only', price: 0, description: 'No studio rental · Equipment rental only · Client location or off-site' },
 } as const;
 
@@ -221,6 +221,6 @@ export const VAT_RATE = 0.12;
 
 export const PAYMENT_ACCOUNTS = [
   { bank: 'BDO Savings Account', name: 'Alberto C. Monteras II', number: '7290126766' },
-  { bank: 'GCash', name: 'Alberto C. Monteras II', number: '+63 939 933 8732' },
+  { bank: 'GCash', name: 'Alberto I M.', number: '+63 939 933 8732' },
   { bank: 'Metrobank', name: 'Alberto II Caidoy Monteras', number: '1637163527169' },
 ];

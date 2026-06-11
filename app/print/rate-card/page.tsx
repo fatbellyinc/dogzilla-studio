@@ -16,7 +16,7 @@ export default function RateCardPage() {
           <div style={{ fontSize: '24px', fontWeight: 900, color: '#E32726', letterSpacing: '-1px', lineHeight: 1 }}>DOGZILLA STUDIO</div>
           <div style={{ fontSize: '10px', color: '#888', letterSpacing: '3px', marginTop: '2px' }}>CYCLORAMA STUDIO & EQUIPMENT RENTAL</div>
           <div style={{ fontSize: '10px', color: '#555', marginTop: '6px', lineHeight: '1.6' }}>
-            102 7th St, Grace Park, Caloocan City &nbsp;·&nbsp; +63 939 933 8732 &nbsp;·&nbsp; info@dogzillafilms.com
+            102 7th St, Grace Park, Caloocan City &nbsp;·&nbsp; +63 939 933 8732 &nbsp;·&nbsp; dogzillastudiorental@gmail.com
           </div>
         </div>
         <div style={{ marginLeft: 'auto', textAlign: 'right' }}>

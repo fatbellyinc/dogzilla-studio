@@ -3,6 +3,7 @@ import { use, useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { formatPHP, formatDate, fmt24, calcOT, OT_RATE } from '@/lib/utils';
 import { Booking, BookingEquipment, Quotation, BookingDay, STUDIO_RATES, VAT_RATE, PAYMENT_ACCOUNTS } from '@/lib/types';
+import ShareDocBar from '@/components/ShareDocBar';
 
 interface BookingDetail {
   booking: Booking;
@@ -119,7 +120,7 @@ function DocView({ bookingId }: { bookingId: string }) {
             <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '4px', color: '#888', marginTop: '2px' }}>STUDIO</div>
             <div style={{ fontSize: '11px', color: '#555', marginTop: '8px', lineHeight: '1.6' }}>
               <div>102 7th St, Grace Park, Caloocan City</div>
-              <div>info@dogzillafilms.com · +63 939 933 8732</div>
+              <div>dogzillastudiorental@gmail.com · +63 939 933 8732</div>
               <div>www.dogzillafilms.com</div>
             </div>
           </div>
@@ -325,11 +326,13 @@ function DocView({ bookingId }: { bookingId: string }) {
 
       {/* Footer */}
       <div style={{ borderTop: '1px solid #e5e5e5', paddingTop: '8px', marginTop: '16px', textAlign: 'center', fontSize: '10px', color: '#aaa' }}>
-        DOGZILLA STUDIO · info@dogzillafilms.com · +63 939 933 8732 · 102 7th St, Grace Park, Caloocan City · www.dogzillafilms.com
+        DOGZILLA STUDIO · dogzillastudiorental@gmail.com · +63 939 933 8732 · 102 7th St, Grace Park, Caloocan City · www.dogzillafilms.com
+        <br />📘 facebook.com/dogzillastudioph · 📸 Instagram @dogzillastudioph
         <br />All rates VAT-exclusive. VAT (12%) applied per TRAIN Law, RA 10963.
         <br />© Alberto Monteras II · Dogzilla Films · All rights reserved.
       </div>
 
+      <ShareDocBar bookingId={booking.id} docType="quotation" clientName={booking.client_name || ''} clientPhone={booking.client_phone} clientEmail={booking.client_email} docNumber={docNumber} />
       <button onClick={() => window.print()} className="no-print fixed bottom-6 right-6 bg-[#E32726] text-white px-5 py-2.5 rounded-lg font-semibold shadow-xl hover:bg-[#c41f1e] transition-colors text-sm">
         🖨️ Print / Save PDF
       </button>

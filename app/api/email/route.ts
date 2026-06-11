@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
   </td></tr>
   <tr><td style="padding:28px;">${body}</td></tr>
   <tr><td style="background:#f9f9f9;padding:16px 28px;text-align:center;font-size:11px;color:#aaa;border-top:1px solid #e5e5e5;">
-    102 7th St Grace Park, Caloocan City &nbsp;·&nbsp; +63 939 933 8732 &nbsp;·&nbsp; info@dogzillafilms.com<br>
+    102 7th St Grace Park, Caloocan City &nbsp;·&nbsp; +63 939 933 8732 &nbsp;·&nbsp; dogzillastudiorental@gmail.com<br>
     <span style="margin-top:4px;display:block;">© Alberto Monteras II · Dogzilla Films</span>
   </td></tr>
 </table></td></tr></table>

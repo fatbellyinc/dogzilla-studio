@@ -316,10 +316,26 @@ function initSchema(db: Database.Database) {
     `ALTER TABLE bookings ADD COLUMN no_deposit INTEGER DEFAULT 0`,
     `ALTER TABLE fixed_costs ADD COLUMN vat_on_top INTEGER DEFAULT 0`,
     `ALTER TABLE bookings ADD COLUMN fully_paid INTEGER DEFAULT 0`,
+    `ALTER TABLE clients ADD COLUMN is_vip INTEGER DEFAULT 0`,
   ];
   for (const sql of migrations) {
     try { db.exec(sql); } catch { /* column already exists */ }
   }
+
+  // Data sync: flag bookings as fully_paid when payments cover the invoice total.
+  // Idempotent — fixes old bookings paid before the auto-flag logic existed,
+  // so notifications/receivables stop alerting on settled shoots.
+  try {
+    db.exec(`
+      UPDATE bookings SET fully_paid = 1, deposit_paid = 1
+      WHERE COALESCE(fully_paid, 0) = 0
+        AND status != 'cancelled'
+        AND (
+          SELECT COALESCE(SUM(p.amount), 0) FROM payments p WHERE p.booking_id = bookings.id
+        ) >= (CASE WHEN COALESCE(vat_exempt, 0) = 1 THEN total ELSE total * 1.12 END) - 0.01
+        AND total > 0
+    `);
+  } catch { /* ignore */ }
 
   // Equipment upserts — add new items to existing databases
   const equipmentUpserts: [string, string, string, number, number, string, number][] = [

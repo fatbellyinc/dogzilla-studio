@@ -1,5 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
+import { logActivity } from '@/lib/activity';
+
+// Log an activity entry from the client (e.g. message sent via WhatsApp/Viber/Messenger)
+export async function POST(req: NextRequest) {
+  const { booking_id, action, description } = await req.json();
+  if (!action || !description) return NextResponse.json({ error: 'missing fields' }, { status: 400 });
+  logActivity(booking_id || null, action, description);
+  return NextResponse.json({ ok: true });
+}
 
 export async function GET(req: NextRequest) {
   const db = getDb();
