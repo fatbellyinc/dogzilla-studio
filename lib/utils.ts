@@ -66,20 +66,23 @@ const FREE_INGRESS_EGRESS: Record<string, number> = {
   equipment_only: 0,
 };
 
-// Calculate duration in decimal hours between two "HH:MM" 24hr strings
-export function calcDuration(callTime: string, wrapTime: string): number {
+// Calculate duration in decimal hours between two "HH:MM" 24hr strings.
+// dayOffset: explicit number of days between call date and wrap date (from wrap_date).
+// When omitted, auto-detects overnight (wrap <= call → next day).
+export function calcDuration(callTime: string, wrapTime: string, dayOffset?: number): number {
   const [ch, cm] = callTime.split(':').map(Number);
   const [wh, wm] = wrapTime.split(':').map(Number);
   const callMins = ch * 60 + cm;
   let wrapMins = wh * 60 + wm;
-  if (wrapMins <= callMins) wrapMins += 24 * 60; // overnight
+  if (dayOffset !== undefined && dayOffset > 0) wrapMins += dayOffset * 24 * 60;
+  else if (wrapMins <= callMins) wrapMins += 24 * 60; // auto overnight
   return (wrapMins - callMins) / 60;
 }
 
 // Calculate OT hours:
 // Total duration − free ingress/egress − included shoot hours = OT
 // Example Full Day: 17hr total − 2hr (ingress+egress) − 14hr shoot = 1hr OT
-export function calcOT(studioRate: string, callTime: string | null, wrapTime: string | null): {
+export function calcOT(studioRate: string, callTime: string | null, wrapTime: string | null, dayOffset?: number): {
   durationHrs: number;
   ingressEgressHrs: number;
   shootHrs: number;
@@ -93,7 +96,7 @@ export function calcOT(studioRate: string, callTime: string | null, wrapTime: st
   const shootIncluded = SHOOT_HOURS[studioRate] || 0;
   if (shootIncluded === 0) return zero;
 
-  const durationHrs = calcDuration(callTime, wrapTime);
+  const durationHrs = calcDuration(callTime, wrapTime, dayOffset);
   const ingressEgressHrs = FREE_INGRESS_EGRESS[studioRate] || 0;
   const shootHrs = Math.max(0, durationHrs - ingressEgressHrs);
   const otHrs = Math.max(0, Math.round((shootHrs - shootIncluded) * 4) / 4); // nearest 15min

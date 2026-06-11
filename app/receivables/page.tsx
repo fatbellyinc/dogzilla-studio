@@ -8,7 +8,7 @@ interface ReceivableItem {
   total_with_vat: number; client_name: string; client_phone: string;
   client_email: string; project_name: string; shoot_type: string; studio_rate: string;
   total_paid: number; balance_due: number; deposit_paid: number;
-  no_deposit: number; vat_exempt: number;
+  deposit_amount: number; no_deposit: number; vat_exempt: number;
   daysToShoot: number; daysSinceShoot: number;
   urgency: 'critical' | 'overdue' | 'due_soon' | 'upcoming' | 'completed_unpaid';
 }
@@ -27,7 +27,7 @@ function PaymentRow({ item, onPaid }: { item: ReceivableItem; onPaid: () => void
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
     amount: item.balance_due.toFixed(0),
-    type: (item.deposit_paid || item.no_deposit) ? 'balance' : 'deposit',
+    type: (item.deposit_paid || item.no_deposit || item.total_paid >= item.deposit_amount - 0.01) ? 'balance' : 'deposit',
     method: 'GCash',
     reference: '',
   });
@@ -39,7 +39,7 @@ function PaymentRow({ item, onPaid }: { item: ReceivableItem; onPaid: () => void
     setForm(f => ({
       ...f,
       amount: item.balance_due.toFixed(0),
-      type: (item.deposit_paid || item.no_deposit) ? 'balance' : 'deposit',
+      type: (item.deposit_paid || item.no_deposit || item.total_paid >= item.deposit_amount - 0.01) ? 'balance' : 'deposit',
     }));
   }, [item.balance_due, item.deposit_paid, item.no_deposit]);
 
@@ -56,7 +56,7 @@ function PaymentRow({ item, onPaid }: { item: ReceivableItem; onPaid: () => void
   }
 
   // WhatsApp chase message
-  const waMsg = `Hi ${item.client_name}! 👋\n\nThis is Dogzilla Studio. Just following up on your ${item.urgency === 'completed_unpaid' ? `shoot on ${formatDateShort(item.booking_date)}` : `upcoming shoot on ${formatDateShort(item.booking_date)}`}.\n\nOutstanding balance: *${formatPHP(item.balance_due)}*\n\nKindly settle at your earliest convenience:\n🏦 BDO: 7290126766 (Alberto C. Monteras II)\n📱 GCash: +63 939 933 8732 (Alberto C. Monteras II)\n\nThank you! 🙏\n– Dogzilla Studio`;
+  const waMsg = `Hi ${item.client_name}! 👋\n\nThis is Dogzilla Studio. Just following up on your ${item.urgency === 'completed_unpaid' ? `shoot on ${formatDateShort(item.booking_date)}` : `upcoming shoot on ${formatDateShort(item.booking_date)}`}.\n\nOutstanding balance: *${formatPHP(item.balance_due)}*\n\nKindly settle at your earliest convenience:\n🏦 BDO: 7290126766 (Alberto C. Monteras II)\n📱 GCash: +63 939 933 8732 (Alberto I M.)\n\nThank you! 🙏\n– Dogzilla Studio`;
 
   const cfg = URGENCY_CONFIG[item.urgency];
 
@@ -78,8 +78,11 @@ function PaymentRow({ item, onPaid }: { item: ReceivableItem; onPaid: () => void
             {!!item.vat_exempt && (
               <span className="text-[10px] bg-blue-500/20 text-blue-400 border border-blue-500/30 px-2 py-0.5 rounded-full">VAT exempt</span>
             )}
-            {!item.deposit_paid && !item.no_deposit && (
+            {!item.deposit_paid && !item.no_deposit && item.total_paid < item.deposit_amount - 0.01 && (
               <span className="text-[10px] bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 px-2 py-0.5 rounded-full">⚠ deposit unpaid</span>
+            )}
+            {!item.no_deposit && (item.deposit_paid || item.total_paid >= item.deposit_amount - 0.01) && item.total_paid > 0 && (
+              <span className="text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full">✓ deposit received</span>
             )}
           </div>
           <div className="text-xs text-white/40">
@@ -127,7 +130,7 @@ function PaymentRow({ item, onPaid }: { item: ReceivableItem; onPaid: () => void
             <div>
               <label className="text-[10px] text-white/30 mb-1 block">Type</label>
               <select value={form.type} onChange={e => setForm(f => ({...f, type: e.target.value}))} className={ic + ' w-full'}>
-                {!item.deposit_paid && !item.no_deposit && <option value="deposit">Deposit</option>}
+                {!item.deposit_paid && !item.no_deposit && item.total_paid < item.deposit_amount - 0.01 && <option value="deposit">Deposit</option>}
                 <option value="balance">Balance</option>
                 <option value="full">Full Payment</option>
               </select>

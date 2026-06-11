@@ -3,14 +3,14 @@ import { useState } from 'react';
 
 interface Props {
   bookingId: number;
-  docType: 'invoice' | 'quotation' | 'ack';
+  docType: 'invoice' | 'quotation' | 'ack' | 'receipt';
   clientName: string;
   clientPhone?: string | null;
   clientEmail?: string | null;
   docNumber?: string;
 }
 
-const DOC_LABELS = { invoice: 'Invoice', quotation: 'Quotation', ack: 'Acknowledgement Receipt' };
+const DOC_LABELS = { invoice: 'Invoice', quotation: 'Quotation', ack: 'Acknowledgement Receipt', receipt: 'Payment Receipt' };
 
 export default function ShareDocBar({ bookingId, docType, clientName, clientPhone, clientEmail, docNumber }: Props) {
   const [status, setStatus] = useState('');
@@ -58,7 +58,7 @@ export default function ShareDocBar({ bookingId, docType, clientName, clientPhon
   }
 
   async function shareEmail() {
-    if (docType !== 'ack' && clientEmail) {
+    if ((docType === 'invoice' || docType === 'quotation') && clientEmail) {
       // Use built-in email sender for quotation/invoice
       setStatus('Sending email...');
       const res = await fetch('/api/email', {

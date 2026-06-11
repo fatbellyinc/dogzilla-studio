@@ -47,6 +47,7 @@ export interface Booking {
   recurrence: string | null;
   call_time: string | null;
   wrap_time: string | null;
+  wrap_date: string | null;
   overtime_hours: number;
   overtime_amount: number;
   deposit_paid: number;

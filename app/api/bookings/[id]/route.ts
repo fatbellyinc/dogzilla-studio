@@ -35,6 +35,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   if (status !== undefined) { db.prepare('UPDATE bookings SET status = ? WHERE id = ?').run(status, id); logActivity(Number(id), ACTIONS.STATUS_CHANGED, `Status changed to ${status}`); }
   if (notes !== undefined) db.prepare('UPDATE bookings SET notes = ? WHERE id = ?').run(notes, id);
   if (deposit_paid !== undefined) db.prepare('UPDATE bookings SET deposit_paid = ? WHERE id = ?').run(deposit_paid ? 1 : 0, id);
+  if (body.deposit_amount !== undefined) { db.prepare('UPDATE bookings SET deposit_amount = ? WHERE id = ?').run(Number(body.deposit_amount) || 0, id); logActivity(Number(id), ACTIONS.ITEMS_EDITED, `Deposit amount set to ₱${(Number(body.deposit_amount) || 0).toLocaleString()}`); }
+  if (body.wrap_date !== undefined) db.prepare('UPDATE bookings SET wrap_date = ? WHERE id = ?').run(body.wrap_date || null, id);
   if (fully_paid !== undefined) db.prepare('UPDATE bookings SET fully_paid = ? WHERE id = ?').run(fully_paid ? 1 : 0, id);
   if (vat_exempt !== undefined) db.prepare("UPDATE bookings SET vat_exempt = ? WHERE id = ?").run(vat_exempt ? 1 : 0, id);
   if (no_deposit !== undefined) db.prepare("UPDATE bookings SET no_deposit = ? WHERE id = ?").run(no_deposit ? 1 : 0, id);

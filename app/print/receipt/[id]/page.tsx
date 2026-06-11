@@ -1,10 +1,11 @@
 'use client';
 import { use, useEffect, useState } from 'react';
 import { formatPHP, formatDate, STUDIO_WHATSAPP } from '@/lib/utils';
+import ShareDocBar from '@/components/ShareDocBar';
 
 interface ReceiptData {
   payment: { id: number; booking_id: number; amount: number; type: string; method: string; reference: string; paid_at: string; };
-  booking: { booking_date: string; total: number; client_name: string; client_company?: string; project_name: string; };
+  booking: { booking_date: string; total: number; client_name: string; client_company?: string; project_name: string; client_phone?: string; client_email?: string; };
   or_sequence: number;
 }
 
@@ -126,6 +127,7 @@ export default function ReceiptPage({ params }: { params: Promise<{ id: string }
         </div>
       </div>
 
+      <ShareDocBar bookingId={payment.booking_id} docType="receipt" clientName={booking.client_name || ''} clientPhone={booking.client_phone} clientEmail={booking.client_email} docNumber={receiptNo} />
       <button onClick={() => window.print()} className="no-print fixed bottom-6 right-6 bg-[#E32726] text-white px-5 py-2.5 rounded-lg font-semibold shadow-xl text-sm">
         🖨️ Print Receipt
       </button>

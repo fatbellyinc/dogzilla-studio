@@ -128,20 +128,33 @@ function WeatherWidget({ date }: { date: string }) {
   );
 }
 
-function ShootTimesPanel({ callTime, wrapTime, studioRate, bookingDate, onSave }: {
-  callTime: string | null; wrapTime: string | null;
-  studioRate: string; bookingDate: string; onSave: (c: string | null, w: string | null) => void;
+function ShootTimesPanel({ callTime, wrapTime, wrapDate, studioRate, bookingDate, onSave }: {
+  callTime: string | null; wrapTime: string | null; wrapDate: string | null;
+  studioRate: string; bookingDate: string; onSave: (c: string | null, w: string | null, wd: string | null) => void;
 }) {
   const [ct, setCt] = useState<string | null>(callTime);
   const [wt, setWt] = useState<string | null>(wrapTime);
+  const [wd, setWd] = useState<string>(wrapDate || bookingDate);
   const [dirty, setDirty] = useState(false);
 
-  useEffect(() => { setCt(callTime); setWt(wrapTime); setDirty(false); }, [callTime, wrapTime]);
+  useEffect(() => { setCt(callTime); setWt(wrapTime); setWd(wrapDate || bookingDate); setDirty(false); }, [callTime, wrapTime, wrapDate, bookingDate]);
 
-  const ot = calcOT(studioRate, ct, wt);
+  // Explicit day offset from the wrap date picker (0 = same day, 1 = next day, ...)
+  const dayOffset = Math.max(0, Math.round((new Date(wd + 'T00:00').getTime() - new Date(bookingDate + 'T00:00').getTime()) / 86400000));
+  const ot = calcOT(studioRate, ct, wt, dayOffset);
 
   function handleChange(newCt: string | null, newWt: string | null) {
     setCt(newCt); setWt(newWt); setDirty(true);
+    // Auto-suggest next-day wrap when wrap time <= call time and date untouched
+    if (newCt && newWt && wd === bookingDate) {
+      const [ch, cm] = newCt.split(':').map(Number);
+      const [wh, wm] = newWt.split(':').map(Number);
+      if ((wh * 60 + wm) <= (ch * 60 + cm)) {
+        const next = new Date(bookingDate + 'T00:00');
+        next.setDate(next.getDate() + 1);
+        setWd(`${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-${String(next.getDate()).padStart(2, '0')}`);
+      }
+    }
   }
 
   return (
@@ -149,7 +162,7 @@ function ShootTimesPanel({ callTime, wrapTime, studioRate, bookingDate, onSave }
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-xs text-white/40 uppercase tracking-wider">Shoot Times</h2>
         {dirty && (
-          <button onClick={() => { onSave(ct, wt); setDirty(false); }}
+          <button onClick={() => { onSave(ct, wt, wd); setDirty(false); }}
             className="text-xs bg-[#E32726] text-white px-2.5 py-1 rounded font-medium hover:bg-[#c41f1e]">
             Save Times
           </button>
@@ -161,23 +174,33 @@ function ShootTimesPanel({ callTime, wrapTime, studioRate, bookingDate, onSave }
         <TimePicker label="Wrap Time (Out)" value={wt} onChange={v => handleChange(ct, v)} placeholder="Set wrap time" />
       </div>
 
+      {/* Wrap date — for shoots that go beyond midnight */}
+      {ct && wt && (
+        <div className="flex items-center gap-2 mb-3 flex-wrap">
+          <label className="text-xs text-white/40">Wrap date:</label>
+          <input type="date" value={wd} min={bookingDate}
+            onChange={e => { setWd(e.target.value || bookingDate); setDirty(true); }}
+            className="bg-[#0f0f0f] border border-[#2a2a2a] rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-[#E32726]" />
+          {dayOffset > 0 && (
+            <span className="text-xs bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 px-2 py-0.5 rounded font-semibold">
+              🌙 +{dayOffset} day{dayOffset > 1 ? 's' : ''} — past midnight
+            </span>
+          )}
+        </div>
+      )}
+
       {ct && wt && (
         <div className="bg-[#0f0f0f] rounded-lg p-3 space-y-1.5 text-sm">
           {(() => {
-            // Detect overnight wrap: wrap time earlier than (or equal to) call time = next day
-            const [ch, cm] = ct.split(':').map(Number);
-            const [wh, wm] = wt.split(':').map(Number);
-            const overnight = (wh * 60 + wm) <= (ch * 60 + cm);
             const callDate = new Date(bookingDate + 'T00:00');
-            const wrapDate = new Date(callDate);
-            if (overnight) wrapDate.setDate(wrapDate.getDate() + 1);
+            const wrapD = new Date(wd + 'T00:00');
             const fmtD = (d: Date) => d.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
             return (
               <div className="flex justify-between text-white/60">
                 <span>Call → Wrap</span>
                 <span className="text-white font-medium">
-                  {fmtD(callDate)} {fmt24(ct)} → {fmtD(wrapDate)} {fmt24(wt)}
-                  {overnight && <span className="text-yellow-400 text-xs ml-1">(next day)</span>}
+                  {fmtD(callDate)} {fmt24(ct)} → {fmtD(wrapD)} {fmt24(wt)}
+                  {dayOffset > 0 && <span className="text-yellow-400 text-xs ml-1">(+{dayOffset}d)</span>}
                 </span>
               </div>
             );
@@ -354,19 +377,20 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
     loadCrew();
   }
 
-  async function saveTimes(ct: string | null, wt: string | null) {
-    const ot = calcOT(booking.studio_rate, ct, wt);
+  async function saveTimes(ct: string | null, wt: string | null, wd: string | null) {
+    const dayOffset = wd ? Math.max(0, Math.round((new Date(wd + 'T00:00').getTime() - new Date(booking.booking_date + 'T00:00').getTime()) / 86400000)) : undefined;
+    const ot = calcOT(booking.studio_rate, ct, wt, dayOffset);
     await fetch(`/api/bookings/${id}`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ call_time: ct, wrap_time: wt, overtime_hours: ot.otHrs, overtime_amount: ot.otAmount }),
+      body: JSON.stringify({ call_time: ct, wrap_time: wt, wrap_date: wd, overtime_hours: ot.otHrs, overtime_amount: ot.otAmount }),
     });
 
     // Auto-update electricity item if one exists in booking equipment
     if (ct && wt && equipment.length > 0) {
       const [ch, cm] = ct.split(':').map(Number);
       const [wh, wm] = wt.split(':').map(Number);
-      let mins = wh * 60 + wm - (ch * 60 + cm);
-      if (mins <= 0) mins += 24 * 60; // wrap past midnight
+      let mins = wh * 60 + wm - (ch * 60 + cm) + (dayOffset ? dayOffset * 24 * 60 : 0);
+      if (mins <= 0) mins += 24 * 60; // fallback: wrap past midnight
       const hrs = mins / 60;
       if (hrs > 0) {
         const hasElec = equipment.some(e => e.name.toLowerCase().includes('electricity'));
@@ -671,6 +695,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
           <ShootTimesPanel
             callTime={callTime}
             wrapTime={wrapTime}
+            wrapDate={booking.wrap_date || null}
             studioRate={booking.studio_rate}
             bookingDate={booking.booking_date}
             onSave={saveTimes}
@@ -686,12 +711,23 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
               <div className="flex justify-between text-white/60 text-xs">
                 <span>Invoice total (VAT-incl.)</span><span>{formatPHP(totalIncVAT)}</span>
               </div>
-              <div className="flex justify-between">
-                <span className={`text-xs ${booking.no_deposit ? 'text-green-400' : 'text-yellow-400'}`}>
-                  {booking.no_deposit ? '🤝 No Deposit Required' : 'Deposit (50%)'}
+              <div className="flex justify-between items-center">
+                <span className={`text-xs flex items-center gap-1 ${booking.no_deposit ? 'text-green-400' : 'text-yellow-400'}`}>
+                  {booking.no_deposit ? '🤝 No Deposit Required' : 'Deposit'}
+                  {!booking.no_deposit && (
+                    <button onClick={async () => {
+                      const v = prompt('Custom deposit amount (₱):', String(booking.deposit_amount));
+                      if (v === null) return;
+                      const amt = Number(v);
+                      if (isNaN(amt) || amt < 0) return alert('Invalid amount');
+                      setSaving(true);
+                      await fetch(`/api/bookings/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ deposit_amount: amt }) });
+                      await load(); setSaving(false);
+                    }} title="Set custom deposit amount" className="text-white/30 hover:text-white text-[10px] border border-white/10 px-1 rounded">✏</button>
+                  )}
                 </span>
                 <span className={booking.deposit_paid || booking.no_deposit ? 'text-green-400 text-xs' : 'text-yellow-400 text-xs'}>
-                  {booking.no_deposit ? '—' : `${formatPHP(booking.deposit_amount)} ${booking.deposit_paid ? 'Paid' : 'Pending'}`}
+                  {booking.no_deposit ? '—' : `${formatPHP(booking.deposit_amount)} ${booking.deposit_paid ? '✓ Paid' : 'Pending'}`}
                 </span>
               </div>
               {payments.length > 0 && (

@@ -317,6 +317,7 @@ function initSchema(db: Database.Database) {
     `ALTER TABLE fixed_costs ADD COLUMN vat_on_top INTEGER DEFAULT 0`,
     `ALTER TABLE bookings ADD COLUMN fully_paid INTEGER DEFAULT 0`,
     `ALTER TABLE clients ADD COLUMN is_vip INTEGER DEFAULT 0`,
+    `ALTER TABLE bookings ADD COLUMN wrap_date TEXT`,
   ];
   for (const sql of migrations) {
     try { db.exec(sql); } catch { /* column already exists */ }
