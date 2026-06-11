@@ -186,10 +186,26 @@ export default function Dashboard() {
           {pendingDeposits.length === 0 ? <p className="text-white/30 text-sm py-4 text-center">All deposits collected ✓</p> : (
             <div className="space-y-2">
               {pendingDeposits.map(b => (
-                <Link key={b.id} href={`/bookings/${b.id}`} className="flex items-center justify-between p-3 bg-yellow-500/5 border border-yellow-500/20 rounded-lg hover:bg-yellow-500/10 transition-colors">
-                  <div><div className="text-sm font-medium text-white">{b.client_name}</div><div className="text-xs text-white/40">{formatDateShort(b.booking_date)}</div></div>
-                  <div className="text-right"><div className="text-sm font-semibold text-yellow-400">{formatPHP(b.deposit_amount)}</div><div className="text-xs text-white/30">50% deposit due</div></div>
-                </Link>
+                <div key={b.id} className="flex items-center justify-between gap-2 p-3 bg-yellow-500/5 border border-yellow-500/20 rounded-lg hover:bg-yellow-500/10 transition-colors">
+                  <Link href={`/bookings/${b.id}`} className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-white">{b.client_name}</div>
+                    <div className="text-xs text-white/40">{formatDateShort(b.booking_date)}</div>
+                  </Link>
+                  <div className="text-right shrink-0">
+                    <div className="text-sm font-semibold text-yellow-400">{formatPHP(b.deposit_amount)}</div>
+                    <div className="text-xs text-white/30">50% deposit due</div>
+                  </div>
+                  {/* One-click: mark deposit received */}
+                  <button onClick={async () => {
+                    if (!confirm(`Mark ${b.client_name}'s deposit of ${formatPHP(b.deposit_amount)} as PAID?`)) return;
+                    await fetch(`/api/bookings/${b.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ deposit_paid: true }) });
+                    fetch('/api/dashboard').then(r => r.json()).then(setData);
+                  }}
+                    title="Mark deposit as paid"
+                    className="shrink-0 text-xs bg-green-500/20 text-green-400 border border-green-500/30 px-2.5 py-1.5 rounded-lg hover:bg-green-500/30 transition-colors font-semibold">
+                    ✓ Paid
+                  </button>
+                </div>
               ))}
             </div>
           )}

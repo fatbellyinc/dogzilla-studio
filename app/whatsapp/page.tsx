@@ -112,7 +112,8 @@ Thank you for choosing *Dogzilla Studio* for your shoot on ${formatDate(b.bookin
 We hope the session went smoothly and you got all the shots you needed. 🎬✨
 
 We'd love to see your finished work — feel free to tag us!
-📸 _@dogzillafilms_
+📸 Instagram: _@dogzillastudioph_
+📘 Facebook: _facebook.com/dogzillastudioph_
 
 If you need to rebook or have any other productions coming up, we're always here!
 
