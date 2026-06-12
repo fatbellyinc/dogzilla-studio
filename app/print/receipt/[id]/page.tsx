@@ -40,7 +40,7 @@ export default function ReceiptPage({ params }: { params: Promise<{ id: string }
   const receiptNo = `${receiptPrefix}-${new Date(payment.paid_at).getFullYear()}-${String(payment.id).padStart(5, '0')}`;
 
   return (
-    <div style={{ background: 'white', color: '#111', fontFamily: 'Arial, sans-serif', fontSize: '13px', padding: '32px', maxWidth: '400px', margin: '40px auto', border: '1px solid #ddd', borderRadius: '8px' }}>
+    <div className="doc-page" style={{ background: 'white', color: '#111', fontFamily: 'Arial, sans-serif', fontSize: '13px', padding: '32px', maxWidth: '400px', margin: '40px auto', border: '1px solid #ddd', borderRadius: '8px' }}>
 
       {/* Header */}
       <div style={{ textAlign: 'center', borderBottom: '3px solid #E32726', paddingBottom: '16px', marginBottom: '16px' }}>

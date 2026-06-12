@@ -203,7 +203,7 @@ export default function BIRInvoicePage({ params }: { params: Promise<{ id: strin
       {/* ══════════════════════════════════════════════ */}
       {docType === 'ack' ? (
         /* ─── ACKNOWLEDGEMENT RECEIPT (no VAT breakdown) ─── */
-        <div style={{ border: '2px solid #333', padding: '20px 24px', maxWidth: '480px', margin: '0 auto' }}>
+        <div className="doc-page" style={{ border: '2px solid #333', padding: '20px 24px', maxWidth: '480px', margin: '0 auto', background: 'white' }}>
           {/* Header */}
           <div style={{ textAlign: 'center', borderBottom: '2px solid #E32726', paddingBottom: '12px', marginBottom: '16px' }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}

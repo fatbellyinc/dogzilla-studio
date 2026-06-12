@@ -1,9 +1,14 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
 
 const SESSION_KEY = 'dz_unlocked';
+// Client-facing routes — never PIN-locked (portal links sent to clients, public booking request form)
+const PUBLIC_PREFIXES = ['/portal', '/request'];
 
 export default function PinLock({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const isPublic = PUBLIC_PREFIXES.some(p => pathname?.startsWith(p));
   const [status, setStatus] = useState<'loading' | 'unlocked' | 'locked'>('loading');
   const [input, setInput] = useState('');
   const [error, setError] = useState('');
@@ -40,6 +45,9 @@ export default function PinLock({ children }: { children: React.ReactNode }) {
     setInput(next);
     if (next.length === 4) verify(next);
   }
+
+  // Public client-facing pages bypass the PIN entirely
+  if (isPublic) return <>{children}</>;
 
   if (status === 'loading') return (
     <div className="fixed inset-0 bg-[#0f0f0f] flex items-center justify-center">
