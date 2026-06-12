@@ -55,6 +55,17 @@ export default function ShareDocBar({ bookingId, docType, clientName, clientPhon
     setTimeout(() => URL.revokeObjectURL(url), 5000);
   }
 
+  /** Copy the image to the clipboard so it can be pasted (Ctrl+V) straight into a chat */
+  async function copyToClipboard(file: File): Promise<boolean> {
+    try {
+      if (typeof ClipboardItem === 'undefined' || !navigator.clipboard?.write) return false;
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': file })]);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   /** Share the document image: native share sheet on mobile (pick Viber/WA/Messenger),
    *  download + open app on desktop where file-sharing isn't supported. */
   async function shareImage(channel: 'WhatsApp' | 'Viber' | 'Messenger' | 'Any') {
@@ -74,21 +85,25 @@ export default function ShareDocBar({ bookingId, docType, clientName, clientPhon
       } catch { /* user cancelled — fall through to download */ }
     }
 
-    // Desktop fallback: download the image, then open the app so it can be attached
-    downloadFile(file);
-    logSend(channel === 'Any' ? 'download' : channel);
+    // Desktop fallback: copy image to clipboard (paste with Ctrl+V in the chat),
+    // plus download as backup, then open the app
+    const copied = await copyToClipboard(file);
+    if (!copied) downloadFile(file);
+    logSend(channel === 'Any' ? (copied ? 'clipboard' : 'download') : channel);
+    const hint = copied ? 'Image COPIED — press Ctrl+V in the chat to paste it' : 'Image downloaded — attach it with 📎';
+
     if (channel === 'WhatsApp') {
       const phone = (clientPhone || '').replace(/\D/g, '').replace(/^0/, '63');
       window.open(`https://wa.me/${phone}`, '_blank');
-      setStatus('✓ Image downloaded — attach it in the WhatsApp chat (📎)');
+      setStatus(`✓ ${hint}`);
     } else if (channel === 'Viber') {
       window.location.href = 'viber://';
-      setStatus('✓ Image downloaded — attach it in Viber');
+      setStatus(`✓ ${hint}`);
     } else if (channel === 'Messenger') {
       window.open('https://www.messenger.com', '_blank');
-      setStatus('✓ Image downloaded — attach it in Messenger');
+      setStatus(`✓ ${hint}`);
     } else {
-      setStatus('✓ Image downloaded');
+      setStatus(`✓ ${hint}`);
     }
   }
 
@@ -115,6 +130,15 @@ export default function ShareDocBar({ bookingId, docType, clientName, clientPhon
   return (
     <div className="no-print fixed bottom-6 left-6 flex flex-col items-start gap-1.5 z-50 max-w-[90vw]">
       <div className="flex gap-1.5 flex-wrap">
+        <button disabled={busy} onClick={async () => {
+          setBusy(true); setStatus('📸 Generating image...');
+          const file = await captureImage();
+          setBusy(false);
+          if (!file) return;
+          const copied = await copyToClipboard(file);
+          if (copied) { logSend('clipboard'); setStatus('✓ Image copied — press Ctrl+V in any chat to paste it'); }
+          else { downloadFile(file); setStatus('✓ Clipboard not supported here — image downloaded instead'); }
+        }} className="bg-[#2a2a2a] text-white px-3 py-2 rounded-lg font-semibold shadow-xl hover:bg-[#3a3a3a] transition-colors text-xs disabled:opacity-50">📋 Copy Image</button>
         <button disabled={busy} onClick={() => shareImage('Any')} className="bg-[#E32726] text-white px-3 py-2 rounded-lg font-semibold shadow-xl hover:bg-[#c41f1e] transition-colors text-xs disabled:opacity-50">📤 Share Image</button>
         <button disabled={busy} onClick={() => shareImage('WhatsApp')} className="bg-[#25D366] text-white px-3 py-2 rounded-lg font-semibold shadow-xl hover:bg-[#20b558] transition-colors text-xs disabled:opacity-50">💬 WhatsApp</button>
         <button disabled={busy} onClick={() => shareImage('Viber')} className="bg-[#7360F2] text-white px-3 py-2 rounded-lg font-semibold shadow-xl hover:bg-[#5d4ad1] transition-colors text-xs disabled:opacity-50">📱 Viber</button>
