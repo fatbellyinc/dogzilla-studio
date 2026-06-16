@@ -24,30 +24,43 @@ body {
 
 @media print {
   .no-print { display: none !important; }
-  body { background: white !important; color: black !important; }
-  .print-white { background: white !important; color: black !important; }
-  img { display: block !important; break-inside: avoid; page-break-inside: avoid; }
-  /* Hide all app chrome */
-  aside, nav { display: none !important; }
-  /* A4 document: let @page supply the outer margins; doc-page adds a small
-     inner buffer so content never sits flush against the margin edge */
-  .doc-page {
-    max-width: 100% !important;
-    width: 100% !important;
+
+  /* Flatten the gray shell — it's screen-only chrome */
+  .doc-shell {
+    background: white !important;
+    padding: 0 !important;
     min-height: 0 !important;
-    padding: 6mm !important;
+    display: block !important;
+  }
+
+  /* Strip the card look; @page margin becomes the PDF margin */
+  .doc-page {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
     margin: 0 !important;
     box-shadow: none !important;
+    min-height: 0 !important;
   }
-  /* Allow tables to break across pages; prevent orphaned rows */
-  table { page-break-inside: auto; }
-  tr { page-break-inside: avoid; page-break-after: auto; }
-  thead { display: table-header-group; }
+
+  body { background: white !important; color: black !important; }
+  aside, nav { display: none !important; }
+  img { display: block !important; break-inside: avoid; }
+
+  /* Multi-page table behaviour */
+  table  { page-break-inside: auto; }
+  tr     { page-break-inside: avoid; }
+  thead  { display: table-header-group; }
+
+  /* Keep the doc header together on the first page */
+  .doc-header { break-inside: avoid; page-break-inside: avoid; }
+
+  /* Keep signature + footer together at the bottom of the last page */
+  .doc-footer { break-inside: avoid; page-break-inside: avoid; }
 }
 
 @page {
   size: A4 portrait;
-  /* 15 mm top/bottom gives enough room above/below content;
-     12 mm sides keeps the 190 mm printable width matching max-w-[794px] at 96 dpi */
+  /* 15 mm top/bottom, 12 mm sides — matches the 794 px screen width at 96 dpi */
   margin: 15mm 12mm;
 }

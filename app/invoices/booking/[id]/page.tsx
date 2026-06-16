@@ -1,5 +1,5 @@
 'use client';
-import { use, useEffect, useState, useCallback } from 'react';
+import React, { use, useEffect, useState, useCallback } from 'react';
 import { formatPHP, formatDate, STUDIO_WHATSAPP, fmt24, calcOT, OT_RATE } from '@/lib/utils';
 import { Booking, BookingEquipment, BookingDay, Payment, Invoice, STUDIO_RATES, VAT_RATE, PAYMENT_ACCOUNTS } from '@/lib/types';
 import ShareDocBar from '@/components/ShareDocBar';
@@ -105,11 +105,16 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
   const waLink = `https://wa.me/${STUDIO_WHATSAPP.replace(/\D/g, '')}`;
   void waLink;
 
-  return (
-    <div className="doc-page min-h-screen bg-white p-8 max-w-[794px] mx-auto" style={{ color: '#111', fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '13px' }}>
+  const docStyle: React.CSSProperties = { color: '#111', fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '13px' };
 
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', borderBottom: '3px solid #E32726', marginBottom: '24px', paddingBottom: '20px', breakInside: 'avoid', pageBreakInside: 'avoid' }}>
+  return (
+    <>
+      {/* Gray shell — screen only; flattened to white in print */}
+      <div className="doc-shell" style={{ background: '#d1d5db', minHeight: '100vh', padding: '32px 16px', display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
+        <div className="doc-page" style={{ ...docStyle, background: 'white', width: '100%', maxWidth: '794px', padding: '48px', boxShadow: '0 4px 24px rgba(0,0,0,0.18)' }}>
+
+      {/* Header — kept together on page 1 */}
+      <div className="doc-header" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', borderBottom: '3px solid #E32726', marginBottom: '24px', paddingBottom: '20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.png" alt="Dogzilla Studio" style={{ width: '90px', height: '90px', objectFit: 'contain', display: 'block', flexShrink: 0 }} />
@@ -336,30 +341,34 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
         50% non-refundable deposit required to confirm. Balance due on shoot day before session begins. Client is responsible for any damage to facility or equipment. Late payment charged at 50% daily rate per additional day. All rates VAT-exclusive; VAT 12% per TRAIN Law, RA 10963.
       </div>
 
-      {/* Signature */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '40px' }}>
-        <div>
-          <div style={{ borderTop: '1px solid #ccc', paddingTop: '6px', fontSize: '11px', color: '#888' }}>
-            <div style={{ fontWeight: 600, color: '#333' }}>Issued by</div>
-            <div>Dogzilla Studio Management</div>
+      {/* Signature + footer — kept together at bottom of last page */}
+      <div className="doc-footer">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '40px' }}>
+          <div>
+            <div style={{ borderTop: '1px solid #ccc', paddingTop: '6px', fontSize: '11px', color: '#888' }}>
+              <div style={{ fontWeight: 600, color: '#333' }}>Issued by</div>
+              <div>Dogzilla Studio Management</div>
+            </div>
+          </div>
+          <div>
+            <div style={{ borderTop: '1px solid #ccc', paddingTop: '6px', fontSize: '11px', color: '#888' }}>
+              <div style={{ fontWeight: 600, color: '#333' }}>Received by</div>
+              <div>Client / Authorized Signatory</div>
+              <div style={{ marginTop: '4px' }}>Date: ____________________</div>
+            </div>
           </div>
         </div>
-        <div>
-          <div style={{ borderTop: '1px solid #ccc', paddingTop: '6px', fontSize: '11px', color: '#888' }}>
-            <div style={{ fontWeight: 600, color: '#333' }}>Received by</div>
-            <div>Client / Authorized Signatory</div>
-            <div style={{ marginTop: '4px' }}>Date: ____________________</div>
-          </div>
+        <div style={{ borderTop: '1px solid #e5e5e5', paddingTop: '8px', marginTop: '16px', textAlign: 'center', fontSize: '10px', color: '#aaa' }}>
+          <div>DOGZILLA STUDIO · dogzillastudiorental@gmail.com · {STUDIO_WHATSAPP} · 102 7th St, Grace Park, Caloocan City · www.dogzillafilms.com</div>
+          <div style={{ marginTop: '2px' }}>📘 facebook.com/dogzillastudioph · 📸 Instagram @dogzillastudioph</div>
+          <div style={{ marginTop: '3px' }}>© Alberto Monteras II · Dogzilla Films · All rights reserved.</div>
         </div>
       </div>
 
-      {/* Footer */}
-      <div style={{ borderTop: '1px solid #e5e5e5', paddingTop: '8px', marginTop: '16px', textAlign: 'center', fontSize: '10px', color: '#aaa' }}>
-        <div>DOGZILLA STUDIO · dogzillastudiorental@gmail.com · {STUDIO_WHATSAPP} · 102 7th St, Grace Park, Caloocan City · www.dogzillafilms.com</div>
-        <div style={{ marginTop: '2px' }}>📘 facebook.com/dogzillastudioph · 📸 Instagram @dogzillastudioph</div>
-        <div style={{ marginTop: '3px' }}>© Alberto Monteras II · Dogzilla Films · All rights reserved.</div>
-      </div>
+        </div>{/* end doc-page */}
+      </div>{/* end doc-shell */}
 
+      {/* Buttons live outside the captured area */}
       <ShareDocBar bookingId={booking.id} docType="invoice" clientName={booking.client_name || ''} clientPhone={booking.client_phone} clientEmail={booking.client_email} docNumber={invoiceNumber} />
       <div className="no-print fixed bottom-6 right-6 flex gap-2">
         <button onClick={loadBooking}
@@ -371,6 +380,6 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
           🖨️ Print / PDF
         </button>
       </div>
-    </div>
+    </>
   );
 }

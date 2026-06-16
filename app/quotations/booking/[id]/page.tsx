@@ -126,10 +126,12 @@ function DocView({ bookingId }: { bookingId: string }) {
   const docNumber = quotation?.quote_number || `DZB-${String(booking.id).padStart(4, '0')}`;
 
   return (
-    <div className="doc-page min-h-screen bg-white p-8 max-w-[794px] mx-auto" style={{ color: '#111', fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '13px' }}>
+    <>
+      <div className="doc-shell" style={{ background: '#d1d5db', minHeight: '100vh', padding: '32px 16px', display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
+        <div className="doc-page" style={{ color: '#111', fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '13px', background: 'white', width: '100%', maxWidth: '794px', padding: '48px', boxShadow: '0 4px 24px rgba(0,0,0,0.18)' }}>
 
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', borderBottom: '3px solid #E32726', marginBottom: '24px', paddingBottom: '20px', breakInside: 'avoid', pageBreakInside: 'avoid' }}>
+      {/* Header — kept together on page 1 */}
+      <div className="doc-header" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', borderBottom: '3px solid #E32726', marginBottom: '24px', paddingBottom: '20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.png" alt="Dogzilla Studio" style={{ width: '90px', height: '90px', objectFit: 'contain', display: 'block', flexShrink: 0 }} />
@@ -352,31 +354,35 @@ function DocView({ bookingId }: { bookingId: string }) {
         </div>
       </div>
 
-      {/* Signature */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '40px', marginTop: '10px' }}>
-        <div>
-          <div style={{ borderTop: '1px solid #ccc', paddingTop: '6px', fontSize: '11px', color: '#888' }}>
-            <div style={{ fontWeight: 600, color: '#333' }}>Prepared by</div>
-            <div>Dogzilla Studio Management</div>
+      {/* Signature + footer — kept together at bottom of last page */}
+      <div className="doc-footer">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '40px', marginTop: '10px' }}>
+          <div>
+            <div style={{ borderTop: '1px solid #ccc', paddingTop: '6px', fontSize: '11px', color: '#888' }}>
+              <div style={{ fontWeight: 600, color: '#333' }}>Prepared by</div>
+              <div>Dogzilla Studio Management</div>
+            </div>
+          </div>
+          <div>
+            <div style={{ borderTop: '1px solid #ccc', paddingTop: '6px', fontSize: '11px', color: '#888' }}>
+              <div style={{ fontWeight: 600, color: '#333' }}>Confirmed & Accepted by</div>
+              <div>Client / Authorized Signatory</div>
+              <div style={{ marginTop: '4px' }}>Date: ____________________</div>
+            </div>
           </div>
         </div>
-        <div>
-          <div style={{ borderTop: '1px solid #ccc', paddingTop: '6px', fontSize: '11px', color: '#888' }}>
-            <div style={{ fontWeight: 600, color: '#333' }}>Confirmed & Accepted by</div>
-            <div>Client / Authorized Signatory</div>
-            <div style={{ marginTop: '4px' }}>Date: ____________________</div>
-          </div>
+        <div style={{ borderTop: '1px solid #e5e5e5', paddingTop: '8px', marginTop: '16px', textAlign: 'center', fontSize: '10px', color: '#aaa' }}>
+          DOGZILLA STUDIO · dogzillastudiorental@gmail.com · +63 939 933 8732 · 102 7th St, Grace Park, Caloocan City · www.dogzillafilms.com
+          <br />📘 facebook.com/dogzillastudioph · 📸 Instagram @dogzillastudioph
+          <br />All rates VAT-exclusive. VAT (12%) applied per TRAIN Law, RA 10963.
+          <br />© Alberto Monteras II · Dogzilla Films · All rights reserved.
         </div>
       </div>
 
-      {/* Footer */}
-      <div style={{ borderTop: '1px solid #e5e5e5', paddingTop: '8px', marginTop: '16px', textAlign: 'center', fontSize: '10px', color: '#aaa' }}>
-        DOGZILLA STUDIO · dogzillastudiorental@gmail.com · +63 939 933 8732 · 102 7th St, Grace Park, Caloocan City · www.dogzillafilms.com
-        <br />📘 facebook.com/dogzillastudioph · 📸 Instagram @dogzillastudioph
-        <br />All rates VAT-exclusive. VAT (12%) applied per TRAIN Law, RA 10963.
-        <br />© Alberto Monteras II · Dogzilla Films · All rights reserved.
-      </div>
+        </div>{/* end doc-page */}
+      </div>{/* end doc-shell */}
 
+      {/* Buttons live outside the captured area */}
       <ShareDocBar bookingId={booking.id} docType="quotation" clientName={booking.client_name || ''} clientPhone={booking.client_phone} clientEmail={booking.client_email} docNumber={docNumber} />
       <div className="no-print fixed bottom-6 right-6 flex gap-2">
         <button onClick={loadData} className="bg-[#2a2a2a] text-white px-4 py-2.5 rounded-lg font-semibold shadow-xl hover:bg-[#3a3a3a] transition-colors text-sm">
@@ -386,7 +392,7 @@ function DocView({ bookingId }: { bookingId: string }) {
           🖨️ Print / Save PDF
         </button>
       </div>
-    </div>
+    </>
   );
 }
 
