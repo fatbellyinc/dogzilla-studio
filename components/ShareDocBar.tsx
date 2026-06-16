@@ -33,13 +33,46 @@ export default function ShareDocBar({ bookingId, docType, clientName, clientPhon
     const node = document.querySelector(captureSelector) as HTMLElement | null;
     if (!node) { setStatus('✗ Could not find document to capture'); return null; }
     try {
-      // White background, 2x scale for crisp text; skip on-screen buttons
-      const dataUrl = await toPng(node, {
+      try { await (document as Document & { fonts?: { ready: Promise<unknown> } }).fonts?.ready; } catch { /* ignore */ }
+
+      // Inline all images as base64 data URLs so the cloned DOM used by html-to-image
+      // can render them without re-fetching (avoids blank logo on first clone pass)
+      const imgElements = Array.from(node.querySelectorAll('img')) as HTMLImageElement[];
+      const savedSrcs = imgElements.map(img => img.src);
+      await Promise.all(imgElements.map(async (img) => {
+        try {
+          const resp = await fetch(img.src, { cache: 'force-cache' });
+          const blob = await resp.blob();
+          await new Promise<void>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => { img.src = reader.result as string; resolve(); };
+            reader.onerror = () => resolve();
+            reader.readAsDataURL(blob);
+          });
+        } catch { /* keep original src on network error */ }
+      }));
+
+      const opts = {
         backgroundColor: '#ffffff',
         pixelRatio: 2,
-        filter: el => !(el instanceof HTMLElement && el.classList?.contains('no-print')),
-      });
+        width: node.scrollWidth,
+        height: node.scrollHeight,
+        skipFonts: true,
+        filter: (el: Node) => !(el instanceof HTMLElement && el.classList?.contains('no-print')),
+      };
+
+      // Chrome quirk: first render often partial — render 3x, keep the last
+      let dataUrl = '';
+      for (let i = 0; i < 3; i++) dataUrl = await toPng(node, opts);
+
+      // Restore original srcs
+      imgElements.forEach((img, i) => { img.src = savedSrcs[i]; });
+
       const blob = await (await fetch(dataUrl)).blob();
+      if (blob.size < 5000) {
+        setStatus('✗ Capture came out blank — try again or use Print/PDF');
+        return null;
+      }
       return new File([blob], `${fileBase}.png`, { type: 'image/png' });
     } catch {
       setStatus('✗ Image capture failed — use Print/PDF instead');

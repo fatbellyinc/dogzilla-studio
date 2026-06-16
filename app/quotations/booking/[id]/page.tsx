@@ -1,5 +1,5 @@
 'use client';
-import { use, useEffect, useState, Suspense } from 'react';
+import { use, useEffect, useState, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { formatPHP, formatDate, fmt24, calcOT, OT_RATE } from '@/lib/utils';
 import { Booking, BookingEquipment, Quotation, BookingDay, Payment, STUDIO_RATES, VAT_RATE, PAYMENT_ACCOUNTS } from '@/lib/types';
@@ -18,9 +18,11 @@ function DocView({ bookingId }: { bookingId: string }) {
   const isInvoice = params.get('invoice') === '1';
   const [data, setData] = useState<BookingDetail | null>(null);
 
-  useEffect(() => {
+  const loadData = useCallback(() => {
     fetch(`/api/bookings/${bookingId}`).then(r => r.json()).then(setData);
   }, [bookingId]);
+
+  useEffect(() => { loadData(); }, [loadData]);
 
   // Filename convention for Save-as-PDF: Dogzilla_Quotation_<no>_<client>_<date>
   useEffect(() => {
@@ -35,12 +37,8 @@ function DocView({ bookingId }: { bookingId: string }) {
   const { booking, equipment, quotation, bookingDays, payments } = data;
   const totalPaid = (payments || []).reduce((s, p) => s + p.amount, 0);
   const studioRate = STUDIO_RATES[booking.studio_rate];
-  const subtotalExVAT = booking.total;
   const vatExempt = !!booking.vat_exempt;
-  const vatAmount = vatExempt ? 0 : subtotalExVAT * VAT_RATE;
-  const totalIncVAT = subtotalExVAT + vatAmount;
   const depositAmount = booking.deposit_amount;
-  const balanceDue = subtotalExVAT - depositAmount;
   const isMultiDay = bookingDays && bookingDays.length > 1;
 
   type Line = { code: string; desc: string; qty: number; unit: number; total: number; bold?: boolean; indent?: boolean; comp?: boolean; disc?: number };
@@ -114,6 +112,13 @@ function DocView({ bookingId }: { bookingId: string }) {
       qty: 1, unit: otAmount, total: otAmount,
     });
   }
+
+  // Recompute totals from line items — lines already include discount (negative) and OT
+  // so this stays accurate when items or discounts are edited on the booking
+  const subtotalExVAT = lines.reduce((s, l) => s + l.total, 0);
+  const vatAmount = vatExempt ? 0 : subtotalExVAT * VAT_RATE;
+  const totalIncVAT = subtotalExVAT + vatAmount;
+  const balanceDue = totalIncVAT - depositAmount;
 
   const docNumber = quotation?.quote_number || `DZB-${String(booking.id).padStart(4, '0')}`;
 
@@ -358,9 +363,14 @@ function DocView({ bookingId }: { bookingId: string }) {
       </div>
 
       <ShareDocBar bookingId={booking.id} docType="quotation" clientName={booking.client_name || ''} clientPhone={booking.client_phone} clientEmail={booking.client_email} docNumber={docNumber} />
-      <button onClick={() => window.print()} className="no-print fixed bottom-6 right-6 bg-[#E32726] text-white px-5 py-2.5 rounded-lg font-semibold shadow-xl hover:bg-[#c41f1e] transition-colors text-sm">
-        🖨️ Print / Save PDF
-      </button>
+      <div className="no-print fixed bottom-6 right-6 flex gap-2">
+        <button onClick={loadData} className="bg-[#2a2a2a] text-white px-4 py-2.5 rounded-lg font-semibold shadow-xl hover:bg-[#3a3a3a] transition-colors text-sm">
+          🔄 Refresh
+        </button>
+        <button onClick={() => window.print()} className="bg-[#E32726] text-white px-5 py-2.5 rounded-lg font-semibold shadow-xl hover:bg-[#c41f1e] transition-colors text-sm">
+          🖨️ Print / Save PDF
+        </button>
+      </div>
     </div>
   );
 }
