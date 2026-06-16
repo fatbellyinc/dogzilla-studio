@@ -126,7 +126,7 @@ function DocView({ bookingId }: { bookingId: string }) {
   const docNumber = quotation?.quote_number || `DZB-${String(booking.id).padStart(4, '0')}`;
 
   return (
-    <div className="doc-page min-h-screen bg-white p-6 md:p-10 max-w-[794px] mx-auto" style={{ color: '#111', fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '13px', paddingTop: '24px' }}>
+    <div className="doc-page min-h-screen bg-white p-8 max-w-[794px] mx-auto" style={{ color: '#111', fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '13px' }}>
 
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', borderBottom: '3px solid #E32726', marginBottom: '24px', paddingBottom: '20px', breakInside: 'avoid', pageBreakInside: 'avoid' }}>

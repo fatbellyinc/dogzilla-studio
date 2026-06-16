@@ -27,19 +27,27 @@ body {
   body { background: white !important; color: black !important; }
   .print-white { background: white !important; color: black !important; }
   img { display: block !important; break-inside: avoid; page-break-inside: avoid; }
-  /* Hide all app chrome (sidebar, mobile topbar, overlays) */
+  /* Hide all app chrome */
   aside, nav { display: none !important; }
-  /* A4-safe document width: full printable area, no screen padding quirks */
+  /* A4 document: let @page supply the outer margins; doc-page adds a small
+     inner buffer so content never sits flush against the margin edge */
   .doc-page {
     max-width: 100% !important;
     width: 100% !important;
     min-height: 0 !important;
-    padding: 0 !important;
+    padding: 6mm !important;
     margin: 0 !important;
+    box-shadow: none !important;
   }
+  /* Allow tables to break across pages; prevent orphaned rows */
+  table { page-break-inside: auto; }
+  tr { page-break-inside: avoid; page-break-after: auto; }
+  thead { display: table-header-group; }
 }
 
 @page {
-  margin: 12mm 10mm 10mm 10mm;
   size: A4 portrait;
+  /* 15 mm top/bottom gives enough room above/below content;
+     12 mm sides keeps the 190 mm printable width matching max-w-[794px] at 96 dpi */
+  margin: 15mm 12mm;
 }
