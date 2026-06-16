@@ -92,6 +92,9 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
   const bookingDiscount = booking.discount_amount || 0;
   const lineItemsSubtotal = lines.reduce((s, l) => s + l.total, 0);
   const subtotalExVAT = lineItemsSubtotal - bookingDiscount;
+  // Regular price = full rate × qty for every line (no per-item or booking discounts)
+  const regularPrice = lines.reduce((s, l) => s + l.qty * l.unit, 0);
+  const totalSavings = regularPrice - subtotalExVAT;
   const vatExempt = !!booking.vat_exempt;
   const vatAmount = vatExempt ? 0 : subtotalExVAT * VAT_RATE;
   const totalIncVAT = subtotalExVAT + vatAmount;
@@ -235,23 +238,21 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
         <table style={{ width: '320px', borderCollapse: 'collapse', fontSize: '13px' }}>
           <tbody>
             <tr>
-              <td style={{ padding: '4px 10px', color: '#555' }}>Items Subtotal</td>
-              <td style={{ padding: '4px 10px', textAlign: 'right' }}>{formatPHP(lineItemsSubtotal)}</td>
+              <td style={{ padding: '4px 10px', color: '#888' }}>Regular Price</td>
+              <td style={{ padding: '4px 10px', textAlign: 'right', color: '#888', textDecoration: totalSavings > 0 ? 'line-through' : 'none' }}>{formatPHP(regularPrice)}</td>
             </tr>
-            {bookingDiscount > 0 && (
-              <tr>
-                <td style={{ padding: '4px 10px', color: '#166534' }}>
-                  Discount {booking.discount_type === 'percent' ? `(${booking.discount_value}%)` : '(fixed)'}
+            {totalSavings > 0 && (
+              <tr style={{ background: '#f0fdf4' }}>
+                <td style={{ padding: '4px 10px', color: '#166534', fontWeight: 700 }}>
+                  🎉 Client Saves {booking.discount_type === 'percent' && bookingDiscount > 0 ? `(${booking.discount_value}% off)` : booking.discount_type === 'fixed' && bookingDiscount > 0 ? '(fixed discount)' : '(item discounts)'}
                 </td>
-                <td style={{ padding: '4px 10px', textAlign: 'right', color: '#166534' }}>−{formatPHP(bookingDiscount)}</td>
+                <td style={{ padding: '4px 10px', textAlign: 'right', color: '#166534', fontWeight: 700 }}>−{formatPHP(totalSavings)}</td>
               </tr>
             )}
-            {bookingDiscount > 0 && (
-              <tr style={{ borderTop: '1px solid #e5e5e5' }}>
-                <td style={{ padding: '4px 10px', color: '#555' }}>Subtotal (VAT-exclusive)</td>
-                <td style={{ padding: '4px 10px', textAlign: 'right' }}>{formatPHP(subtotalExVAT)}</td>
-              </tr>
-            )}
+            <tr style={{ borderTop: '1px solid #e5e5e5' }}>
+              <td style={{ padding: '4px 10px', color: '#555' }}>Subtotal (VAT-exclusive)</td>
+              <td style={{ padding: '4px 10px', textAlign: 'right' }}>{formatPHP(subtotalExVAT)}</td>
+            </tr>
             {vatExempt ? (
               <tr>
                 <td style={{ padding: '4px 10px', color: '#1d4ed8' }}>VAT Exempt</td>

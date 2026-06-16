@@ -119,6 +119,9 @@ function DocView({ bookingId }: { bookingId: string }) {
   const vatAmount = vatExempt ? 0 : subtotalExVAT * VAT_RATE;
   const totalIncVAT = subtotalExVAT + vatAmount;
   const balanceDue = totalIncVAT - depositAmount;
+  // Regular price = full rate × qty (no per-item discounts, exclude the negative discount line)
+  const regularPrice = lines.reduce((s, l) => s + (l.total >= 0 ? l.qty * l.unit : 0), 0);
+  const totalSavings = regularPrice - subtotalExVAT;
 
   const docNumber = quotation?.quote_number || `DZB-${String(booking.id).padStart(4, '0')}`;
 
@@ -244,6 +247,18 @@ function DocView({ bookingId }: { bookingId: string }) {
         <table style={{ width: '280px', borderCollapse: 'collapse', fontSize: '13px' }}>
           <tbody>
             <tr>
+              <td style={{ padding: '4px 10px', color: '#888' }}>Regular Price</td>
+              <td style={{ padding: '4px 10px', textAlign: 'right', color: '#888', textDecoration: totalSavings > 0 ? 'line-through' : 'none' }}>{formatPHP(regularPrice)}</td>
+            </tr>
+            {totalSavings > 0 && (
+              <tr style={{ background: '#f0fdf4' }}>
+                <td style={{ padding: '4px 10px', color: '#166534', fontWeight: 700 }}>
+                  🎉 Client Saves {booking.discount_type === 'percent' && booking.discount_amount > 0 ? `(${booking.discount_value}% off)` : booking.discount_type === 'fixed' && booking.discount_amount > 0 ? '(fixed discount)' : '(item discounts)'}
+                </td>
+                <td style={{ padding: '4px 10px', textAlign: 'right', color: '#166534', fontWeight: 700 }}>−{formatPHP(totalSavings)}</td>
+              </tr>
+            )}
+            <tr style={{ borderTop: '1px solid #e5e5e5' }}>
               <td style={{ padding: '4px 10px', color: '#555' }}>Subtotal (VAT-exclusive)</td>
               <td style={{ padding: '4px 10px', textAlign: 'right', fontWeight: 500 }}>{formatPHP(subtotalExVAT)}</td>
             </tr>
