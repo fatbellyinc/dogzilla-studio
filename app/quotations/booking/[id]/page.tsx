@@ -38,7 +38,6 @@ function DocView({ bookingId }: { bookingId: string }) {
   const totalPaid = (payments || []).reduce((s, p) => s + p.amount, 0);
   const studioRate = STUDIO_RATES[booking.studio_rate];
   const vatExempt = !!booking.vat_exempt;
-  const depositAmount = booking.deposit_amount;
   const isMultiDay = bookingDays && bookingDays.length > 1;
 
   type Line = { code: string; desc: string; qty: number; unit: number; total: number; bold?: boolean; indent?: boolean; comp?: boolean; disc?: number };
@@ -118,6 +117,9 @@ function DocView({ bookingId }: { bookingId: string }) {
   const subtotalExVAT = lines.reduce((s, l) => s + l.total, 0);
   const vatAmount = vatExempt ? 0 : subtotalExVAT * VAT_RATE;
   const totalIncVAT = subtotalExVAT + vatAmount;
+  // Deposit is always exactly 50% of the computed VAT-inclusive total — never use
+  // the stored booking.deposit_amount, which is pre-VAT and excludes OT / per-item discounts
+  const depositAmount = booking.no_deposit ? 0 : totalIncVAT * 0.5;
   const balanceDue = totalIncVAT - depositAmount;
   // Regular price = full rate × qty (no per-item discounts, exclude the negative discount line)
   const regularPrice = lines.reduce((s, l) => s + (l.total >= 0 ? l.qty * l.unit : 0), 0);
