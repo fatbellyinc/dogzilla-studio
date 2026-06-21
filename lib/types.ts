@@ -135,6 +135,7 @@ export interface Equipment {
   vendor: string | null;
   pre_studio: number;
   active: number;
+  sort_order: number;
   booked_qty?: number;
 }
 

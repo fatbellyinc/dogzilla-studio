@@ -318,10 +318,17 @@ function initSchema(db: Database.Database) {
     `ALTER TABLE bookings ADD COLUMN fully_paid INTEGER DEFAULT 0`,
     `ALTER TABLE clients ADD COLUMN is_vip INTEGER DEFAULT 0`,
     `ALTER TABLE bookings ADD COLUMN wrap_date TEXT`,
+    `ALTER TABLE equipment ADD COLUMN sort_order INTEGER DEFAULT 0`,
   ];
   for (const sql of migrations) {
     try { db.exec(sql); } catch { /* column already exists */ }
   }
+
+  // Backfill sort_order from id on first run after the column is added,
+  // so existing rows get a stable, unique order instead of all sitting at 0
+  try {
+    db.exec(`UPDATE equipment SET sort_order = id WHERE sort_order = 0`);
+  } catch { /* ignore */ }
 
   // Data sync: flag bookings as fully_paid when payments cover the invoice total.
   // Idempotent — fixes old bookings paid before the auto-flag logic existed,

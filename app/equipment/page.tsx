@@ -45,6 +45,11 @@ export default function EquipmentPage() {
     load();
   }
 
+  async function move(id: number, direction: 'up' | 'down') {
+    await fetch('/api/equipment/reorder', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, direction }) });
+    load();
+  }
+
   // Derive categories from actual data so nothing is hidden
   const categories = [...new Set(equipment.map(e => e.category))].sort(
     (a, b) => (CATEGORY_LABELS[a] || a).localeCompare(CATEGORY_LABELS[b] || b)
@@ -104,7 +109,7 @@ export default function EquipmentPage() {
           <div key={cat} className="mb-6">
             <h2 className="text-xs text-white/40 uppercase tracking-wider mb-2 px-1">{CATEGORY_LABELS[cat]}</h2>
             <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl divide-y divide-[#2a2a2a]">
-              {items.map(item => {
+              {items.map((item, idx) => {
                 const bookedQty = (item as Equipment & { booked_qty?: number }).booked_qty || 0;
                 const available = item.quantity - bookedQty;
                 return (
@@ -132,6 +137,8 @@ export default function EquipmentPage() {
                         <div className="text-xs text-white/30">available</div>
                       </div>
                       <div className="flex gap-1">
+                        <button onClick={() => move(item.id, 'up')} disabled={idx === 0} className="w-7 h-7 flex items-center justify-center text-white/40 hover:text-white rounded hover:bg-[#2a2a2a] transition-colors text-xs disabled:opacity-20 disabled:hover:bg-transparent">↑</button>
+                        <button onClick={() => move(item.id, 'down')} disabled={idx === items.length - 1} className="w-7 h-7 flex items-center justify-center text-white/40 hover:text-white rounded hover:bg-[#2a2a2a] transition-colors text-xs disabled:opacity-20 disabled:hover:bg-transparent">↓</button>
                         <button onClick={() => startEdit(item)} className="w-7 h-7 flex items-center justify-center text-white/40 hover:text-white rounded hover:bg-[#2a2a2a] transition-colors text-xs">✏️</button>
                         <button onClick={() => deactivate(item.id)} className="w-7 h-7 flex items-center justify-center text-white/40 hover:text-[#E32726] rounded hover:bg-[#E32726]/10 transition-colors text-xs">🗑</button>
                       </div>

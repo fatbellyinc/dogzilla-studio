@@ -23,12 +23,12 @@ export async function GET(req: NextRequest) {
       LEFT JOIN bookings b ON b.id = be.booking_id
       WHERE e.active = 1
       GROUP BY e.id
-      ORDER BY e.category, e.name
+      ORDER BY e.category, e.sort_order
     `).all(date, date);
     return NextResponse.json(equipment);
   }
 
-  const equipment = db.prepare(`SELECT * FROM equipment WHERE active = 1 ORDER BY category, name`).all();
+  const equipment = db.prepare(`SELECT * FROM equipment WHERE active = 1 ORDER BY category, sort_order`).all();
   return NextResponse.json(equipment);
 }
 
