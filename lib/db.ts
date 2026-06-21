@@ -367,12 +367,20 @@ function initSchema(db: Database.Database) {
   // Equipment upserts — add new items to existing databases
   const equipmentUpserts: [string, string, string, number, number, string, number][] = [
     ['LED-032', 'Rectangular Softbox', 'lighting', 500, 2, 'Passive modifier', 0],
+    ['MON-011', 'Mars 400S Pro', 'monitor', 2000, 2, '', 0],
+    ['RIG-001', 'Mofage Talos Damping Magic Arm', 'rigging', 500, 1, '', 0],
+    ['RIG-002', 'iFootage Spider Crab Magic Arm with QR', 'rigging', 300, 1, '', 0],
   ];
   for (const [code, name, category, daily_rate, quantity, description, wattage] of equipmentUpserts) {
     try {
       db.prepare(`INSERT INTO equipment (code, name, category, daily_rate, quantity, description, wattage) SELECT ?, ?, ?, ?, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM equipment WHERE code = ?)`).run(code, name, category, daily_rate, quantity, description, wattage, code);
     } catch { /* ignore */ }
   }
+
+  // Price correction: Accsoon Cineview SE was seeded at 2000, correct rate is 2500
+  try {
+    db.prepare(`UPDATE equipment SET daily_rate = 2500 WHERE code = 'MON-009'`).run();
+  } catch { /* ignore */ }
 
   // Create newer tables that may not exist in older databases
   const newTables = [
@@ -635,8 +643,13 @@ function seedEquipment(db: Database.Database) {
     ['MON-006', 'SmallHD 7" OLED Monitor', 'monitor', 2500, 1, '', 10],
     ['MON-007', 'SmallHD 5" Monitor', 'monitor', 1000, 1, '', 8],
     ['MON-008', 'Tilta Nucleus Wireless Follow Focus', 'monitor', 2000, 1, 'Battery operated', 0],
-    ['MON-009', 'Accsoon Cineview SE Wireless Video', 'monitor', 2000, 2, 'TX/RX ~5W each', 5],
+    ['MON-009', 'Accsoon Cineview SE Wireless Video', 'monitor', 2500, 2, 'TX/RX ~5W each', 5],
     ['MON-010', 'Vaxis Atom 500 Wireless Video TX/RX', 'monitor', 2500, 1, 'TX/RX ~5W', 5],
+    ['MON-011', 'Mars 400S Pro', 'monitor', 2000, 2, '', 0],
+
+    // CAMERA / RIGGING ACCESSORIES
+    ['RIG-001', 'Mofage Talos Damping Magic Arm', 'rigging', 500, 1, '', 0],
+    ['RIG-002', 'iFootage Spider Crab Magic Arm with QR', 'rigging', 300, 1, '', 0],
 
     // CAPTURE / POST & COMM
     ['CAP-001', 'Blackmagic ATEM Mini Pro', 'monitor', 3500, 1, 'Live switcher / capture card', 12],

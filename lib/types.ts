@@ -214,6 +214,7 @@ export const CATEGORY_LABELS: Record<string, string> = {
   tripod: 'Tripods',
   audio: 'Audio',
   monitor: 'Monitors & Wireless',
+  rigging: 'Camera/Rigging Accessories',
   misc: 'Miscellaneous',
   crew: 'Crew',
 };
