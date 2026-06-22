@@ -10,7 +10,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
     FROM bookings b JOIN clients c ON c.id = b.client_id WHERE b.id = ?
   `).get(id);
   if (!booking) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  const equipment = db.prepare('SELECT * FROM booking_equipment WHERE booking_id = ?').all(id);
+  const equipment = db.prepare('SELECT * FROM booking_equipment WHERE booking_id = ? ORDER BY id').all(id);
   const payments = db.prepare('SELECT * FROM payments WHERE booking_id = ? ORDER BY paid_at').all(id);
   const quotation = db.prepare('SELECT * FROM quotations WHERE booking_id = ? ORDER BY created_at DESC LIMIT 1').get(id);
   const invoice = db.prepare('SELECT * FROM invoices WHERE booking_id = ? ORDER BY created_at DESC LIMIT 1').get(id);

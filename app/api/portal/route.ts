@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
     WHERE b.portal_token = ?
   `).get(token);
   if (!booking) return NextResponse.json({ error: 'Invalid link' }, { status: 404 });
-  const equipment = db.prepare('SELECT * FROM booking_equipment WHERE booking_id = ?').all((booking as { id: number }).id);
+  const equipment = db.prepare('SELECT * FROM booking_equipment WHERE booking_id = ? ORDER BY id').all((booking as { id: number }).id);
   const payments = db.prepare('SELECT amount, type, method, paid_at FROM payments WHERE booking_id = ? ORDER BY paid_at').all((booking as { id: number }).id);
   const quotation = db.prepare('SELECT * FROM quotations WHERE booking_id = ? ORDER BY created_at DESC LIMIT 1').get((booking as { id: number }).id);
   const invoice = db.prepare('SELECT * FROM invoices WHERE booking_id = ? ORDER BY created_at DESC LIMIT 1').get((booking as { id: number }).id);

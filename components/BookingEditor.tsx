@@ -27,28 +27,6 @@ function isElecItem(item: EditItem): boolean {
   return item.key === 'ADD_ELEC' || item.name.toLowerCase().includes('electricity') || item.name.toLowerCase().includes('power consumption');
 }
 
-const GROUP_ORDER = [...Object.keys(CATEGORY_LABELS), 'package', 'addon', 'manpower', 'custom', 'other'];
-
-function groupLabel(key: string): string {
-  if (key === 'package') return 'Packages';
-  if (key === 'addon') return 'Add-ons';
-  if (key === 'manpower') return 'Manpower';
-  if (key === 'custom') return 'Custom';
-  if (key === 'other') return 'Other';
-  return CATEGORY_LABELS[key] || key;
-}
-
-function getItemGroup(item: EditItem, equipment: Equipment[]): string {
-  if (item.item_type === 'individual' && item.equipment_id) {
-    return equipment.find(e => e.id === item.equipment_id)?.category || 'other';
-  }
-  if (item.item_type === 'package') return 'package';
-  if (item.item_type === 'addon') return 'addon';
-  if (item.item_type === 'manpower') return 'manpower';
-  if (item.item_type === 'custom') return 'custom';
-  return 'other';
-}
-
 function shootHoursFromTimes(callTime?: string | null, wrapTime?: string | null): number | null {
   if (!callTime || !wrapTime) return null;
   const [ch, cm] = callTime.split(':').map(Number);
@@ -121,13 +99,6 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
   const eqTotal = items.reduce((s, e) => s + (e.is_complimentary ? 0 : e.rate * e.quantity * (1 - e.discount_pct / 100)), 0);
   const newTotal = studioSubtotal + eqTotal;
 
-  const groupedItems = items.reduce((acc, item) => {
-    const g = getItemGroup(item, equipment);
-    (acc[g] ||= []).push(item);
-    return acc;
-  }, {} as Record<string, EditItem[]>);
-  const groupKeys = Object.keys(groupedItems).sort((a, b) => GROUP_ORDER.indexOf(a) - GROUP_ORDER.indexOf(b));
-
   function addPackage(pkg: (typeof EQUIPMENT_PACKAGES)[PackageCat][number]) {
     const existing = items.find(i => i.key === pkg.id);
     if (existing) { setItems(prev => prev.filter(i => i.key !== pkg.id)); return; }
@@ -176,6 +147,16 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
   }
 
   function removeItem(key: string) { setItems(prev => prev.filter(i => i.key !== key)); }
+  function moveItem(key: string, direction: 'up' | 'down') {
+    setItems(prev => {
+      const idx = prev.findIndex(i => i.key === key);
+      const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+      if (idx === -1 || swapIdx < 0 || swapIdx >= prev.length) return prev;
+      const next = [...prev];
+      [next[idx], next[swapIdx]] = [next[swapIdx], next[idx]];
+      return next;
+    });
+  }
   function updateQty(key: string, qty: number) { setItems(prev => prev.map(i => i.key === key ? { ...i, quantity: Math.max(1, qty) } : i)); }
   function toggleComp(key: string) { setItems(prev => prev.map(i => i.key === key ? { ...i, is_complimentary: !i.is_complimentary, discount_pct: 0 } : i)); }
   function setDisc(key: string, pct: number) { setItems(prev => prev.map(i => i.key === key ? { ...i, discount_pct: i.discount_pct === pct ? 0 : pct, is_complimentary: false } : i)); }
@@ -228,22 +209,26 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
             <button onClick={() => setStudioSubtotal(currentSubtotal)} className="text-[10px] text-white/30 hover:text-white border border-white/10 px-1.5 py-0.5 rounded" title="Reset to original">↺</button>
           )}
         </div>
+        <div className="text-[10px] text-white/30 mb-1.5">Use ↑↓ to set the order items appear on invoices/quotations.</div>
         {items.length === 0 ? <p className="text-white/30 text-xs py-2">No equipment — studio only</p> : (
-          <div className="space-y-3">
-            {groupKeys.map(gKey => (
-              <div key={gKey}>
-                <div className="text-[10px] text-white/30 uppercase tracking-wider mb-1.5">{groupLabel(gKey)}</div>
-                <div className="space-y-1.5">
-                  {groupedItems[gKey].map(item => {
+          <div className="space-y-1.5">
+            {items.map((item, idx) => {
               const lineTotal = item.is_complimentary ? 0 : item.rate * item.quantity * (1 - item.discount_pct / 100);
               const elec = isElecItem(item);
               const itemElecHours = elecHoursFromItem(item);
+              const moveButtons = (
+                <div className="flex flex-col gap-0.5 shrink-0">
+                  <button onClick={() => moveItem(item.key, 'up')} disabled={idx === 0} className="w-5 h-4 flex items-center justify-center text-white/40 hover:text-white rounded hover:bg-[#2a2a2a] transition-colors text-[10px] disabled:opacity-20 disabled:hover:bg-transparent">▲</button>
+                  <button onClick={() => moveItem(item.key, 'down')} disabled={idx === items.length - 1} className="w-5 h-4 flex items-center justify-center text-white/40 hover:text-white rounded hover:bg-[#2a2a2a] transition-colors text-[10px] disabled:opacity-20 disabled:hover:bg-transparent">▼</button>
+                </div>
+              );
 
               if (elec) {
                 // Special electricity row — hours-based editor
                 return (
                   <div key={item.key} className="bg-[#0f0f0f] rounded-lg p-2 space-y-1.5 border border-yellow-500/20">
                     <div className="flex items-center gap-2">
+                      {moveButtons}
                       <span className="text-xs text-yellow-400 flex-1 font-medium">⚡ Power Consumption</span>
                       <span className="text-xs text-[#E32726] font-bold">{formatPHP(item.rate)}</span>
                       <button onClick={removeElec} className="text-white/20 hover:text-red-400 text-xs">✕</button>
@@ -279,6 +264,7 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
               return (
                 <div key={item.key} className="bg-[#0f0f0f] rounded-lg p-2 space-y-1.5">
                   <div className="flex items-center gap-2">
+                    {moveButtons}
                     <div className="flex-1 min-w-0">
                       <div className="text-xs text-white truncate">{item.name}</div>
                     </div>
@@ -339,10 +325,7 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
                   </div>
                 </div>
               );
-                  })}
-                </div>
-              </div>
-            ))}
+            })}
           </div>
         )}
         <div className="flex justify-between text-sm font-semibold text-white border-t border-[#2a2a2a] pt-2 mt-2">
