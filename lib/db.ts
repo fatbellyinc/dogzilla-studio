@@ -389,6 +389,12 @@ function initSchema(db: Database.Database) {
     db.prepare(`UPDATE equipment SET daily_rate = 2500 WHERE code = 'MON-009'`).run();
   } catch { /* ignore */ }
 
+  // Name correction: "Aputure 1200C" → "Aputure 1000C" everywhere, including past bookings' saved line-item names
+  try {
+    db.exec(`UPDATE equipment SET name = REPLACE(name, 'Aputure 1200C', 'Aputure 1000C') WHERE name LIKE '%Aputure 1200C%'`);
+    db.exec(`UPDATE booking_equipment SET name = REPLACE(name, 'Aputure 1200C', 'Aputure 1000C') WHERE name LIKE '%Aputure 1200C%'`);
+  } catch { /* ignore */ }
+
   // Create newer tables that may not exist in older databases
   const newTables = [
     `CREATE TABLE IF NOT EXISTS studio_visits (
@@ -546,7 +552,7 @@ function seedEquipment(db: Database.Database) {
 
     // LIGHTS — LED (wattage from manufacturer specs)
     ['LED-001', 'Godox F600 Bi', 'lighting', 6000, 2, '600W bicolor LED fresnel', 600],
-    ['LED-002', 'Aputure 1200C RGB', 'lighting', 9500, 1, '1,200W RGB COB, full color', 1200],
+    ['LED-002', 'Aputure 1000C RGB', 'lighting', 9500, 1, '1,200W RGB COB, full color', 1200],
     ['LED-003', 'Aputure 1200X', 'lighting', 8000, 3, '1,200W daylight COB', 1200],
     ['LED-004', 'Aputure Nova 600C', 'lighting', 8500, 2, '600W RGBWW panel', 600],
     ['LED-005', 'Aputure 600D Pro', 'lighting', 5000, 1, '600W daylight COB', 600],
