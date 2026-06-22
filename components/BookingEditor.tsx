@@ -27,6 +27,28 @@ function isElecItem(item: EditItem): boolean {
   return item.key === 'ADD_ELEC' || item.name.toLowerCase().includes('electricity') || item.name.toLowerCase().includes('power consumption');
 }
 
+const GROUP_ORDER = [...Object.keys(CATEGORY_LABELS), 'package', 'addon', 'manpower', 'custom', 'other'];
+
+function groupLabel(key: string): string {
+  if (key === 'package') return 'Packages';
+  if (key === 'addon') return 'Add-ons';
+  if (key === 'manpower') return 'Manpower';
+  if (key === 'custom') return 'Custom';
+  if (key === 'other') return 'Other';
+  return CATEGORY_LABELS[key] || key;
+}
+
+function getItemGroup(item: EditItem, equipment: Equipment[]): string {
+  if (item.item_type === 'individual' && item.equipment_id) {
+    return equipment.find(e => e.id === item.equipment_id)?.category || 'other';
+  }
+  if (item.item_type === 'package') return 'package';
+  if (item.item_type === 'addon') return 'addon';
+  if (item.item_type === 'manpower') return 'manpower';
+  if (item.item_type === 'custom') return 'custom';
+  return 'other';
+}
+
 function shootHoursFromTimes(callTime?: string | null, wrapTime?: string | null): number | null {
   if (!callTime || !wrapTime) return null;
   const [ch, cm] = callTime.split(':').map(Number);
@@ -98,6 +120,13 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
 
   const eqTotal = items.reduce((s, e) => s + (e.is_complimentary ? 0 : e.rate * e.quantity * (1 - e.discount_pct / 100)), 0);
   const newTotal = studioSubtotal + eqTotal;
+
+  const groupedItems = items.reduce((acc, item) => {
+    const g = getItemGroup(item, equipment);
+    (acc[g] ||= []).push(item);
+    return acc;
+  }, {} as Record<string, EditItem[]>);
+  const groupKeys = Object.keys(groupedItems).sort((a, b) => GROUP_ORDER.indexOf(a) - GROUP_ORDER.indexOf(b));
 
   function addPackage(pkg: (typeof EQUIPMENT_PACKAGES)[PackageCat][number]) {
     const existing = items.find(i => i.key === pkg.id);
@@ -200,8 +229,12 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
           )}
         </div>
         {items.length === 0 ? <p className="text-white/30 text-xs py-2">No equipment — studio only</p> : (
-          <div className="space-y-1.5">
-            {items.map(item => {
+          <div className="space-y-3">
+            {groupKeys.map(gKey => (
+              <div key={gKey}>
+                <div className="text-[10px] text-white/30 uppercase tracking-wider mb-1.5">{groupLabel(gKey)}</div>
+                <div className="space-y-1.5">
+                  {groupedItems[gKey].map(item => {
               const lineTotal = item.is_complimentary ? 0 : item.rate * item.quantity * (1 - item.discount_pct / 100);
               const elec = isElecItem(item);
               const itemElecHours = elecHoursFromItem(item);
@@ -306,7 +339,10 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
                   </div>
                 </div>
               );
-            })}
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
         )}
         <div className="flex justify-between text-sm font-semibold text-white border-t border-[#2a2a2a] pt-2 mt-2">
