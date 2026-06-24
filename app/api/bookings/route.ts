@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const db = getDb();
   const body = await req.json();
-  const { client_id, booking_days, equipment_items, notes, discount_type, discount_value, project_name, shoot_type, is_pencil, no_deposit, vat_exempt, recurrence, recurrence_end } = body;
+  const { client_id, booking_days, equipment_items, notes, discount_type, discount_value, project_name, shoot_type, production_house, is_pencil, no_deposit, vat_exempt, recurrence, recurrence_end } = body;
 
   // Multi-day: studioSubtotal = sum of all day subtotals
   const days: { date: string; day_type: string; studio_rate: string; hours: number; subtotal: number }[] = booking_days || [];
@@ -80,11 +80,11 @@ export async function POST(req: NextRequest) {
   }
 
   const result = db.prepare(`
-    INSERT INTO bookings (client_id, booking_date, end_date, studio_rate, hours, subtotal, equipment_total, total, deposit_amount, discount_type, discount_value, discount_amount, status, notes, project_name, shoot_type, is_pencil, no_deposit, vat_exempt)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)
+    INSERT INTO bookings (client_id, booking_date, end_date, studio_rate, hours, subtotal, equipment_total, total, deposit_amount, discount_type, discount_value, discount_amount, status, notes, project_name, shoot_type, production_house, is_pencil, no_deposit, vat_exempt)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?)
   `).run(client_id, bookingDate, endDate, representativeRate, hours, studioSubtotal, eqTotal, total, deposit,
     discount_type || null, discount_value || 0, discountAmount, notes || null,
-    project_name || null, shoot_type || null, is_pencil ? 1 : 0, no_deposit ? 1 : 0, vat_exempt ? 1 : 0);
+    project_name || null, shoot_type || null, production_house || null, is_pencil ? 1 : 0, no_deposit ? 1 : 0, vat_exempt ? 1 : 0);
 
   const bookingId = result.lastInsertRowid;
 
@@ -106,7 +106,7 @@ export async function POST(req: NextRequest) {
   if (recurrence && recurrence_end && bookingDate) {
     const endRecur = new Date(recurrence_end + 'T00:00');
     let nextDate = new Date(bookingDate + 'T00:00');
-    const insRecur = db.prepare(`INSERT INTO bookings (client_id, booking_date, studio_rate, hours, subtotal, equipment_total, total, deposit_amount, discount_type, discount_value, discount_amount, status, notes, project_name, shoot_type, is_pencil, recurrence, series_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,'pending',?,?,?,?,?,?)`);
+    const insRecur = db.prepare(`INSERT INTO bookings (client_id, booking_date, studio_rate, hours, subtotal, equipment_total, total, deposit_amount, discount_type, discount_value, discount_amount, status, notes, project_name, shoot_type, production_house, is_pencil, recurrence, series_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,'pending',?,?,?,?,?,?,?)`);
     const insEq = db.prepare(`INSERT INTO booking_equipment (booking_id, equipment_id, quantity, rate, name, item_type, is_complimentary, discount_pct) VALUES (?,?,?,?,?,?,?,?)`);
 
     while (true) {
@@ -123,7 +123,7 @@ export async function POST(req: NextRequest) {
       const recurResult = insRecur.run(
         client_id, nextDateStr, representativeRate, hours, studioSubtotal, eqTotal, total, deposit,
         discount_type || null, discount_value || 0, discountAmount,
-        notes || null, project_name || null, shoot_type || null, is_pencil ? 1 : 0,
+        notes || null, project_name || null, shoot_type || null, production_house || null, is_pencil ? 1 : 0,
         recurrence, Number(bookingId)
       );
 

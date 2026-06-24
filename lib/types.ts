@@ -5,6 +5,7 @@ export const SHOOT_TYPES = [
   'Commercial / TVC',
   'Event',
   'Workshop',
+  'Equipment Rental',
   'Others',
 ] as const;
 
@@ -40,6 +41,7 @@ export interface Booking {
   deposit_amount: number;
   project_name: string | null;
   shoot_type: string | null;
+  production_house: string | null;
   is_pencil: number;
   vat_exempt: number;
   no_deposit: number;

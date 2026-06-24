@@ -22,7 +22,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   const db = getDb();
   const { id } = await params;
   const body = await req.json();
-  const { status, notes, deposit_paid, fully_paid, discount_type, discount_value, is_pencil, vat_exempt, no_deposit, call_time, wrap_time, overtime_hours, overtime_amount, client_id } = body;
+  const { status, notes, deposit_paid, fully_paid, discount_type, discount_value, is_pencil, vat_exempt, no_deposit, call_time, wrap_time, overtime_hours, overtime_amount, client_id, project_name, shoot_type, production_house } = body;
 
   if (client_id !== undefined) {
     const newClient = db.prepare('SELECT name FROM clients WHERE id = ?').get(client_id) as { name: string } | undefined;
@@ -44,6 +44,10 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   if (call_time !== undefined) db.prepare('UPDATE bookings SET call_time = ? WHERE id = ?').run(call_time || null, id);
   if (wrap_time !== undefined) { db.prepare('UPDATE bookings SET wrap_time = ? WHERE id = ?').run(wrap_time || null, id); if (call_time || wrap_time) logActivity(Number(id), ACTIONS.TIMES_SET, `Shoot times set: ${call_time || '?'} → ${wrap_time || '?'}`); }
   if (overtime_hours !== undefined) { db.prepare('UPDATE bookings SET overtime_hours = ?, overtime_amount = ? WHERE id = ?').run(overtime_hours, overtime_amount || 0, id); if (overtime_hours > 0) logActivity(Number(id), ACTIONS.OT_LOGGED, `Overtime recorded: ${overtime_hours}hrs — ₱${(overtime_amount || 0).toLocaleString()}`); }
+  if (project_name !== undefined) db.prepare('UPDATE bookings SET project_name = ? WHERE id = ?').run(project_name || null, id);
+  if (shoot_type !== undefined) db.prepare('UPDATE bookings SET shoot_type = ? WHERE id = ?').run(shoot_type || null, id);
+  if (production_house !== undefined) db.prepare('UPDATE bookings SET production_house = ? WHERE id = ?').run(production_house || null, id);
+  if (project_name !== undefined || shoot_type !== undefined || production_house !== undefined) logActivity(Number(id), ACTIONS.ITEMS_EDITED, 'Project details updated');
 
   // Recalculate totals when discount changes
   if (discount_type !== undefined || discount_value !== undefined) {

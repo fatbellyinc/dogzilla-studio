@@ -162,6 +162,7 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
           {(booking as Booking & { client_company?: string }).client_company && (
             <div style={{ color: '#333', fontWeight: 600 }}>{(booking as Booking & { client_company?: string }).client_company}</div>
           )}
+          {booking.production_house && <div style={{ color: '#555' }}>{booking.production_house}</div>}
           {booking.client_phone && <div style={{ color: '#555' }}>{booking.client_phone}</div>}
           {booking.client_email && <div style={{ color: '#555' }}>{booking.client_email}</div>}
           {booking.client_address && <div style={{ color: '#555' }}>{booking.client_address}</div>}
@@ -173,7 +174,7 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
               ? `${formatDate(booking.booking_date)} – ${formatDate(booking.end_date || booking.booking_date)} (${bookingDays.length} days)`
               : formatDate(booking.booking_date)}
           </div>
-          <div style={{ color: '#555', marginTop: '2px' }}>Dogzilla Studio — Cyclorama</div>
+          {booking.shoot_type !== 'Equipment Rental' && <div style={{ color: '#555', marginTop: '2px' }}>Dogzilla Studio — Cyclorama</div>}
           {booking.project_name && <div style={{ color: '#333', fontWeight: 600, marginTop: '2px' }}>{booking.project_name}</div>}
           {booking.call_time && (
             <div style={{ color: '#555', marginTop: '4px', fontSize: '12px' }}>

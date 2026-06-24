@@ -119,6 +119,7 @@ function NewBookingForm() {
   const [form, setForm] = useState({
     client_id: params.get('client_id') || '',
     project_name: params.get('project_name') || '',
+    production_house: params.get('production_house') || '',
     shoot_type: params.get('shoot_type') || '',
     notes: params.get('notes') || '',
     is_pencil: false,
@@ -294,6 +295,7 @@ function NewBookingForm() {
           discount_type: discount.type || null,
           discount_value: Number(discount.value) || 0,
           project_name: form.project_name || null,
+          production_house: form.production_house || null,
           shoot_type: form.shoot_type || null,
           is_pencil: form.is_pencil,
           no_deposit: form.no_deposit,
@@ -404,6 +406,12 @@ function NewBookingForm() {
                   <label className="text-xs text-white/40 mb-1 block">Project / Production Name</label>
                   <input value={form.project_name} onChange={e => setForm(f => ({ ...f, project_name: e.target.value }))}
                     placeholder="e.g. Brand X Summer Campaign 2026"
+                    className={inputCls} />
+                </div>
+                <div>
+                  <label className="text-xs text-white/40 mb-1 block">Production House</label>
+                  <input value={form.production_house} onChange={e => setForm(f => ({ ...f, production_house: e.target.value }))}
+                    placeholder="e.g. ABC Productions"
                     className={inputCls} />
                 </div>
                 <div>

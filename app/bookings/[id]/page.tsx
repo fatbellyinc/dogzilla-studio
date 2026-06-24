@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { formatPHP, formatDate, fmt24, calcOT, OT_RATE, SETUP_OT_RATE } from '@/lib/utils';
-import { Booking, BookingEquipment, Payment, Quotation, Invoice, BookingDay, STUDIO_RATES, VAT_RATE } from '@/lib/types';
+import { Booking, BookingEquipment, Payment, Quotation, Invoice, BookingDay, STUDIO_RATES, VAT_RATE, SHOOT_TYPES } from '@/lib/types';
 import OverheadPanel from '@/components/OverheadPanel';
 import TimePicker from '@/components/TimePicker';
 import BookingEditor from '@/components/BookingEditor';
@@ -290,6 +290,8 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
   const [saving, setSaving] = useState(false);
   const [showClientChange, setShowClientChange] = useState(false);
   const [allClients, setAllClients] = useState<{ id: number; name: string; company?: string }[]>([]);
+  const [editingProject, setEditingProject] = useState(false);
+  const [projectForm, setProjectForm] = useState({ project_name: '', production_house: '', shoot_type: '' });
 
   const loadCrew = useCallback(() => { fetch(`/api/bookings/${id}/crew`).then(r => r.json()).then(setCrew); }, [id]);
   const load = () => fetch(`/api/bookings/${id}`).then(r => r.json()).then((d: BookingDetail) => {
@@ -299,6 +301,11 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
     }
     setCallTime(d.booking.call_time || null);
     setWrapTime(d.booking.wrap_time || null);
+    setProjectForm({
+      project_name: d.booking.project_name || '',
+      production_house: d.booking.production_house || '',
+      shoot_type: d.booking.shoot_type || '',
+    });
   });
 
   useEffect(() => { load(); loadCrew(); }, [id, loadCrew]);
@@ -434,6 +441,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
       studio_rate: booking.studio_rate,
       hours: String(booking.hours),
       project_name: booking.project_name || '',
+      production_house: booking.production_house || '',
       shoot_type: booking.shoot_type || '',
       notes: booking.notes || '',
       from_booking: id,
@@ -458,6 +466,21 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
     setShowClientChange(false);
     await load(); setSaving(false);
     toast.success('Client updated');
+  }
+
+  async function saveProjectDetails() {
+    setSaving(true);
+    await fetch(`/api/bookings/${id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        project_name: projectForm.project_name || null,
+        production_house: projectForm.production_house || null,
+        shoot_type: projectForm.shoot_type || null,
+      }),
+    });
+    setEditingProject(false);
+    await load(); setSaving(false);
+    toast.success('Project details updated');
   }
 
   async function applyDiscount() {
@@ -510,17 +533,59 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
             )}
             {booking.client_phone && <div className="text-sm text-white/60 mt-1">📞 {booking.client_phone}</div>}
             {booking.client_email && <div className="text-sm text-white/60">✉️ {booking.client_email}</div>}
-            {booking.project_name && (
-              <div className="mt-2 pt-2 border-t border-[#2a2a2a]">
-                <div className="text-xs text-white/40">Project</div>
-                <div className="text-sm text-white font-medium">{booking.project_name}</div>
+
+            <div className="mt-2 pt-2 border-t border-[#2a2a2a]">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs text-white/40">Project Details</span>
+                <button onClick={() => setEditingProject(!editingProject)} className="text-xs text-[#E32726] hover:underline">
+                  {editingProject ? '✕ Cancel' : '✏️ Edit'}
+                </button>
               </div>
-            )}
-            {booking.shoot_type && (
-              <div className="mt-1">
-                <span className="text-xs bg-[#E32726]/20 text-[#E32726] px-2 py-0.5 rounded font-medium">{booking.shoot_type}</span>
-              </div>
-            )}
+              {editingProject ? (
+                <div className="space-y-2">
+                  <div>
+                    <label className="text-[10px] text-white/40 mb-1 block">Project / Production Name</label>
+                    <input value={projectForm.project_name} onChange={e => setProjectForm(f => ({ ...f, project_name: e.target.value }))}
+                      placeholder="e.g. Brand X Summer Campaign 2026"
+                      className="w-full bg-[#0f0f0f] border border-[#2a2a2a] rounded-lg px-2.5 py-1.5 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-[#E32726]" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-white/40 mb-1 block">Production House</label>
+                    <input value={projectForm.production_house} onChange={e => setProjectForm(f => ({ ...f, production_house: e.target.value }))}
+                      placeholder="e.g. ABC Productions"
+                      className="w-full bg-[#0f0f0f] border border-[#2a2a2a] rounded-lg px-2.5 py-1.5 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-[#E32726]" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-white/40 mb-1.5 block">Type of Shoot</label>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {SHOOT_TYPES.map(type => (
+                        <button key={type} type="button"
+                          onClick={() => setProjectForm(f => ({ ...f, shoot_type: f.shoot_type === type ? '' : type }))}
+                          className={`text-left px-2.5 py-1.5 rounded-lg border text-xs transition-all ${projectForm.shoot_type === type ? 'border-[#E32726] bg-[#E32726]/10 text-white font-medium' : 'border-[#2a2a2a] text-white/50 hover:border-[#3a3a3a] hover:text-white'}`}>
+                          {type}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <button onClick={saveProjectDetails} disabled={saving} className="w-full bg-[#E32726] text-white text-xs py-1.5 rounded font-medium disabled:opacity-50">
+                    {saving ? 'Saving...' : 'Save Project Details'}
+                  </button>
+                </div>
+              ) : (
+                <>
+                  {booking.project_name && <div className="text-sm text-white font-medium">{booking.project_name}</div>}
+                  {booking.production_house && <div className="text-sm text-white/50">{booking.production_house}</div>}
+                  {booking.shoot_type && (
+                    <div className="mt-1">
+                      <span className="text-xs bg-[#E32726]/20 text-[#E32726] px-2 py-0.5 rounded font-medium">{booking.shoot_type}</span>
+                    </div>
+                  )}
+                  {!booking.project_name && !booking.production_house && !booking.shoot_type && (
+                    <div className="text-xs text-white/20">No project details set</div>
+                  )}
+                </>
+              )}
+            </div>
           </div>
 
           {/* Booking details */}

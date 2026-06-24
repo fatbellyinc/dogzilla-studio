@@ -319,6 +319,7 @@ function initSchema(db: Database.Database) {
     `ALTER TABLE clients ADD COLUMN is_vip INTEGER DEFAULT 0`,
     `ALTER TABLE bookings ADD COLUMN wrap_date TEXT`,
     `ALTER TABLE equipment ADD COLUMN sort_order INTEGER DEFAULT 0`,
+    `ALTER TABLE bookings ADD COLUMN production_house TEXT`,
   ];
   for (const sql of migrations) {
     try { db.exec(sql); } catch { /* column already exists */ }
