@@ -58,25 +58,29 @@ export async function POST(req: NextRequest) {
   const total = subtotalBeforeDiscount - discountAmount;
   const deposit = total * 0.5;
 
-  // Double-booking guard — reject if a CONFIRMED booking already exists on any of these dates.
-  // Equipment-only bookings don't occupy the studio, so they never conflict and never block
-  // other bookings on the same date (e.g. one client rents the studio while another only rents gear).
+  // Double-booking guard — reject if a CONFIRMED booking already occupies any of these exact dates.
+  // Checked against individual booking_days rows (not a date range) so non-consecutive day
+  // selections don't get falsely blocked by, or falsely block, gaps between someone else's days.
+  // Equipment-only bookings/days don't occupy the studio, so they never conflict.
   const isEquipmentOnly = days.every(d => d.studio_rate === 'equipment_only') || representativeRate === 'equipment_only';
   const allDates = days.map(d => d.date);
   if (allDates.length > 0 && !isEquipmentOnly) {
     const placeholders = allDates.map(() => '?').join(',');
     const conflicts = db.prepare(`
-      SELECT id, booking_date, end_date FROM bookings
-      WHERE status = 'confirmed' AND is_pencil = 0 AND studio_rate != 'equipment_only'
-        AND (
-          booking_date IN (${placeholders})
-          OR (end_date IS NOT NULL AND end_date >= ? AND booking_date <= ?)
-        )
-    `).all(...allDates, allDates[0], allDates[allDates.length - 1]) as { id: number; booking_date: string; end_date: string }[];
+      SELECT b.id, bd.date as conflict_date FROM bookings b
+      JOIN booking_days bd ON bd.booking_id = b.id
+      WHERE b.status = 'confirmed' AND b.is_pencil = 0 AND bd.studio_rate != 'equipment_only'
+        AND bd.date IN (${placeholders})
+      UNION
+      SELECT b.id, b.booking_date as conflict_date FROM bookings b
+      WHERE b.status = 'confirmed' AND b.is_pencil = 0 AND b.studio_rate != 'equipment_only'
+        AND NOT EXISTS (SELECT 1 FROM booking_days bd2 WHERE bd2.booking_id = b.id)
+        AND b.booking_date IN (${placeholders})
+    `).all(...allDates, ...allDates) as { id: number; conflict_date: string }[];
     if (conflicts.length > 0) {
       return NextResponse.json({
         error: 'double_booking',
-        message: `A confirmed booking already exists on ${conflicts.map(c => c.booking_date).join(', ')}. Cannot double-book.`,
+        message: `A confirmed booking already exists on ${conflicts.map(c => c.conflict_date).join(', ')}. Cannot double-book.`,
         conflicts,
       }, { status: 409 });
     }

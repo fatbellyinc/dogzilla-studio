@@ -567,7 +567,8 @@ function NewBookingForm() {
                 {ADDON_ITEMS.map(addon => {
                   const sel = selectedItems.find(e => e.key === addon.id);
                   const isElec = addon.id === 'ADD_ELEC';
-                  const effectivePrice = isElec ? addon.price * addonElecHours : addon.price;
+                  const qty = sel?.quantity || 1;
+                  const effectivePrice = isElec ? addon.price * addonElecHours : addon.price * qty;
                   const discountedPrice = sel?.discount_pct
                     ? effectivePrice * (1 - (sel.discount_pct / 100))
                     : effectivePrice;
@@ -608,14 +609,25 @@ function NewBookingForm() {
                           </div>
                         </div>
                       ) : (
-                      <button type="button" onClick={() => toggleAddon(addon)} className="w-full text-left p-3">
-                        <div className="font-medium text-white text-xs">{addon.label}</div>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className="text-[#E32726] text-xs font-bold">{formatPHP(discountedPrice)}</span>
-                          {sel?.discount_pct ? <span className="text-[10px] text-white/40 line-through">{formatPHP(effectivePrice)}</span> : null}
-                        </div>
-                        <div className="text-white/30 text-xs mt-0.5 leading-tight">{addon.description}</div>
-                      </button>
+                      <div className="w-full text-left p-3">
+                        <button type="button" onClick={() => toggleAddon(addon)} className="w-full text-left">
+                          <div className="font-medium text-white text-xs">{addon.label}</div>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className="text-[#E32726] text-xs font-bold">{formatPHP(discountedPrice)}</span>
+                            {sel?.discount_pct ? <span className="text-[10px] text-white/40 line-through">{formatPHP(effectivePrice)}</span> : null}
+                            {qty > 1 && <span className="text-[10px] text-white/40">({formatPHP(addon.price)} × {qty})</span>}
+                          </div>
+                          <div className="text-white/30 text-xs mt-0.5 leading-tight">{addon.description}</div>
+                        </button>
+                        {sel && (
+                          <div className="flex items-center gap-1.5 mt-1.5">
+                            <span className="text-[10px] text-white/40">Qty (e.g. per day):</span>
+                            <button type="button" onClick={() => updateQty(addon.id, qty - 1)} className="w-5 h-5 bg-[#2a2a2a] rounded text-white text-xs">−</button>
+                            <span className="text-xs text-white w-4 text-center font-bold">{qty}</span>
+                            <button type="button" onClick={() => updateQty(addon.id, qty + 1)} className="w-5 h-5 bg-[#2a2a2a] rounded text-white text-xs">+</button>
+                          </div>
+                        )}
+                      </div>
                       )}
                       {/* Old electricity hours selector — now unused, kept for non-elec discount buttons */}
                       {isElec && false && (

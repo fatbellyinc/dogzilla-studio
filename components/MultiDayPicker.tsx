@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import CalendarPicker from './CalendarPicker';
 import { formatPHP } from '@/lib/utils';
 import { STUDIO_RATES } from '@/lib/types';
@@ -50,25 +50,37 @@ const DAY_RATES_SETUP: (keyof typeof STUDIO_RATES)[] = ['setup'];
 const DAY_RATES_SHOOT: (keyof typeof STUDIO_RATES)[] = ['fullday', 'hourly', 'event', 'equipment_only'];
 
 export default function MultiDayPicker({ days, onChange, bookedDates = [], blockoutDates = [], pencilDates = [] }: Props) {
-  const [startDate, setStartDate] = useState(days[0]?.date || '');
-  const [endDate, setEndDate] = useState(days[days.length - 1]?.date || '');
+  const [pickerDate, setPickerDate] = useState('');
+  const [fillRangeEnd, setFillRangeEnd] = useState('');
 
-  // Rebuild days array when date range changes
-  useEffect(() => {
-    if (!startDate) return;
-    const end = endDate && endDate >= startDate ? endDate : startDate;
-    const dates = datesBetween(startDate, end);
-    const newDays = dates.map((date, i) => {
+  function addDay(date: string) {
+    if (!date || days.some(d => d.date === date)) return;
+    const defaultType: 'setup' | 'shoot' = 'shoot';
+    const defaultRate: keyof typeof STUDIO_RATES = 'fullday';
+    const day: DayConfig = { date, day_type: defaultType, studio_rate: defaultRate, hours: 8, subtotal: STUDIO_RATES[defaultRate].price };
+    const newDays = [...days, day].sort((a, b) => a.date.localeCompare(b.date));
+    onChange(newDays);
+    setPickerDate('');
+  }
+
+  function removeDay(date: string) {
+    onChange(days.filter(d => d.date !== date));
+  }
+
+  // Fill every date between the first day and a chosen end date — for the common
+  // consecutive-range case, without forcing all multi-day bookings to be contiguous
+  function fillRange() {
+    if (!days[0] || !fillRangeEnd) return;
+    const dates = datesBetween(days[0].date, fillRangeEnd);
+    const newDays = dates.map(date => {
       const existing = days.find(d => d.date === date);
       if (existing) return existing;
-      // Default: first day setup, rest are shoots
-      const defaultType: 'setup' | 'shoot' = i === 0 && dates.length > 1 ? 'setup' : 'shoot';
-      const defaultRate: keyof typeof STUDIO_RATES = defaultType === 'setup' ? 'setup' : 'fullday';
-      const day: DayConfig = { date, day_type: defaultType, studio_rate: defaultRate, hours: 8, subtotal: STUDIO_RATES[defaultRate].price };
-      return day;
+      const defaultRate: keyof typeof STUDIO_RATES = 'fullday';
+      return { date, day_type: 'shoot' as const, studio_rate: defaultRate, hours: 8, subtotal: STUDIO_RATES[defaultRate].price };
     });
-    onChange(newDays);
-  }, [startDate, endDate]);
+    onChange(newDays.sort((a, b) => a.date.localeCompare(b.date)));
+    setFillRangeEnd('');
+  }
 
   function updateDay(index: number, updates: Partial<DayConfig>) {
     const newDays = days.map((d, i) => {
@@ -90,27 +102,48 @@ export default function MultiDayPicker({ days, onChange, bookedDates = [], block
 
   return (
     <div className="space-y-3">
-      {/* Date range selectors */}
-      <div className={`grid gap-3 ${isMulti ? 'grid-cols-2' : 'grid-cols-1'}`}>
+      {/* Date picker — add days one at a time, no contiguity required */}
+      {days.length === 0 ? (
         <CalendarPicker
-          label="Start Date"
-          value={startDate}
-          onChange={d => { setStartDate(d); if (!endDate || d > endDate) setEndDate(d); }}
+          label="Shoot Date"
+          value={pickerDate}
+          onChange={d => { setPickerDate(d); addDay(d); }}
           bookedDates={bookedDates}
           blockoutDates={blockoutDates}
           pencilDates={pencilDates}
         />
-        <CalendarPicker
-          label="End Date (multi-day)"
-          value={endDate}
-          onChange={d => setEndDate(d >= startDate ? d : startDate)}
-          bookedDates={bookedDates}
-          blockoutDates={blockoutDates}
-          pencilDates={pencilDates}
-          minDate={startDate}
-          placeholder="Same as start (single day)"
-        />
-      </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-3">
+          <CalendarPicker
+            label="+ Add Another Day"
+            value={pickerDate}
+            onChange={d => addDay(d)}
+            bookedDates={bookedDates}
+            blockoutDates={blockoutDates}
+            pencilDates={pencilDates}
+            placeholder="Pick any date — doesn't have to be consecutive"
+          />
+          <div>
+            <label className="text-xs text-white/40 mb-1 block">Or fill a consecutive range up to...</label>
+            <div className="flex gap-1.5">
+              <CalendarPicker
+                value={fillRangeEnd}
+                onChange={setFillRangeEnd}
+                bookedDates={bookedDates}
+                blockoutDates={blockoutDates}
+                pencilDates={pencilDates}
+                minDate={days[days.length - 1]?.date}
+                placeholder="End date"
+                className="flex-1"
+              />
+              <button type="button" onClick={fillRange} disabled={!fillRangeEnd}
+                className="shrink-0 px-3 py-2 bg-[#2a2a2a] text-white text-xs rounded-lg disabled:opacity-40 hover:bg-[#3a3a3a]">
+                Fill
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Per-day configuration */}
       {days.length > 0 && (
@@ -131,7 +164,12 @@ export default function MultiDayPicker({ days, onChange, bookedDates = [], block
                   <span className="text-xs font-semibold text-white">Day {i + 1} — {dayLabel(day.date)}</span>
                   {isMulti && i === 0 && days.length > 1 && <span className="text-[10px] text-white/30">first</span>}
                 </div>
-                <span className="text-sm font-bold text-[#E32726]">{formatPHP(day.subtotal)}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-[#E32726]">{formatPHP(day.subtotal)}</span>
+                  {isMulti && (
+                    <button type="button" onClick={() => removeDay(day.date)} className="text-white/20 hover:text-red-400 text-xs">✕</button>
+                  )}
+                </div>
               </div>
 
               {/* Setup vs Shoot toggle */}
