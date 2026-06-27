@@ -58,13 +58,16 @@ export async function POST(req: NextRequest) {
   const total = subtotalBeforeDiscount - discountAmount;
   const deposit = total * 0.5;
 
-  // Double-booking guard — reject if a CONFIRMED booking already exists on any of these dates
+  // Double-booking guard — reject if a CONFIRMED booking already exists on any of these dates.
+  // Equipment-only bookings don't occupy the studio, so they never conflict and never block
+  // other bookings on the same date (e.g. one client rents the studio while another only rents gear).
+  const isEquipmentOnly = days.every(d => d.studio_rate === 'equipment_only') || representativeRate === 'equipment_only';
   const allDates = days.map(d => d.date);
-  if (allDates.length > 0) {
+  if (allDates.length > 0 && !isEquipmentOnly) {
     const placeholders = allDates.map(() => '?').join(',');
     const conflicts = db.prepare(`
       SELECT id, booking_date, end_date FROM bookings
-      WHERE status = 'confirmed' AND is_pencil = 0
+      WHERE status = 'confirmed' AND is_pencil = 0 AND studio_rate != 'equipment_only'
         AND (
           booking_date IN (${placeholders})
           OR (end_date IS NOT NULL AND end_date >= ? AND booking_date <= ?)
