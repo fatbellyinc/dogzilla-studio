@@ -26,7 +26,27 @@ export async function GET(req: NextRequest) {
   if (conditions.length) query += ' WHERE ' + conditions.join(' AND ');
   query += ' ORDER BY b.booking_date DESC, b.created_at DESC';
 
-  return NextResponse.json(db.prepare(query).all(...args));
+  const bookings = db.prepare(query).all(...args) as { id: number; booking_date: string; studio_rate: string }[];
+
+  // Attach each booking's exact occupied dates (from booking_days, excluding equipment-only
+  // days that don't occupy the studio) so calendar views don't fill in gaps for non-consecutive
+  // multi-day bookings, or mark equipment-only rentals as occupying the studio.
+  const dayRows = bookings.length
+    ? db.prepare(`SELECT booking_id, date FROM booking_days WHERE booking_id IN (${bookings.map(() => '?').join(',')}) AND studio_rate != 'equipment_only'`)
+        .all(...bookings.map(b => b.id)) as { booking_id: number; date: string }[]
+    : [];
+  const daysByBooking = new Map<number, string[]>();
+  for (const row of dayRows) {
+    if (!daysByBooking.has(row.booking_id)) daysByBooking.set(row.booking_id, []);
+    daysByBooking.get(row.booking_id)!.push(row.date);
+  }
+
+  const result = bookings.map(b => ({
+    ...b,
+    occupied_dates: b.studio_rate === 'equipment_only' ? [] : (daysByBooking.get(b.id) ?? [b.booking_date]),
+  }));
+
+  return NextResponse.json(result);
 }
 
 export async function POST(req: NextRequest) {

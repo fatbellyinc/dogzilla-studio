@@ -154,9 +154,11 @@ function NewBookingForm() {
     const months = [`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`,
                     `${now.getFullYear()}-${String(now.getMonth() + 2).padStart(2, '0')}`];
     Promise.all(months.map(m => fetch(`/api/bookings?month=${m}`).then(r => r.json()))).then(results => {
-      const all = results.flat() as Array<{ status: string; is_pencil?: number; booking_date: string; studio_rate?: string }>;
-      // Equipment-only bookings don't occupy the studio, so they shouldn't show as booked on the calendar
-      setBookedDates(all.filter(b => b.status !== 'cancelled' && !b.is_pencil && b.studio_rate !== 'equipment_only').map(b => b.booking_date));
+      const all = results.flat() as Array<{ status: string; is_pencil?: number; booking_date: string; studio_rate?: string; occupied_dates?: string[] }>;
+      // Equipment-only bookings don't occupy the studio, so they shouldn't show as booked.
+      // Use occupied_dates (exact booking_days, excludes equipment-only) instead of just
+      // booking_date so every day of a multi-day booking is reflected, not just the first.
+      setBookedDates(all.filter(b => b.status !== 'cancelled' && !b.is_pencil).flatMap(b => b.occupied_dates ?? [b.booking_date]));
     });
     fetch('/api/blockout').then(r => r.json()).then((bs: { date: string }[]) => setBlockoutDates(bs.map(b => b.date)));
 

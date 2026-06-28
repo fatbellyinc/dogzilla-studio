@@ -60,13 +60,16 @@ export default function BookingsPage() {
   }
 
   const visitDates = new Set(visits.filter(v => v.purpose !== 'cancelled').map(v => v.visit_date));
+  // Use each booking's exact occupied_dates (from booking_days) rather than expanding the
+  // booking_date→end_date range — that range-fill wrongly marked gap days as booked for
+  // non-consecutive multi-day bookings, and equipment-only rentals don't occupy the studio at all.
   const confirmedDates = new Set(
     bookings.filter(b => b.status !== 'cancelled' && !b.is_pencil)
-      .flatMap(b => expandDates(b.booking_date, b.end_date))
+      .flatMap(b => b.occupied_dates ?? expandDates(b.booking_date, b.end_date))
   );
   const pencilDates = new Set(
     bookings.filter(b => b.status !== 'cancelled' && b.is_pencil)
-      .flatMap(b => expandDates(b.booking_date, b.end_date))
+      .flatMap(b => b.occupied_dates ?? expandDates(b.booking_date, b.end_date))
   );
   const bookedDates = new Set([...confirmedDates, ...pencilDates]);
   const blockoutSet = new Set(blockouts.map(b => b.date));

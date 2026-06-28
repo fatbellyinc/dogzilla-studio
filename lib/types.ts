@@ -61,6 +61,8 @@ export interface Booking {
   notes: string | null;
   created_at: string;
   equipment?: BookingEquipment[];
+  /** Exact dates this booking occupies the studio (excludes equipment-only days/bookings). Set by GET /api/bookings. */
+  occupied_dates?: string[];
 }
 
 export interface BookingDay {
