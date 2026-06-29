@@ -8,6 +8,7 @@ import { Booking, BookingEquipment, Payment, Quotation, Invoice, BookingDay, STU
 import OverheadPanel from '@/components/OverheadPanel';
 import TimePicker from '@/components/TimePicker';
 import BookingEditor from '@/components/BookingEditor';
+import MultiDayPicker, { DayConfig } from '@/components/MultiDayPicker';
 
 interface BookingDetail {
   booking: Booking;
@@ -292,6 +293,11 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
   const [allClients, setAllClients] = useState<{ id: number; name: string; company?: string }[]>([]);
   const [editingProject, setEditingProject] = useState(false);
   const [projectForm, setProjectForm] = useState({ project_name: '', production_house: '', shoot_type: '' });
+  const [editingDates, setEditingDates] = useState(false);
+  const [editDays, setEditDays] = useState<DayConfig[]>([]);
+  const [savingDates, setSavingDates] = useState(false);
+  const [otherBookedDates, setOtherBookedDates] = useState<string[]>([]);
+  const [blockoutDates, setBlockoutDates] = useState<string[]>([]);
 
   const loadCrew = useCallback(() => { fetch(`/api/bookings/${id}/crew`).then(r => r.json()).then(setCrew); }, [id]);
   const load = () => fetch(`/api/bookings/${id}`).then(r => r.json()).then((d: BookingDetail) => {
@@ -309,6 +315,46 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
   });
 
   useEffect(() => { load(); loadCrew(); }, [id, loadCrew]);
+
+  function startEditDates() {
+    setEditDays((data!.bookingDays || []).map(d => ({
+      date: d.date,
+      day_type: d.day_type,
+      studio_rate: d.studio_rate as DayConfig['studio_rate'],
+      hours: d.hours,
+      subtotal: d.subtotal,
+    })));
+    // Load other bookings' dates (excluding this one) so the picker can warn about conflicts
+    const center = new Date((data!.booking.booking_date) + 'T00:00');
+    const months = [-1, 0, 1, 2].map(offset => {
+      const d = new Date(center.getFullYear(), center.getMonth() + offset, 1);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    });
+    Promise.all(months.map(m => fetch(`/api/bookings?month=${m}`).then(r => r.json()))).then(results => {
+      const all = results.flat() as Array<{ id: number; status: string; is_pencil?: number; occupied_dates?: string[]; booking_date: string }>;
+      setOtherBookedDates(all.filter(b => b.id !== Number(id) && b.status !== 'cancelled' && !b.is_pencil).flatMap(b => b.occupied_dates ?? [b.booking_date]));
+    });
+    fetch('/api/blockout').then(r => r.json()).then((bs: { date: string }[]) => setBlockoutDates(bs.map(b => b.date)));
+    setEditingDates(true);
+  }
+
+  async function saveDates() {
+    setSavingDates(true);
+    const res = await fetch(`/api/bookings/${id}/days`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ booking_days: editDays }),
+    });
+    setSavingDates(false);
+    if (res.status === 409) {
+      const err = await res.json();
+      toast.error(err.message || 'Date conflict');
+      return;
+    }
+    if (!res.ok) { toast.error('Failed to update dates'); return; }
+    setEditingDates(false);
+    await load();
+    toast.success('Booking dates updated');
+  }
 
   if (!data) return <div className="flex items-center justify-center h-64 text-white/30 pt-14 md:pt-0">Loading...</div>;
 
@@ -613,9 +659,33 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                 </div>
               ) : null}
               {booking.series_id && <SeriesPanel bookingId={Number(id)} seriesId={booking.series_id} />}
-              <div className="flex justify-between"><span className="text-white/40">Date</span>
-                <span className="text-white">{formatDate(booking.booking_date)}{booking.end_date && booking.end_date !== booking.booking_date ? ` – ${formatDate(booking.end_date)}` : ''}</span>
+              <div className="flex justify-between items-center">
+                <span className="text-white/40">Date</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-white">{formatDate(booking.booking_date)}{booking.end_date && booking.end_date !== booking.booking_date ? ` – ${formatDate(booking.end_date)}` : ''}</span>
+                  <button onClick={() => editingDates ? setEditingDates(false) : startEditDates()} className="text-xs text-[#E32726] hover:underline">
+                    {editingDates ? '✕' : '✏️ Edit'}
+                  </button>
+                </div>
               </div>
+
+              {editingDates && (
+                <div className="bg-[#0f0f0f] rounded-lg p-3 border border-[#E32726]/30 space-y-3">
+                  <MultiDayPicker
+                    days={editDays}
+                    onChange={setEditDays}
+                    bookedDates={otherBookedDates}
+                    blockoutDates={blockoutDates}
+                  />
+                  <div className="flex gap-2">
+                    <button onClick={saveDates} disabled={savingDates || editDays.length === 0}
+                      className="flex-1 bg-[#E32726] text-white text-xs py-1.5 rounded font-medium disabled:opacity-50">
+                      {savingDates ? 'Saving...' : 'Save Dates'}
+                    </button>
+                    <button onClick={() => setEditingDates(false)} className="text-xs text-white/40 hover:text-white px-3">Cancel</button>
+                  </div>
+                </div>
+              )}
 
               {/* Multi-day breakdown */}
               {bookingDays && bookingDays.length > 1 ? (
