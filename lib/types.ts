@@ -85,6 +85,8 @@ export interface BookingEquipment {
   item_type?: string;
   is_complimentary?: number;
   discount_pct?: number;
+  /** If set, this line item (e.g. an add-on like Electricity) applies to a specific shoot day rather than the whole booking. */
+  day_date?: string | null;
 }
 
 export interface Invoice {

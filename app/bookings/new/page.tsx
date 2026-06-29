@@ -17,6 +17,8 @@ interface SelectedItem {
   is_package: boolean;
   is_complimentary?: boolean;
   discount_pct?: number;
+  /** If set, this add-on (e.g. Electricity) applies to a specific shoot day rather than the whole booking. */
+  day_date?: string;
 }
 
 function RecurringPanel({ recurrence, recurrenceEnd, startDate, onChange }: {
@@ -139,6 +141,8 @@ function NewBookingForm() {
   const [blockoutDates, setBlockoutDates] = useState<string[]>([]);
   const [selectedItems, setSelectedItems] = useState<SelectedItem[]>([]);
   const [addonElecHours, setAddonElecHours] = useState(10);
+  // Which day new add-ons (electricity, holding areas, etc.) get tagged with, when there's more than one day
+  const [addonDay, setAddonDay] = useState('');
   const [discount, setDiscount] = useState({ type: '' as '' | 'percent' | 'fixed', value: '' });
   const [tab, setTab] = useState<'packages' | 'individual'>('packages');
   const [equipmentTab, setEquipmentTab] = useState<PackageCategory>('camera');
@@ -230,34 +234,48 @@ function NewBookingForm() {
     setSelectedItems(prev => prev.map(e => e.key === key ? { ...e, discount_pct: pct, is_complimentary: false } : e));
   }
 
+  // When there's more than one shoot day, add-ons get a composite key so the same
+  // add-on (e.g. Electricity) can be added separately per day instead of once for the whole booking.
+  const isMultiDay = bookingDays.length > 1;
+  const effectiveAddonDay = addonDay || bookingDays[0]?.date || '';
+  function addonKey(id: string, day?: string) {
+    return isMultiDay ? `${id}::${day || effectiveAddonDay}` : id;
+  }
+  function dayLabel(date: string) {
+    const idx = bookingDays.findIndex(d => d.date === date);
+    const d = new Date(date + 'T00:00');
+    return `Day ${idx + 1} — ${d.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}`;
+  }
+
   function toggleAddon(addon: typeof ADDON_ITEMS[number]) {
+    const key = addonKey(addon.id);
+    const day = isMultiDay ? effectiveAddonDay : undefined;
     setSelectedItems(prev => {
-      const existing = prev.find(e => e.key === addon.id);
-      if (existing) return prev.filter(e => e.key !== addon.id);
+      const existing = prev.find(e => e.key === key);
+      if (existing) return prev.filter(e => e.key !== key);
       // Electricity is per-hour — quantity = hours, rate = 600/hr
       const isElec = addon.id === 'ADD_ELEC';
       const rate = isElec ? 750 * addonElecHours : addon.price;
-      const name = isElec ? `Power Consumption` : addon.label;
-      return [...prev, { key: addon.id, name, rate, quantity: 1, is_package: false }];
+      const name = (isElec ? `Power Consumption` : addon.label) + (day ? ` — ${dayLabel(day)}` : '');
+      return [...prev, { key, name, rate, quantity: 1, is_package: false, day_date: day }];
     });
   }
 
   function updateElecHours(hrs: number) {
     const h = Math.max(1, hrs);
     setAddonElecHours(h);
+    const key = addonKey('ADD_ELEC');
+    const day = isMultiDay ? effectiveAddonDay : undefined;
     // Store as quantity=1, rate=total so summary shows cleanly
     const total = 750 * h;
+    const name = `Power Consumption` + (day ? ` — ${dayLabel(day)}` : '');
     setSelectedItems(prev => {
-      const exists = prev.find(e => e.key === 'ADD_ELEC');
+      const exists = prev.find(e => e.key === key);
       if (exists) {
-        return prev.map(e =>
-          e.key === 'ADD_ELEC'
-            ? { ...e, quantity: 1, rate: total, name: `Power Consumption` }
-            : e
-        );
+        return prev.map(e => e.key === key ? { ...e, quantity: 1, rate: total, name } : e);
       }
       // Auto-add
-      return [...prev, { key: 'ADD_ELEC', name: `Power Consumption`, rate: total, quantity: 1, is_package: false }];
+      return [...prev, { key, name, rate: total, quantity: 1, is_package: false, day_date: day }];
     });
   }
 
@@ -287,6 +305,7 @@ function NewBookingForm() {
         item_type: item.is_package ? 'package' : 'individual',
         is_complimentary: item.is_complimentary || false,
         discount_pct: item.discount_pct || 0,
+        day_date: item.day_date || null,
       }));
       const res = await fetch('/api/bookings', {
         method: 'POST',
@@ -564,10 +583,25 @@ function NewBookingForm() {
 
             {/* Add-ons */}
             <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4">
-              <h2 className="font-semibold text-white text-sm mb-3">Studio Add-ons</h2>
+              <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                <h2 className="font-semibold text-white text-sm">Studio Add-ons</h2>
+                {isMultiDay && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] text-white/40">Applying to:</span>
+                    <select value={effectiveAddonDay} onChange={e => {
+                      setAddonDay(e.target.value);
+                      const existingElec = selectedItems.find(i => i.key === addonKey('ADD_ELEC', e.target.value));
+                      setAddonElecHours(existingElec ? existingElec.rate / 750 : 10);
+                    }} className="bg-[#0f0f0f] border border-[#2a2a2a] rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-[#E32726]">
+                      {bookingDays.map(d => <option key={d.date} value={d.date}>{dayLabel(d.date)}</option>)}
+                    </select>
+                  </div>
+                )}
+              </div>
               <div className="grid grid-cols-2 gap-2">
                 {ADDON_ITEMS.map(addon => {
-                  const sel = selectedItems.find(e => e.key === addon.id);
+                  const key = addonKey(addon.id);
+                  const sel = selectedItems.find(e => e.key === key);
                   const isElec = addon.id === 'ADD_ELEC';
                   const qty = sel?.quantity || 1;
                   const effectivePrice = isElec ? addon.price * addonElecHours : addon.price * qty;
@@ -623,10 +657,10 @@ function NewBookingForm() {
                         </button>
                         {sel && (
                           <div className="flex items-center gap-1.5 mt-1.5">
-                            <span className="text-[10px] text-white/40">Qty (e.g. per day):</span>
-                            <button type="button" onClick={() => updateQty(addon.id, qty - 1)} className="w-5 h-5 bg-[#2a2a2a] rounded text-white text-xs">−</button>
+                            <span className="text-[10px] text-white/40">Qty:</span>
+                            <button type="button" onClick={() => updateQty(key, qty - 1)} className="w-5 h-5 bg-[#2a2a2a] rounded text-white text-xs">−</button>
                             <span className="text-xs text-white w-4 text-center font-bold">{qty}</span>
-                            <button type="button" onClick={() => updateQty(addon.id, qty + 1)} className="w-5 h-5 bg-[#2a2a2a] rounded text-white text-xs">+</button>
+                            <button type="button" onClick={() => updateQty(key, qty + 1)} className="w-5 h-5 bg-[#2a2a2a] rounded text-white text-xs">+</button>
                           </div>
                         )}
                       </div>
@@ -651,13 +685,13 @@ function NewBookingForm() {
                         <div className="flex gap-1 px-3 pb-2">
                           {(addon.id === 'ADD_HOLDING' ? [10, 20, 30, 40, 50] : [10, 20, 30]).map(pct => (
                             <button key={pct} type="button"
-                              onClick={() => setItemDiscount(addon.id, sel.discount_pct === pct ? 0 : pct)}
+                              onClick={() => setItemDiscount(key, sel.discount_pct === pct ? 0 : pct)}
                               className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${sel.discount_pct === pct ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' : 'text-white/30 border-white/10 hover:border-yellow-500/30 hover:text-yellow-400'}`}>
                               {pct}%
                             </button>
                           ))}
                           <button type="button"
-                            onClick={() => toggleComplimentary(addon.id)}
+                            onClick={() => toggleComplimentary(key)}
                             className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${sel.is_complimentary ? 'bg-green-500/20 text-green-400 border-green-500/30' : 'text-white/30 border-white/10 hover:border-green-500/30 hover:text-green-400'}`}>
                             🎁
                           </button>

@@ -15,9 +15,9 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
   // Replace all equipment for this booking
   db.prepare('DELETE FROM booking_equipment WHERE booking_id = ?').run(id);
-  const ins = db.prepare('INSERT INTO booking_equipment (booking_id, equipment_id, quantity, rate, name, item_type, is_complimentary, discount_pct) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+  const ins = db.prepare('INSERT INTO booking_equipment (booking_id, equipment_id, quantity, rate, name, item_type, is_complimentary, discount_pct, day_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
   for (const item of equipment_items || []) {
-    ins.run(id, item.equipment_id || null, item.quantity, item.rate, item.name, item.item_type || 'individual', item.is_complimentary ? 1 : 0, item.discount_pct || 0);
+    ins.run(id, item.equipment_id || null, item.quantity, item.rate, item.name, item.item_type || 'individual', item.is_complimentary ? 1 : 0, item.discount_pct || 0, item.day_date || null);
   }
 
   // Recalculate totals

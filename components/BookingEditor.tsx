@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { formatPHP } from '@/lib/utils';
-import { Equipment, BookingEquipment, STUDIO_RATES, CATEGORY_LABELS, EQUIPMENT_PACKAGES, ADDON_ITEMS } from '@/lib/types';
+import { Equipment, BookingEquipment, BookingDay, STUDIO_RATES, CATEGORY_LABELS, EQUIPMENT_PACKAGES, ADDON_ITEMS } from '@/lib/types';
 
 type PackageCat = keyof typeof EQUIPMENT_PACKAGES;
 
@@ -14,6 +14,8 @@ interface EditItem {
   is_complimentary: boolean;
   discount_pct: number;
   item_type: string;
+  /** If set, this add-on (e.g. Electricity) applies to a specific shoot day rather than the whole booking. */
+  day_date?: string | null;
 }
 
 const ELEC_RATE = 750; // ₱750/hr
@@ -43,11 +45,12 @@ interface Props {
   studioRate: string;
   callTime?: string | null;
   wrapTime?: string | null;
+  bookingDays?: BookingDay[];
   onSaved: () => void;
   onCancel: () => void;
 }
 
-export default function BookingEditor({ bookingId, currentEquipment, currentSubtotal, studioRate, callTime, wrapTime, onSaved, onCancel }: Props) {
+export default function BookingEditor({ bookingId, currentEquipment, currentSubtotal, studioRate, callTime, wrapTime, bookingDays = [], onSaved, onCancel }: Props) {
   const [items, setItems] = useState<EditItem[]>(() => {
     const mapped: EditItem[] = currentEquipment.map(e => {
       const item: EditItem = {
@@ -59,28 +62,46 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
         is_complimentary: !!e.is_complimentary,
         discount_pct: e.discount_pct || 0,
         item_type: e.item_type || 'individual',
+        day_date: e.day_date || undefined,
       };
       // Normalize old electricity name patterns → "Power Consumption"
-      if (item.name.toLowerCase().includes('electricity') || item.name === 'Power Consumption') {
-        item.name = 'Power Consumption';
-        item.key = 'ADD_ELEC'; // ensure key is canonical so isElecItem catches it
+      if (item.name.toLowerCase().includes('electricity') || item.name.startsWith('Power Consumption')) {
+        item.name = item.day_date ? `Power Consumption — ${item.day_date}` : 'Power Consumption';
+        item.key = item.day_date ? `ADD_ELEC::${item.day_date}` : 'ADD_ELEC'; // canonical so isElecItem catches it
       }
       return item;
     });
-    // Deduplicate electricity items — keep the one with the highest rate, drop the rest
+    // Deduplicate electricity items per day — keep the one with the highest rate within each day group
     const elecItems = mapped.filter(i => isElecItem(i));
-    if (elecItems.length > 1) {
-      const best = elecItems.reduce((a, b) => a.rate >= b.rate ? a : b);
-      return mapped.filter(i => !isElecItem(i) || i.key === best.key);
+    const byDay = new Map<string, EditItem[]>();
+    for (const i of elecItems) {
+      const k = i.day_date || '__none__';
+      if (!byDay.has(k)) byDay.set(k, []);
+      byDay.get(k)!.push(i);
     }
-    return mapped;
+    const keepKeys = new Set<string>();
+    for (const group of byDay.values()) keepKeys.add(group.reduce((a, b) => a.rate >= b.rate ? a : b).key);
+    return mapped.filter(i => !isElecItem(i) || keepKeys.has(i.key));
   });
 
-  // Electricity hours — prefer existing item's hours, then call/wrap times, then 14
+  const isMultiDay = bookingDays.length > 1;
+  const [addonDay, setAddonDay] = useState(bookingDays[0]?.date || '');
+  const effectiveAddonDay = addonDay || bookingDays[0]?.date || '';
+  function addonKey(id: string, day?: string) {
+    return isMultiDay ? `${id}::${day || effectiveAddonDay}` : id;
+  }
+  function dayShortLabel(date: string) {
+    const idx = bookingDays.findIndex(d => d.date === date);
+    const d = new Date(date + 'T00:00');
+    return `Day ${idx + 1} — ${d.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}`;
+  }
+
+  // Electricity hours — prefer the currently-selected day's existing item, then call/wrap times, then 14
   const autoHours = shootHoursFromTimes(callTime, wrapTime);
-  const existingElec = currentEquipment.find(e => isElecItem({ key: `existing-${e.id}`, name: e.name, rate: e.rate, quantity: e.quantity, equipment_id: undefined, is_complimentary: false, discount_pct: 0, item_type: '' }));
-  const defaultElecHours = existingElec ? Math.round(existingElec.rate / ELEC_RATE) : (autoHours ?? 14);
-  const [addonElecHours, setAddonElecHours] = useState(defaultElecHours);
+  const [addonElecHours, setAddonElecHours] = useState(() => {
+    const existingElec = items.find(i => i.key === addonKey('ADD_ELEC'));
+    return existingElec ? Math.round(existingElec.rate / ELEC_RATE) : (autoHours ?? 14);
+  });
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [tab, setTab] = useState<'packages' | 'individual' | 'addons' | 'manpower' | 'custom'>('packages');
   const [pkgCat, setPkgCat] = useState<PackageCat>('camera');
@@ -113,30 +134,45 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
   }
 
   function addAddon(addon: typeof ADDON_ITEMS[number]) {
-    const key = addon.id;
+    const key = addonKey(addon.id);
     if (addon.id === 'ADD_ELEC') {
       // Electricity: toggle or update hours; handled via separate UI — skip generic toggle
       return;
     }
     const existing = items.find(i => i.key === key);
     if (existing) { setItems(prev => prev.filter(i => i.key !== key)); return; }
-    setItems(prev => [...prev, { key, name: addon.label, rate: addon.price, quantity: 1, is_complimentary: false, discount_pct: 0, item_type: 'addon' }]);
+    const day = isMultiDay ? effectiveAddonDay : undefined;
+    const name = addon.label + (day ? ` — ${dayShortLabel(day)}` : '');
+    setItems(prev => [...prev, { key, name, rate: addon.price, quantity: 1, is_complimentary: false, discount_pct: 0, item_type: 'addon', day_date: day }]);
   }
 
   function updateElecHours(hrs: number) {
     const h = Math.max(1, hrs);
     setAddonElecHours(h);
+    const key = addonKey('ADD_ELEC');
+    const day = isMultiDay ? effectiveAddonDay : undefined;
     const total = h * ELEC_RATE;
-    const name = `Power Consumption`;
+    const name = `Power Consumption` + (day ? ` — ${dayShortLabel(day)}` : '');
     setItems(prev => {
-      const exists = prev.find(i => isElecItem(i));
-      if (exists) return prev.map(i => isElecItem(i) ? { ...i, rate: total, name } : i);
-      return [...prev, { key: 'ADD_ELEC', name, rate: total, quantity: 1, is_complimentary: false, discount_pct: 0, item_type: 'addon' }];
+      const exists = prev.find(i => i.key === key);
+      if (exists) return prev.map(i => i.key === key ? { ...i, rate: total, name } : i);
+      return [...prev, { key, name, rate: total, quantity: 1, is_complimentary: false, discount_pct: 0, item_type: 'addon', day_date: day }];
     });
   }
 
   function removeElec() {
-    setItems(prev => prev.filter(i => !isElecItem(i)));
+    const key = addonKey('ADD_ELEC');
+    setItems(prev => prev.filter(i => i.key !== key));
+  }
+
+  // Updates a specific electricity line item by its own key — used in the "Current Items" list,
+  // where multiple per-day electricity rows can coexist and each must be edited independently
+  // of whichever day is currently selected in the "Add Items" picker below.
+  function updateElecHoursForItem(key: string, hrs: number) {
+    const h = Math.max(1, hrs);
+    const total = h * ELEC_RATE;
+    setItems(prev => prev.map(i => i.key === key ? { ...i, rate: total } : i));
+    if (key === addonKey('ADD_ELEC')) setAddonElecHours(h);
   }
 
   function addCustom() {
@@ -171,6 +207,7 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
       item_type: i.item_type,
       is_complimentary: i.is_complimentary,
       discount_pct: i.discount_pct,
+      day_date: i.day_date || null,
     }));
     await fetch(`/api/bookings/${bookingId}/equipment`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ equipment_items, studio_subtotal: studioSubtotal }) });
     setSaving(false);
@@ -229,23 +266,23 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
                   <div key={item.key} className="bg-[#0f0f0f] rounded-lg p-2 space-y-1.5 border border-yellow-500/20">
                     <div className="flex items-center gap-2">
                       {moveButtons}
-                      <span className="text-xs text-yellow-400 flex-1 font-medium">⚡ Power Consumption</span>
+                      <span className="text-xs text-yellow-400 flex-1 font-medium">{item.name}</span>
                       <span className="text-xs text-[#E32726] font-bold">{formatPHP(item.rate)}</span>
-                      <button onClick={removeElec} className="text-white/20 hover:text-red-400 text-xs">✕</button>
+                      <button onClick={() => removeItem(item.key)} className="text-white/20 hover:text-red-400 text-xs">✕</button>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-[10px] text-white/40">Hours:</span>
-                      <button onClick={() => updateElecHours(itemElecHours - 1)} className="w-5 h-5 bg-[#2a2a2a] rounded text-white text-xs">−</button>
+                      <button onClick={() => updateElecHoursForItem(item.key, itemElecHours - 1)} className="w-5 h-5 bg-[#2a2a2a] rounded text-white text-xs">−</button>
                       <input
                         type="number" min={1}
                         value={itemElecHours}
-                        onChange={e => updateElecHours(Number(e.target.value) || 1)}
+                        onChange={e => updateElecHoursForItem(item.key, Number(e.target.value) || 1)}
                         className="w-12 bg-[#1a1a1a] border border-[#2a2a2a] rounded px-1.5 py-0.5 text-xs text-white text-center focus:outline-none focus:border-[#E32726]"
                       />
-                      <button onClick={() => updateElecHours(itemElecHours + 1)} className="w-5 h-5 bg-[#2a2a2a] rounded text-white text-xs">+</button>
+                      <button onClick={() => updateElecHoursForItem(item.key, itemElecHours + 1)} className="w-5 h-5 bg-[#2a2a2a] rounded text-white text-xs">+</button>
                       <span className="text-[10px] text-white/30">× ₱{ELEC_RATE}/hr</span>
                       {autoHours && (
-                        <button onClick={() => updateElecHours(autoHours)}
+                        <button onClick={() => updateElecHoursForItem(item.key, autoHours)}
                           className="text-[10px] text-green-400/70 hover:text-green-400 border border-green-500/20 px-1.5 py-0.5 rounded transition-colors">
                           ↺ {autoHours}h from times
                         </button>
@@ -425,9 +462,22 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
 
         {tab === 'addons' && (
           <div className="space-y-1.5">
+            {isMultiDay && (
+              <div className="flex items-center gap-1.5 mb-1">
+                <span className="text-[10px] text-white/40">Applying to:</span>
+                <select value={effectiveAddonDay} onChange={e => {
+                  setAddonDay(e.target.value);
+                  const existing = items.find(i => i.key === addonKey('ADD_ELEC', e.target.value));
+                  setAddonElecHours(existing ? Math.round(existing.rate / ELEC_RATE) : (autoHours ?? 14));
+                }} className="bg-[#0f0f0f] border border-[#2a2a2a] rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-[#E32726]">
+                  {bookingDays.map(d => <option key={d.date} value={d.date}>{dayShortLabel(d.date)}</option>)}
+                </select>
+              </div>
+            )}
             {/* Electricity — special hours-based UI */}
             {(() => {
-              const hasElec = items.some(i => isElecItem(i));
+              const elecKey = addonKey('ADD_ELEC');
+              const hasElec = items.some(i => i.key === elecKey);
               return (
                 <div className={`p-2.5 rounded-lg border text-xs ${hasElec ? 'border-yellow-500/30 bg-yellow-500/5' : 'border-[#2a2a2a]'}`}>
                   <div className="flex items-center justify-between mb-1.5">
@@ -465,7 +515,7 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
             {/* Other addons (non-electricity) */}
             <div className="grid grid-cols-2 gap-1.5">
               {ADDON_ITEMS.filter(a => a.id !== 'ADD_ELEC').map(addon => {
-                const sel = items.find(i => i.key === addon.id);
+                const sel = items.find(i => i.key === addonKey(addon.id));
                 return (
                   <button key={addon.id} type="button" onClick={() => addAddon(addon)}
                     className={`text-left p-2.5 rounded-lg border text-xs transition-all ${sel ? 'border-[#E32726] bg-[#E32726]/10' : 'border-[#2a2a2a] hover:border-[#3a3a3a]'}`}>

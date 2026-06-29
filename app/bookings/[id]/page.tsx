@@ -787,6 +787,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
               studioRate={booking.studio_rate}
               callTime={callTime}
               wrapTime={wrapTime}
+              bookingDays={bookingDays}
               onSaved={() => { setEditingItems(false); load(); }}
               onCancel={() => setEditingItems(false)}
             />
