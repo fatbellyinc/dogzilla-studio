@@ -344,7 +344,7 @@ function DocView({ bookingId }: { bookingId: string }) {
             '50% non-refundable deposit required to confirm booking. Balance settled after shoot.',
             'Cancellation: 1-week notice required. Rescheduling: postponement fee applies within 1 month of original date.',
             'Equipment list must be submitted before production day.',
-            'Client supplies generator. No-generator shoots: +₱750/hr electricity charge.',
+            'Client supplies generator. No-generator shoots: +₱850/hr electricity charge.',
             'Overtime billed at ₱3,500/hr. Egress begins at wrap; filming during egress billed as studio time.',
             'Clients are billed for any damage to facility or equipment during their session.',
             'Multi-day bookings: hours are fixed per date, non-transferable across days.',

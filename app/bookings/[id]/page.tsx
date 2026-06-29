@@ -247,7 +247,7 @@ function ShootTimesPanel({ callTime, wrapTime, wrapDate, studioRate, bookingDate
 
       {ct && wt && ot.durationHrs > 0 && (
         <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg px-3 py-2 text-[10px] text-yellow-400">
-          ⚡ Electricity auto-update: {ot.durationHrs.toFixed(1)}hrs × ₱750 = <strong>{formatPHP(Math.round(ot.durationHrs * 750))}</strong> — saved when you click Save Times
+          ⚡ Electricity auto-update: {ot.durationHrs.toFixed(1)}hrs × ₱850 = <strong>{formatPHP(Math.round(ot.durationHrs * 850))}</strong> — saved when you click Save Times
         </div>
       )}
       {(!ct || !wt) && (
@@ -448,7 +448,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
       if (hrs > 0) {
         const hasElec = equipment.some(e => e.name.toLowerCase().includes('electricity'));
         if (hasElec) {
-          const newRate = Math.round(hrs * 750);
+          const newRate = Math.round(hrs * 850);
           const updatedItems = equipment.map(e =>
             e.name.toLowerCase().includes('electricity')
               ? { ...e, rate: newRate, name: 'Power Consumption', quantity: 1 }

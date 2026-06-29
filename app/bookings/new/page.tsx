@@ -7,6 +7,7 @@ import { Client } from '@/lib/types';
 import MultiDayPicker, { DayConfig } from '@/components/MultiDayPicker';
 
 type PackageCategory = keyof typeof EQUIPMENT_PACKAGES;
+const ELEC_RATE = 850; // ₱850/hr
 
 interface SelectedItem {
   key: string;
@@ -253,9 +254,9 @@ function NewBookingForm() {
     setSelectedItems(prev => {
       const existing = prev.find(e => e.key === key);
       if (existing) return prev.filter(e => e.key !== key);
-      // Electricity is per-hour — quantity = hours, rate = 600/hr
+      // Electricity is per-hour — quantity = hours, rate = ELEC_RATE/hr
       const isElec = addon.id === 'ADD_ELEC';
-      const rate = isElec ? 750 * addonElecHours : addon.price;
+      const rate = isElec ? ELEC_RATE * addonElecHours : addon.price;
       const name = (isElec ? `Power Consumption` : addon.label) + (day ? ` — ${dayLabel(day)}` : '');
       return [...prev, { key, name, rate, quantity: 1, is_package: false, day_date: day }];
     });
@@ -267,7 +268,7 @@ function NewBookingForm() {
     const key = addonKey('ADD_ELEC');
     const day = isMultiDay ? effectiveAddonDay : undefined;
     // Store as quantity=1, rate=total so summary shows cleanly
-    const total = 750 * h;
+    const total = ELEC_RATE * h;
     const name = `Power Consumption` + (day ? ` — ${dayLabel(day)}` : '');
     setSelectedItems(prev => {
       const exists = prev.find(e => e.key === key);
@@ -591,7 +592,7 @@ function NewBookingForm() {
                     <select value={effectiveAddonDay} onChange={e => {
                       setAddonDay(e.target.value);
                       const existingElec = selectedItems.find(i => i.key === addonKey('ADD_ELEC', e.target.value));
-                      setAddonElecHours(existingElec ? existingElec.rate / 750 : 10);
+                      setAddonElecHours(existingElec ? existingElec.rate / ELEC_RATE : 10);
                     }} className="bg-[#0f0f0f] border border-[#2a2a2a] rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-[#E32726]">
                       {bookingDays.map(d => <option key={d.date} value={d.date}>{dayLabel(d.date)}</option>)}
                     </select>
@@ -622,8 +623,8 @@ function NewBookingForm() {
                               <div className="text-white/30 text-xs mt-0.5">{addon.description}</div>
                             </div>
                             <div className="text-right">
-                              <div className="text-[#E32726] text-sm font-black">{formatPHP(addonElecHours * 750)}</div>
-                              <div className="text-white/40 text-[10px]">₱750 × {addonElecHours}hrs</div>
+                              <div className="text-[#E32726] text-sm font-black">{formatPHP(addonElecHours * ELEC_RATE)}</div>
+                              <div className="text-white/40 text-[10px]">₱{ELEC_RATE} × {addonElecHours}hrs</div>
                             </div>
                           </div>
                           {/* Hours — clicking any button adds to total */}

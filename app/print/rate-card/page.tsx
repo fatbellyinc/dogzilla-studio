@@ -126,7 +126,7 @@ export default function RateCardPage() {
             'Balance due on shoot day before session begins',
             'Overtime billed at ₱3,500/hr after included hours',
             'Full Day: 14-hr shoot + 1hr free ingress/egress',
-            'No-generator shoots: +₱750/hr electricity charge',
+            'No-generator shoots: +₱850/hr electricity charge',
             'Cancellation: 1-week notice required',
             'Client responsible for damage to facility/equipment',
             'All rates VAT-exclusive · 12% VAT applies',

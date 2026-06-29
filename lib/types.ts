@@ -204,7 +204,7 @@ export const EQUIPMENT_PACKAGES = {
 
 export const ADDON_ITEMS = [
   { id: 'ADD_HOLDING', label: 'Additional Holding Areas', price: 12500, description: 'Extra rooms with restrooms for larger productions' },
-  { id: 'ADD_ELEC', label: 'Electricity Charge', price: 750, description: '₱750/hr — no-generator shoots. Subject to wattage load', perHour: true },
+  { id: 'ADD_ELEC', label: 'Electricity Charge', price: 850, description: '₱850/hr — no-generator shoots. Subject to wattage load', perHour: true },
   { id: 'ADD_TABLES', label: 'Tables & Chairs', price: 2500, description: '8 tables + 40 chairs. Set up before call' },
   { id: 'ADD_WATER', label: 'Water Dispenser', price: 500, description: 'Includes 2 bottles. Extra at ₱75 each' },
   { id: 'ADD_INTERCOM', label: 'Intercom (Hollyland Solidcom SE 8S)', price: 6500, description: 'Full-duplex wireless intercom, 8 headsets' },

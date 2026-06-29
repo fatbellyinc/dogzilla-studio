@@ -18,10 +18,10 @@ interface EditItem {
   day_date?: string | null;
 }
 
-const ELEC_RATE = 750; // ₱750/hr
+const ELEC_RATE = 850; // ₱850/hr
 
 function elecHoursFromItem(item: EditItem): number {
-  // Derive hours from stored rate (rate = hours * 750)
+  // Derive hours from stored rate (rate = hours * ELEC_RATE)
   return item.rate > 0 ? Math.round(item.rate / ELEC_RATE) : 1;
 }
 
