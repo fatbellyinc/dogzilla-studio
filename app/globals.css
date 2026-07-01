@@ -25,6 +25,19 @@ body {
 @media print {
   .no-print { display: none !important; }
 
+  /* The app shell (layout.tsx) makes html/body height:100% with overflow:hidden,
+     and <main> scrolls internally with overflow-y:auto, so the print engine only
+     ever sees one viewport-height page of content. Reset all of them so the
+     document can flow across as many pages as it needs. */
+  html, body {
+    height: auto !important;
+    overflow: visible !important;
+  }
+  main {
+    overflow: visible !important;
+    height: auto !important;
+  }
+
   /* Flatten the gray shell — it's screen-only chrome */
   .doc-shell {
     background: white !important;
