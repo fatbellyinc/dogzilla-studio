@@ -402,6 +402,8 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
           <div>
             <div style={{ borderTop: '1px solid #ccc', paddingTop: '6px', fontSize: '11px', color: '#888' }}>
               <div style={{ fontWeight: 600, color: '#333' }}>Issued by</div>
+              <div style={{ height: '32px' }} />
+              <div style={{ color: '#333' }}>Alberto Monteras II</div>
               <div>Dogzilla Studio Management</div>
             </div>
           </div>
