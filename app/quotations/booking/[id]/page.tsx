@@ -130,10 +130,10 @@ function DocView({ bookingId }: { bookingId: string }) {
   return (
     <>
       <div className="doc-shell" style={{ background: '#d1d5db', minHeight: '100vh', padding: '32px 16px', display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
-        <div className="doc-page" style={{ color: '#111', fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '13px', background: 'white', width: '100%', maxWidth: '794px', padding: '48px', boxShadow: '0 4px 24px rgba(0,0,0,0.18)' }}>
+        <div className="doc-page" style={{ color: '#111', fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '13px', background: 'white', width: '100%', maxWidth: '794px', boxShadow: '0 4px 24px rgba(0,0,0,0.18)' }}>
 
       {/* Header — kept together on page 1 */}
-      <div className="doc-header" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', borderBottom: '3px solid #E32726', marginBottom: '24px', paddingBottom: '20px' }}>
+      <div className="doc-header doc-header-row" style={{ borderBottom: '3px solid #E32726', marginBottom: '24px', paddingBottom: '20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.png" alt="Dogzilla Studio" style={{ width: '90px', height: '90px', objectFit: 'contain', display: 'block', flexShrink: 0 }} />
@@ -147,7 +147,7 @@ function DocView({ bookingId }: { bookingId: string }) {
             </div>
           </div>
         </div>
-        <div style={{ textAlign: 'right' }}>
+        <div className="doc-header-right" style={{ textAlign: 'right' }}>
           <div style={{ fontSize: '22px', fontWeight: 900, color: '#111', textTransform: 'uppercase' }}>
             {isInvoice ? 'Invoice' : 'Quotation'}
           </div>
@@ -161,7 +161,7 @@ function DocView({ bookingId }: { bookingId: string }) {
       </div>
 
       {/* Client & Shoot */}
-      <div className="grid grid-cols-2 gap-6 mb-6">
+      <div className="doc-2col">
         <div>
           <div style={{ fontSize: '10px', fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '6px' }}>Bill To</div>
           <div style={{ fontWeight: 700, fontSize: '15px' }}>{booking.client_name}</div>
@@ -210,6 +210,7 @@ function DocView({ bookingId }: { bookingId: string }) {
       </div>
 
       {/* Line items table */}
+      <div className="doc-table-scroll">
       <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '16px' }}>
         <thead>
           <tr style={{ background: '#0f0f0f', color: 'white' }}>
@@ -246,10 +247,11 @@ function DocView({ bookingId }: { bookingId: string }) {
           ))}
         </tbody>
       </table>
+      </div>{/* end doc-table-scroll */}
 
       {/* Totals */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '20px' }}>
-        <table style={{ width: '280px', borderCollapse: 'collapse', fontSize: '13px' }}>
+      <div className="doc-totals">
+        <table style={{ borderCollapse: 'collapse', fontSize: '13px' }}>
           <tbody>
             <tr>
               <td style={{ padding: '4px 10px', color: '#888' }}>Regular Price</td>

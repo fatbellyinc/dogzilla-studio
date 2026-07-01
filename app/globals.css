@@ -64,3 +64,80 @@ body {
   /* 15 mm top/bottom, 12 mm sides — matches the 794 px screen width at 96 dpi */
   margin: 15mm 12mm;
 }
+
+/* ── Document responsive layout ──────────────────────────────── */
+
+/* Padding lives here so mobile media query can override it */
+.doc-page {
+  padding: 48px;
+}
+
+/* Horizontal shell scroll guard on small screens */
+.doc-shell {
+  overflow-x: hidden;
+}
+
+/* Header row: logo-left + doc-type-right */
+.doc-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+/* Two-column info grid (Bill To / Shoot Details) */
+.doc-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-bottom: 20px;
+}
+
+/* Scrollable table wrapper */
+.doc-table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Totals block — right-aligned on wide, full-width on narrow */
+.doc-totals {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 20px;
+}
+.doc-totals table {
+  width: 320px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+@media (max-width: 620px) {
+  .doc-page {
+    padding: 20px 14px;
+  }
+
+  .doc-shell {
+    padding: 16px 8px !important;
+  }
+
+  /* Stack header vertically; left-align doc number block */
+  .doc-header-row {
+    flex-direction: column;
+    gap: 12px;
+  }
+  .doc-header-row .doc-header-right {
+    text-align: left !important;
+  }
+
+  /* Single column on phones */
+  .doc-2col {
+    grid-template-columns: 1fr;
+  }
+
+  /* Let totals table take full width instead of fixed 280/320px */
+  .doc-totals {
+    justify-content: stretch;
+  }
+  .doc-totals table {
+    width: 100%;
+  }
+}

@@ -111,10 +111,10 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
     <>
       {/* Gray shell — screen only; flattened to white in print */}
       <div className="doc-shell" style={{ background: '#d1d5db', minHeight: '100vh', padding: '32px 16px', display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
-        <div className="doc-page" style={{ ...docStyle, background: 'white', width: '100%', maxWidth: '794px', padding: '48px', boxShadow: '0 4px 24px rgba(0,0,0,0.18)' }}>
+        <div className="doc-page" style={{ ...docStyle, background: 'white', width: '100%', maxWidth: '794px', boxShadow: '0 4px 24px rgba(0,0,0,0.18)' }}>
 
       {/* Header — kept together on page 1 */}
-      <div className="doc-header" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', borderBottom: '3px solid #E32726', marginBottom: '24px', paddingBottom: '20px' }}>
+      <div className="doc-header doc-header-row" style={{ borderBottom: '3px solid #E32726', marginBottom: '24px', paddingBottom: '20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.png" alt="Dogzilla Studio" style={{ width: '90px', height: '90px', objectFit: 'contain', display: 'block', flexShrink: 0 }} />
@@ -128,7 +128,7 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
             </div>
           </div>
         </div>
-        <div style={{ textAlign: 'right' }}>
+        <div className="doc-header-right" style={{ textAlign: 'right' }}>
           <div style={{ fontSize: '22px', fontWeight: 900, color: '#111' }}>INVOICE</div>
           <div style={{ marginTop: '6px', color: '#555', lineHeight: '1.8', fontSize: '12px' }}>
             <div><strong>Invoice No.</strong> {invoiceNumber}</div>
@@ -155,7 +155,7 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
       </div>
 
       {/* Client & Shoot */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '20px' }}>
+      <div className="doc-2col">
         <div>
           <div style={{ fontSize: '10px', fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '6px' }}>Billed To</div>
           <div style={{ fontWeight: 700, fontSize: '15px' }}>{booking.client_name}</div>
@@ -209,6 +209,7 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
       </div>
 
       {/* Line items */}
+      <div className="doc-table-scroll">
       <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '16px' }}>
         <thead>
           <tr style={{ background: '#0f0f0f', color: 'white' }}>
@@ -238,10 +239,11 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
           ))}
         </tbody>
       </table>
+      </div>{/* end doc-table-scroll */}
 
       {/* Totals */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '20px' }}>
-        <table style={{ width: '320px', borderCollapse: 'collapse', fontSize: '13px' }}>
+      <div className="doc-totals">
+        <table style={{ borderCollapse: 'collapse', fontSize: '13px' }}>
           <tbody>
             <tr>
               <td style={{ padding: '4px 10px', color: '#888' }}>Regular Price</td>
