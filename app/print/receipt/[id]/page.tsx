@@ -50,6 +50,8 @@ export default function ReceiptPage({ params }: { params: Promise<{ id: string }
         <div style={{ fontSize: '10px', color: '#888', letterSpacing: '2px' }}>{receiptTitle}</div>
         <div style={{ fontSize: '11px', color: '#555', marginTop: '4px' }}>102 7th St Grace Park, Caloocan City</div>
         <div style={{ fontSize: '11px', color: '#555' }}>{STUDIO_WHATSAPP} · dogzillastudiorental@gmail.com</div>
+        <div style={{ fontSize: '10px', color: '#333', fontWeight: 700, marginTop: '4px' }}>ALBERTO C. MONTERAS II - Prop.</div>
+        <div style={{ fontSize: '10px', color: '#555' }}>VAT Reg. TIN: 238-839-234-00001</div>
       </div>
 
       {/* Receipt number & date */}

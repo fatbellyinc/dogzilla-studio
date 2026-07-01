@@ -18,6 +18,9 @@ export default function RateCardPage() {
           <div style={{ fontSize: '10px', color: '#555', marginTop: '6px', lineHeight: '1.6' }}>
             102 7th St, Grace Park, Caloocan City &nbsp;·&nbsp; +63 939 933 8732 &nbsp;·&nbsp; dogzillastudiorental@gmail.com
           </div>
+          <div style={{ fontSize: '10px', color: '#333', fontWeight: 700, marginTop: '2px' }}>
+            ALBERTO C. MONTERAS II - Prop. &nbsp;·&nbsp; VAT Reg. TIN: 238-839-234-00001
+          </div>
         </div>
         <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
           <div style={{ fontSize: '12px', fontWeight: 700, color: '#888' }}>RATE CARD</div>

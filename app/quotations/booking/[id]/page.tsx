@@ -193,6 +193,8 @@ function DocView({ bookingId }: { bookingId: string }) {
               <div>102 7th St, Grace Park, Caloocan City</div>
               <div>dogzillastudiorental@gmail.com · +63 939 933 8732</div>
               <div>www.dogzillafilms.com</div>
+              <div style={{ fontWeight: 700, color: '#333', marginTop: '4px' }}>ALBERTO C. MONTERAS II - Prop.</div>
+              <div>VAT Reg. TIN: 238-839-234-00001</div>
             </div>
           </div>
         </div>

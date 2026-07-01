@@ -211,6 +211,7 @@ export default function BIRInvoicePage({ params }: { params: Promise<{ id: strin
             <div style={{ fontSize: '16px', fontWeight: 900, textTransform: 'uppercase' }}>DOGZILLA FILM PRODUCTION</div>
             <div style={{ fontSize: '10px', color: '#555' }}>102 7th St. Barangay 89 Grace Park 1400 City of Caloocan NCR, Third District Philippines</div>
             <div style={{ fontSize: '11px', fontWeight: 700, marginTop: '2px' }}>ALBERTO C. MONTERAS II - Prop.</div>
+            <div style={{ fontSize: '10px' }}>VAT Reg. TIN: 238-839-234-00001</div>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', alignItems: 'center' }}>
             <div style={{ fontSize: '16px', fontWeight: 900, textTransform: 'uppercase' }}>ACKNOWLEDGEMENT RECEIPT</div>
