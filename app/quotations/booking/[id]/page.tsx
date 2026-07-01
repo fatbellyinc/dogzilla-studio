@@ -4,6 +4,7 @@ import { useSearchParams } from 'next/navigation';
 import { formatPHP, formatDate, fmt24, calcOT, OT_RATE } from '@/lib/utils';
 import { Booking, BookingEquipment, Quotation, BookingDay, Payment, STUDIO_RATES, VAT_RATE, PAYMENT_ACCOUNTS } from '@/lib/types';
 import ShareDocBar from '@/components/ShareDocBar';
+import * as XLSX from 'xlsx';
 
 interface BookingDetail {
   booking: Booking;
@@ -126,6 +127,54 @@ function DocView({ bookingId }: { bookingId: string }) {
   const totalSavings = regularPrice - subtotalExVAT;
 
   const docNumber = quotation?.quote_number || `DZB-${String(booking.id).padStart(4, '0')}`;
+
+  function exportWord() {
+    const page = document.querySelector('.doc-page') as HTMLElement | null;
+    if (!page) return;
+    const html = page.innerHTML;
+    const blob = new Blob(['﻿', `
+<html xmlns:o="urn:schemas-microsoft-com:office:office"
+      xmlns:w="urn:schemas-microsoft-com:office:word"
+      xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="utf-8"/><title>${docNumber}</title>
+<style>
+  body { font-family: Arial, sans-serif; font-size: 11pt; color: #111; margin: 2cm; }
+  table { border-collapse: collapse; width: 100%; }
+  td, th { padding: 5px 8px; font-size: 10pt; }
+  img { width: 70pt; height: 70pt; }
+  .no-print { display: none; }
+</style>
+</head><body>${html}</body></html>`], { type: 'application/msword' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `${document.title}.doc`; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function exportExcel() {
+    const rows = [
+      ['DOGZILLA STUDIO — QUOTATION', '', '', '', ''],
+      [`Quote No: ${docNumber}`, '', 'Date:', formatDate(quotation?.created_at || new Date().toISOString()), ''],
+      [`Client: ${booking.client_name}`, '', 'Booking #:', String(booking.id), ''],
+      [`Shoot Date: ${formatDate(booking.booking_date)}`, '', '', '', ''],
+      ['', '', '', '', ''],
+      ['Description', 'Qty', 'Unit Price', 'Disc.', 'Amount'],
+      ...lines.map(l => [l.desc, l.qty, l.comp ? 0 : l.unit, l.comp ? '100%' : l.disc ? `${l.disc}%` : '', l.comp ? 0 : l.total]),
+      ['', '', '', '', ''],
+      ['Regular Price', '', '', '', regularPrice],
+      totalSavings > 0 ? ['Client Saves', '', '', '', -totalSavings] : null,
+      ['Subtotal (VAT-exclusive)', '', '', '', subtotalExVAT],
+      vatExempt ? ['VAT Exempt', '', '', '', 0] : ['VAT 12%', '', '', '', vatAmount],
+      ['TOTAL (VAT-inclusive)', '', '', '', totalIncVAT],
+      !booking.no_deposit ? ['50% Deposit Required', '', '', '', depositAmount] : null,
+      !booking.no_deposit ? ['Balance Due on Shoot Day', '', '', '', balanceDue] : null,
+    ].filter(Boolean) as (string | number)[][];
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols'] = [{ wch: 40 }, { wch: 6 }, { wch: 14 }, { wch: 8 }, { wch: 14 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Quotation');
+    XLSX.writeFile(wb, `${document.title}.xlsx`);
+  }
 
   return (
     <>
@@ -389,12 +438,18 @@ function DocView({ bookingId }: { bookingId: string }) {
 
       {/* Buttons live outside the captured area */}
       <ShareDocBar bookingId={booking.id} docType="quotation" clientName={booking.client_name || ''} clientPhone={booking.client_phone} clientEmail={booking.client_email} docNumber={docNumber} />
-      <div className="no-print fixed bottom-6 right-6 flex gap-2">
+      <div className="no-print fixed bottom-6 right-6 flex gap-2 flex-wrap justify-end">
         <button onClick={loadData} className="bg-[#2a2a2a] text-white px-4 py-2.5 rounded-lg font-semibold shadow-xl hover:bg-[#3a3a3a] transition-colors text-sm">
           🔄 Refresh
         </button>
+        <button onClick={exportExcel} className="bg-[#1d6f42] text-white px-4 py-2.5 rounded-lg font-semibold shadow-xl hover:bg-[#155c36] transition-colors text-sm">
+          📊 Excel
+        </button>
+        <button onClick={exportWord} className="bg-[#2b579a] text-white px-4 py-2.5 rounded-lg font-semibold shadow-xl hover:bg-[#1e3f6f] transition-colors text-sm">
+          📄 Word
+        </button>
         <button onClick={() => window.print()} className="bg-[#E32726] text-white px-5 py-2.5 rounded-lg font-semibold shadow-xl hover:bg-[#c41f1e] transition-colors text-sm">
-          🖨️ Print / Save PDF
+          🖨️ Print / PDF
         </button>
       </div>
     </>

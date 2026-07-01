@@ -31,6 +31,8 @@ body {
     padding: 0 !important;
     min-height: 0 !important;
     display: block !important;
+    /* CRITICAL: overflow:hidden clips print content to one page */
+    overflow: visible !important;
   }
 
   /* Strip the card look; @page margin becomes the PDF margin */
@@ -41,6 +43,12 @@ body {
     margin: 0 !important;
     box-shadow: none !important;
     min-height: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* Table scroll wrapper must be transparent in print */
+  .doc-table-scroll {
+    overflow: visible !important;
   }
 
   body { background: white !important; color: black !important; }
@@ -49,7 +57,7 @@ body {
 
   /* Multi-page table behaviour */
   table  { page-break-inside: auto; }
-  tr     { page-break-inside: avoid; }
+  tr     { page-break-inside: avoid; page-break-after: auto; }
   thead  { display: table-header-group; }
 
   /* Keep the doc header together on the first page */
@@ -72,11 +80,6 @@ body {
   padding: 48px;
 }
 
-/* Horizontal shell scroll guard on small screens */
-.doc-shell {
-  overflow-x: hidden;
-}
-
 /* Header row: logo-left + doc-type-right */
 .doc-header-row {
   display: flex;
@@ -92,10 +95,9 @@ body {
   margin-bottom: 20px;
 }
 
-/* Scrollable table wrapper */
+/* Scrollable table wrapper — scroll only on small screens, transparent on desktop & print */
 .doc-table-scroll {
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
+  /* no overflow on desktop — table fits at 794px */
 }
 
 /* Totals block — right-aligned on wide, full-width on narrow */
@@ -131,6 +133,12 @@ body {
   /* Single column on phones */
   .doc-2col {
     grid-template-columns: 1fr;
+  }
+
+  /* Table scrolls horizontally on phones */
+  .doc-table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   /* Let totals table take full width instead of fixed 280/320px */
