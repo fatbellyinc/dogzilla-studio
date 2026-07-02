@@ -141,7 +141,7 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
       ...lines.map(l => [l.desc, l.qty, l.comp ? 0 : l.unit, l.comp ? '100%' : l.disc ? `${l.disc}%` : '', l.comp ? 0 : l.total]),
       ['', '', '', '', ''],
       ['Regular Price', '', '', '', regularPrice],
-      totalSavings > 0 ? ['Client Saves', '', '', '', -totalSavings] : null,
+      totalSavings > 0 ? ['Total Discount', '', '', '', -totalSavings] : null,
       ['Subtotal (VAT-exclusive)', '', '', '', subtotalExVAT],
       vatExempt ? ['VAT Exempt', '', '', '', 0] : ['VAT 12%', '', '', '', vatAmount],
       ['TOTAL (VAT-inclusive)', '', '', '', totalIncVAT],
@@ -304,7 +304,7 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
             {totalSavings > 0 && (
               <tr style={{ background: '#f0fdf4' }}>
                 <td style={{ padding: '4px 10px', color: '#166534', fontWeight: 700 }}>
-                  🎉 Client Saves {booking.discount_type === 'percent' && bookingDiscount > 0 ? `(${booking.discount_value}% off)` : booking.discount_type === 'fixed' && bookingDiscount > 0 ? '(fixed discount)' : '(item discounts)'}
+                  Total Discount {booking.discount_type === 'percent' && bookingDiscount > 0 ? `(${booking.discount_value}% off)` : booking.discount_type === 'fixed' && bookingDiscount > 0 ? '(fixed discount)' : '(item discounts)'}
                 </td>
                 <td style={{ padding: '4px 10px', textAlign: 'right', color: '#166534', fontWeight: 700 }}>−{formatPHP(totalSavings)}</td>
               </tr>
@@ -389,6 +389,9 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
             ))}
           </tbody>
         </table>
+        <div style={{ marginTop: '8px', fontSize: '11px', color: '#555' }}>
+          Please make cheque/s payable to <strong>ALBERTO C. MONTERAS II</strong>.
+        </div>
       </div>
 
       {/* Terms */}

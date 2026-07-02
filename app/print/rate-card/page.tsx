@@ -147,6 +147,7 @@ export default function RateCardPage() {
           <div style={{ fontWeight: 700, marginBottom: '4px' }}>Send Deposit To:</div>
           <div>BDO: <strong>7290126766</strong> · GCash: <strong>+63 939 933 8732</strong> · Metrobank: <strong>1637163527169</strong></div>
           <div style={{ marginTop: '2px' }}>Account Name: <strong>Alberto C. Monteras II</strong></div>
+          <div style={{ marginTop: '2px' }}>Please make cheque/s payable to <strong>ALBERTO C. MONTERAS II</strong>.</div>
         </div>
         <div style={{ fontSize: '9px', color: '#aaa', textAlign: 'right' }}>
           © Alberto Monteras II · Dogzilla Films<br />
