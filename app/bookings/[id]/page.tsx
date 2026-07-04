@@ -9,6 +9,7 @@ import OverheadPanel from '@/components/OverheadPanel';
 import TimePicker from '@/components/TimePicker';
 import BookingEditor from '@/components/BookingEditor';
 import MultiDayPicker, { DayConfig } from '@/components/MultiDayPicker';
+import CalendarPicker from '@/components/CalendarPicker';
 
 interface BookingDetail {
   booking: Booking;
@@ -298,6 +299,10 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
   const [savingDates, setSavingDates] = useState(false);
   const [otherBookedDates, setOtherBookedDates] = useState<string[]>([]);
   const [blockoutDates, setBlockoutDates] = useState<string[]>([]);
+  const [showRebook, setShowRebook] = useState(false);
+  const [rebookDate, setRebookDate] = useState('');
+  const [rebooking, setRebooking] = useState(false);
+  const [rebookError, setRebookError] = useState('');
 
   const loadCrew = useCallback(() => { fetch(`/api/bookings/${id}/crew`).then(r => r.json()).then(setCrew); }, [id]);
   const load = () => fetch(`/api/bookings/${id}`).then(r => r.json()).then((d: BookingDetail) => {
@@ -354,6 +359,22 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
     setEditingDates(false);
     await load();
     toast.success('Booking dates updated');
+  }
+
+  function startRebook() {
+    setRebookDate('');
+    setRebookError('');
+    const center = new Date((data!.booking.booking_date) + 'T00:00');
+    const months = [-1, 0, 1, 2, 3].map(offset => {
+      const d = new Date(center.getFullYear(), center.getMonth() + offset, 1);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    });
+    Promise.all(months.map(m => fetch(`/api/bookings?month=${m}`).then(r => r.json()))).then(results => {
+      const all = results.flat() as Array<{ id: number; status: string; is_pencil?: number; occupied_dates?: string[]; booking_date: string }>;
+      setOtherBookedDates(all.filter(b => b.id !== Number(id) && b.status !== 'cancelled' && !b.is_pencil).flatMap(b => b.occupied_dates ?? [b.booking_date]));
+    });
+    fetch('/api/blockout').then(r => r.json()).then((bs: { date: string }[]) => setBlockoutDates(bs.map(b => b.date)));
+    setShowRebook(true);
   }
 
   if (!data) return <div className="flex items-center justify-center h-64 text-white/30 pt-14 md:pt-0">Loading...</div>;
@@ -480,19 +501,22 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
     load();
   }
 
-  function rebook() {
-    // Build query string with all booking details to pre-fill the new booking form
-    const params = new URLSearchParams({
-      client_id: String(booking.client_id),
-      studio_rate: booking.studio_rate,
-      hours: String(booking.hours),
-      project_name: booking.project_name || '',
-      production_house: booking.production_house || '',
-      shoot_type: booking.shoot_type || '',
-      notes: booking.notes || '',
-      from_booking: id,
+  async function submitRebook() {
+    if (!rebookDate) return;
+    setRebooking(true);
+    setRebookError('');
+    const res = await fetch(`/api/bookings/${id}/rebook`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ new_date: rebookDate }),
     });
-    router.push(`/bookings/new?${params.toString()}`);
+    const result = await res.json();
+    setRebooking(false);
+    if (!res.ok) {
+      setRebookError(result.message || 'Could not rebook — that date conflicts with an existing booking.');
+      return;
+    }
+    toast.success('Booking duplicated to new date ✓');
+    router.push(`/bookings/${result.id}`);
   }
 
   function logMessageSent(channel: string) {
@@ -973,10 +997,36 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                 </button>
               )}
               {/* Rebook — always available */}
-              <button onClick={rebook} disabled={saving}
+              <button onClick={startRebook} disabled={saving}
                 className="w-full bg-purple-500/20 text-purple-400 border border-purple-500/30 text-sm py-2 rounded-lg hover:bg-purple-500/30 transition-colors">
                 🔄 Rebook (copy to new date)
               </button>
+              {showRebook && (
+                <div className="bg-[#0f0f0f] border border-purple-500/30 rounded-lg p-3 space-y-2">
+                  <div className="text-xs text-white/50">
+                    Copies everything — equipment, add-ons, discounts, deposit/VAT settings — to a new date{bookingDays.length > 1 ? ' (keeps the same gaps between days)' : ''}.
+                  </div>
+                  <CalendarPicker
+                    value={rebookDate}
+                    onChange={setRebookDate}
+                    label="New Date"
+                    bookedDates={otherBookedDates}
+                    blockoutDates={blockoutDates}
+                    minDate={new Date().toISOString().slice(0, 10)}
+                  />
+                  {rebookError && <div className="text-xs text-red-400">{rebookError}</div>}
+                  <div className="flex gap-2">
+                    <button onClick={submitRebook} disabled={!rebookDate || rebooking}
+                      className="flex-1 bg-purple-500 text-white text-sm py-2 rounded-lg hover:bg-purple-600 transition-colors disabled:opacity-40">
+                      {rebooking ? 'Creating…' : 'Confirm Rebook'}
+                    </button>
+                    <button onClick={() => setShowRebook(false)} disabled={rebooking}
+                      className="px-4 bg-[#2a2a2a] text-white/60 text-sm py-2 rounded-lg hover:text-white transition-colors">
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
               {/* Pencil toggle */}
               <button onClick={async () => {
                 setSaving(true);

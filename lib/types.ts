@@ -5,6 +5,7 @@ export const SHOOT_TYPES = [
   'Commercial / TVC',
   'Event',
   'Workshop',
+  'Livestream',
   'Equipment Rental',
   'Others',
 ] as const;

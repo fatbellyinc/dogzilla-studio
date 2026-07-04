@@ -397,6 +397,12 @@ function initSchema(db: Database.Database) {
     db.exec(`UPDATE booking_equipment SET name = REPLACE(name, 'Aputure 1200C', 'Aputure 1000C') WHERE name LIKE '%Aputure 1200C%'`);
   } catch { /* ignore */ }
 
+  // Replacement: "Aputure Storm 400C" → "Aputure 80C" at ₱1,350/day, including past bookings' saved line-item names
+  try {
+    db.exec(`UPDATE equipment SET name = 'Aputure 80C', daily_rate = 1350, description = '80W RGB COB', wattage = 80 WHERE name = 'Aputure Storm 400C'`);
+    db.exec(`UPDATE booking_equipment SET name = REPLACE(name, 'Aputure Storm 400C', 'Aputure 80C') WHERE name LIKE '%Aputure Storm 400C%'`);
+  } catch { /* ignore */ }
+
   // Create newer tables that may not exist in older databases
   const newTables = [
     `CREATE TABLE IF NOT EXISTS studio_visits (
@@ -559,7 +565,7 @@ function seedEquipment(db: Database.Database) {
     ['LED-004', 'Aputure Nova 600C', 'lighting', 8500, 2, '600W RGBWW panel', 600],
     ['LED-005', 'Aputure 600D Pro', 'lighting', 5000, 1, '600W daylight COB', 600],
     ['LED-006', 'Aputure 600D', 'lighting', 5000, 1, '600W daylight COB', 600],
-    ['LED-007', 'Aputure Storm 400C', 'lighting', 4500, 1, '400W COB', 400],
+    ['LED-007', 'Aputure 80C', 'lighting', 1350, 1, '80W RGB COB', 80],
     ['LED-008', 'Aputure 300X Bicolor', 'lighting', 3500, 2, '300W bicolor COB', 300],
     ['LED-009', 'Aputure Amaran 300C', 'lighting', 2500, 4, '300W RGB COB', 300],
     ['LED-010', 'Aputure Amaran 150C', 'lighting', 1500, 4, '150W RGB COB', 150],
