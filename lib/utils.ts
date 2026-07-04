@@ -16,6 +16,21 @@ export function formatDateShort(dateStr: string): string {
 
 export const STUDIO_WHATSAPP = '+639399338732';
 
+// Discount on a pre-discount subtotal. Fixed discounts are capped at the subtotal so a
+// discount can never push the total negative.
+export function calcDiscountAmount(subtotal: number, type: 'percent' | 'fixed' | null, value: number): number {
+  if (!type || !value || value <= 0) return 0;
+  if (type === 'percent') return subtotal * (value / 100);
+  return Math.min(value, subtotal);
+}
+
+// VAT-inclusive total from a VAT-exclusive subtotal, using the shared VAT_RATE from lib/types
+// (TRAIN Law, RA 10963). VAT-exempt bookings owe no VAT.
+export function calcVAT(subtotalExVAT: number, vatExempt: boolean, vatRate: number): { vatAmount: number; totalIncVAT: number } {
+  const vatAmount = vatExempt ? 0 : subtotalExVAT * vatRate;
+  return { vatAmount, totalIncVAT: subtotalExVAT + vatAmount };
+}
+
 // Format "HH:MM" 24hr to "H:MM AM/PM"
 export function fmt24(time: string | null): string {
   if (!time) return '';

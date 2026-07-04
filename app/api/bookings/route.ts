@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { STUDIO_RATES } from '@/lib/types';
 import { logActivity, ACTIONS } from '@/lib/activity';
+import { calcDiscountAmount } from '@/lib/utils';
 
 export async function GET(req: NextRequest) {
   const db = getDb();
@@ -71,9 +72,7 @@ export async function POST(req: NextRequest) {
     s + (e.is_complimentary ? 0 : e.rate * e.quantity), 0);
 
   const subtotalBeforeDiscount = studioSubtotal + eqTotal;
-  let discountAmount = 0;
-  if (discount_type === 'percent' && discount_value > 0) discountAmount = subtotalBeforeDiscount * (discount_value / 100);
-  else if (discount_type === 'fixed' && discount_value > 0) discountAmount = Math.min(discount_value, subtotalBeforeDiscount);
+  const discountAmount = calcDiscountAmount(subtotalBeforeDiscount, discount_type, discount_value);
 
   const total = subtotalBeforeDiscount - discountAmount;
   const deposit = total * 0.5;

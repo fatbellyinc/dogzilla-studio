@@ -1,6 +1,31 @@
 'use client';
 import { useEffect, useState } from 'react';
 
+function BackupTestButton({ token }: { token?: string }) {
+  const [status, setStatus] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  async function run() {
+    if (!token) { setStatus('Generate and Save Settings first'); return; }
+    setBusy(true);
+    setStatus('Sending...');
+    const res = await fetch(`/api/backup/auto?token=${token}`);
+    const data = await res.json();
+    setBusy(false);
+    setStatus(res.ok ? `✓ Sent to ${data.sent_to} (${data.size_kb} KB)` : `✗ ${data.error}`);
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <button type="button" onClick={run} disabled={busy}
+        className="px-3 py-2 bg-[#2a2a2a] text-white/70 text-xs rounded-lg hover:text-white transition-colors disabled:opacity-50">
+        {busy ? 'Sending…' : '📧 Send Test Backup Now'}
+      </button>
+      {status && <span className="text-xs text-white/50">{status}</span>}
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const [settings, setSettings] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
@@ -105,6 +130,46 @@ export default function SettingsPage() {
                 type="number" className={ic} />
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Automated Backup */}
+      <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4 mb-4">
+        <h2 className="font-semibold text-white text-sm mb-1">💾 Automated Backup</h2>
+        <p className="text-xs text-white/30 mb-3">
+          Emails a full copy of the database to yourself on a schedule, using the SMTP settings above.
+          Railway does not run scheduled jobs for a web app on its own — set up a free external cron
+          (e.g. <a href="https://cron-job.org" target="_blank" rel="noreferrer" className="text-[#E32726] hover:underline">cron-job.org</a>{' '}
+          or a scheduled GitHub Actions workflow) to hit the URL below once a day.
+        </p>
+        <div className="space-y-2">
+          <div>
+            <label className="text-xs text-white/40 mb-1 block">Backup Email (defaults to your Gmail address above if blank)</label>
+            <input value={settings.backup_email || ''} onChange={e => set('backup_email', e.target.value)}
+              placeholder="you@gmail.com" type="email" className={ic} />
+          </div>
+          <div>
+            <label className="text-xs text-white/40 mb-1 block">Secret Token</label>
+            <div className="flex gap-2">
+              <input value={settings.backup_secret || ''} onChange={e => set('backup_secret', e.target.value)}
+                placeholder="Click Generate →" className={ic} />
+              <button type="button" onClick={() => set('backup_secret', crypto.randomUUID().replace(/-/g, ''))}
+                className="px-3 bg-[#2a2a2a] text-white/60 text-xs rounded-lg hover:text-white transition-colors shrink-0">Generate</button>
+            </div>
+          </div>
+          {settings.backup_secret && (
+            <div>
+              <label className="text-xs text-white/40 mb-1 block">Cron URL — point your scheduler at this</label>
+              <div className="bg-[#0f0f0f] border border-[#2a2a2a] rounded-lg px-3 py-2 text-xs text-white/70 break-all font-mono">
+                {(settings.public_url || 'https://your-app.up.railway.app')}/api/backup/auto?token={settings.backup_secret}
+              </div>
+            </div>
+          )}
+          {settings.last_backup_at && (
+            <p className="text-xs text-white/30">Last backup sent: {new Date(settings.last_backup_at).toLocaleString('en-PH')}</p>
+          )}
+          <p className="text-xs text-white/20">Save Settings below first, then use this to confirm it works.</p>
+          <BackupTestButton token={settings.backup_secret} />
         </div>
       </div>
 
