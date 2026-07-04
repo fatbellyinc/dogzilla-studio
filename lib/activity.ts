@@ -29,4 +29,5 @@ export const ACTIONS = {
   MESSAGE_SENT: 'message_sent',
   OR_SET: 'or_set',
   OT_LOGGED: 'ot_logged',
+  PRICE_BULK_UPDATED: 'price_bulk_updated',
 } as const;

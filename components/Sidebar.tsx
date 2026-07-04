@@ -33,6 +33,7 @@ const NAV_GROUPS = [
       { href: '/utilization', label: 'Utilization', icon: '📈' },
       { href: '/pnl', label: 'P&L Monthly', icon: '💰' },
       { href: '/pnl/history', label: 'P&L History', icon: '📉' },
+      { href: '/reconciliation', label: 'Reconciliation', icon: '✅' },
       { href: '/receivables', label: 'Receivables', icon: '💸' },
       { href: '/payroll', label: 'Payroll', icon: '👷' },
       { href: '/financials', label: 'Financial History', icon: '📜' },
