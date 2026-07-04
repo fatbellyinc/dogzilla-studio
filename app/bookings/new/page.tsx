@@ -377,7 +377,7 @@ function NewBookingForm() {
       )}
 
       <form onSubmit={handleSubmit}>
-        <div className="grid md:grid-cols-[1fr_300px] gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_300px] gap-4 min-w-0">
           <div className="space-y-4">
 
             {/* Client */}

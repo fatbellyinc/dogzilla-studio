@@ -181,7 +181,7 @@ function WhatsAppContent() {
     <div className="pt-14 md:pt-0 p-4 md:p-6 max-w-4xl">
       <h1 className="text-xl font-bold text-white mb-6">WhatsApp Templates</h1>
 
-      <div className="grid md:grid-cols-[280px_1fr] gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-4 min-w-0">
         {/* Left: booking selector + templates */}
         <div className="space-y-4">
           {/* Booking selector */}

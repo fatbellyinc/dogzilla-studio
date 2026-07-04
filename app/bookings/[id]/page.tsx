@@ -572,7 +572,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
       </div>
       <p className="text-white/40 text-sm mb-6 ml-6">{formatDate(booking.booking_date)}</p>
 
-      <div className="grid md:grid-cols-[1fr_280px] gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-[1fr_280px] gap-4 min-w-0">
         <div className="space-y-4">
 
           {/* Client */}

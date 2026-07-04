@@ -45,7 +45,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
         <h1 className="text-xl font-bold text-white">{client.name}</h1>
       </div>
 
-      <div className="grid md:grid-cols-[1fr_260px] gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-[1fr_260px] gap-4 min-w-0">
         <div className="space-y-4">
           {/* Info */}
           <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4">

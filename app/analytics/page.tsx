@@ -101,7 +101,7 @@ export default function AnalyticsPage() {
         ))}
       </div>
 
-      <div className="grid md:grid-cols-2 gap-4 mb-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 min-w-0">
         {/* Revenue chart */}
         <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4">
           <h2 className="text-sm font-semibold text-white mb-3">Monthly Revenue (VAT-excl.)</h2>
@@ -169,7 +169,7 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
-      <div className="grid md:grid-cols-3 gap-4 mb-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 min-w-0">
         {/* Top clients */}
         <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4">
           <h2 className="text-sm font-semibold text-white mb-3">Top Clients</h2>
@@ -230,7 +230,7 @@ export default function AnalyticsPage() {
 
       {/* Historical + Utilities + Capex */}
       {(totalHistoricalRevenue > 0 || utilityTotals.length > 0 || capexTotal > 0) && (
-        <div className="grid md:grid-cols-3 gap-4 mb-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 min-w-0">
           {/* Historical revenue */}
           {totalHistoricalRevenue > 0 && (
             <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4">

@@ -80,7 +80,7 @@ export default function UtilizationPage() {
         </div>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-4 mb-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 min-w-0">
         {/* Month detail table */}
         <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl overflow-hidden">
           <div className="p-3 border-b border-[#2a2a2a] text-xs text-white/40 uppercase tracking-wider">Month Detail</div>

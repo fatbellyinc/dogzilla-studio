@@ -149,7 +149,7 @@ export default function Dashboard() {
         ))}
       </div>
 
-      <div className="grid md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 min-w-0">
         <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4">
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-semibold text-white text-sm">Today&apos;s Shoots</h2>

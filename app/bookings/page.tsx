@@ -119,7 +119,7 @@ export default function BookingsPage() {
         <Link href="/bookings/new" className="px-3 py-2 bg-[#E32726] text-white text-sm font-semibold rounded-lg hover:bg-[#c41f1e] transition-colors">+ New</Link>
       </div>
 
-      <div className="grid md:grid-cols-[1fr_320px] gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-[1fr_320px] gap-4 min-w-0">
         {/* Calendar */}
         <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4">
           <div className="flex items-center justify-between mb-4">
