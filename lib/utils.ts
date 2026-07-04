@@ -14,22 +14,6 @@ export function formatDateShort(dateStr: string): string {
   return d.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-export function generateQuoteNumber(): string {
-  const now = new Date();
-  const y = now.getFullYear().toString().slice(-2);
-  const m = String(now.getMonth() + 1).padStart(2, '0');
-  const r = Math.floor(Math.random() * 9000) + 1000;
-  return `DZQ-${y}${m}-${r}`;
-}
-
-export function generateInvoiceNumber(): string {
-  const now = new Date();
-  const y = now.getFullYear().toString().slice(-2);
-  const m = String(now.getMonth() + 1).padStart(2, '0');
-  const r = Math.floor(Math.random() * 9000) + 1000;
-  return `DZI-${y}${m}-${r}`;
-}
-
 export const STUDIO_WHATSAPP = '+639399338732';
 
 // Format "HH:MM" 24hr to "H:MM AM/PM"

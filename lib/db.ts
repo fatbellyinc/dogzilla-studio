@@ -16,6 +16,24 @@ export function _resetDb() {
   dbOpenSize = 0;
 }
 
+// Sequential, gapless document number for a given year and prefix (e.g. "DZI", "DZQ").
+// Replaces the old scheme of a random 4-digit suffix, which had no uniqueness guarantee
+// and produced non-sequential numbers — a BIR record-keeping defect.
+export function nextDocNumber(db: Database.Database, prefix: string): string {
+  const year = new Date().getFullYear();
+  const key = `${prefix}-${year}`;
+  const seq = db.transaction(() => {
+    const row = db.prepare('SELECT next_seq FROM doc_sequences WHERE key = ?').get(key) as { next_seq: number } | undefined;
+    const current = row ? row.next_seq : 1;
+    db.prepare(`
+      INSERT INTO doc_sequences (key, next_seq) VALUES (?, ?)
+      ON CONFLICT(key) DO UPDATE SET next_seq = excluded.next_seq
+    `).run(key, current + 1);
+    return current;
+  })();
+  return `${prefix}-${year}-${String(seq).padStart(6, '0')}`;
+}
+
 export function getDb(): Database.Database {
   // Auto-detect if file was replaced (Railway volume mount or restore)
   if (db && (db as Database.Database).open && fs.existsSync(DB_PATH)) {
@@ -148,6 +166,13 @@ function initSchema(db: Database.Database) {
       items TEXT NOT NULL,
       notes TEXT,
       created_at TEXT DEFAULT (datetime('now'))
+    );
+
+    -- Backs sequential, gapless invoice/quote numbering (see nextDocNumber below).
+    -- Prevents the collision risk and non-sequential numbers of the old random-number scheme.
+    CREATE TABLE IF NOT EXISTS doc_sequences (
+      key TEXT PRIMARY KEY,
+      next_seq INTEGER NOT NULL DEFAULT 1
     );
 
     CREATE TABLE IF NOT EXISTS booking_days (
@@ -395,6 +420,21 @@ function initSchema(db: Database.Database) {
   try {
     db.exec(`UPDATE equipment SET name = REPLACE(name, 'Aputure 1200C', 'Aputure 1000C') WHERE name LIKE '%Aputure 1200C%'`);
     db.exec(`UPDATE booking_equipment SET name = REPLACE(name, 'Aputure 1200C', 'Aputure 1000C') WHERE name LIKE '%Aputure 1200C%'`);
+  } catch { /* ignore */ }
+
+  // Seed the sequential doc-number counters (one-time, per year) to continue after however many
+  // invoices/quotes were already issued this year under the old random-number scheme, so the new
+  // gapless sequence doesn't jarringly restart at 000001 mid-year.
+  try {
+    const year = new Date().getFullYear();
+    for (const [prefix, table] of [['DZI', 'invoices'], ['DZQ', 'quotations']] as const) {
+      const key = `${prefix}-${year}`;
+      const exists = db.prepare('SELECT 1 FROM doc_sequences WHERE key = ?').get(key);
+      if (!exists) {
+        const count = (db.prepare(`SELECT COUNT(*) as c FROM ${table} WHERE created_at LIKE ?`).get(`${year}-%`) as { c: number }).c;
+        db.prepare('INSERT INTO doc_sequences (key, next_seq) VALUES (?, ?)').run(key, count + 1);
+      }
+    }
   } catch { /* ignore */ }
 
   // Replacement: "Aputure Storm 400C" → "Aputure 80C" at ₱1,350/day, including past bookings' saved line-item names

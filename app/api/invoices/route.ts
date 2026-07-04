@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
-import { generateInvoiceNumber } from '@/lib/utils';
+import { getDb, nextDocNumber } from '@/lib/db';
 import { logActivity, ACTIONS } from '@/lib/activity';
 
 export async function POST(req: NextRequest) {
   const db = getDb();
   const body = await req.json();
   const { booking_id, notes } = body;
-  const invoice_number = generateInvoiceNumber();
+  const invoice_number = nextDocNumber(db, 'DZI');
   const result = db.prepare(`INSERT INTO invoices (booking_id, invoice_number, notes) VALUES (?, ?, ?)`)
     .run(booking_id, invoice_number, notes || null);
   const inv = db.prepare('SELECT * FROM invoices WHERE id = ?').get(result.lastInsertRowid) as { invoice_number: string } | undefined;

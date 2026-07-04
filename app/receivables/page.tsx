@@ -11,7 +11,10 @@ interface ReceivableItem {
   deposit_amount: number; no_deposit: number; vat_exempt: number;
   daysToShoot: number; daysSinceShoot: number;
   urgency: 'critical' | 'overdue' | 'due_soon' | 'upcoming' | 'completed_unpaid';
+  agingBucket: '1-30' | '31-60' | '61-90' | '90+' | null;
 }
+
+interface AgingBucket { bucket: '1-30' | '31-60' | '61-90' | '90+'; total: number; count: number; }
 
 const URGENCY_CONFIG = {
   critical:         { label: '🚨 Critical — shoot in 1-3 days', color: 'bg-red-500/20 border-red-500/30 text-red-400' },
@@ -172,16 +175,19 @@ function PaymentRow({ item, onPaid }: { item: ReceivableItem; onPaid: () => void
 }
 
 export default function ReceivablesPage() {
-  const [data, setData] = useState<{ items: ReceivableItem[]; totalOwed: number; overdueCount: number } | null>(null);
+  const [data, setData] = useState<{ items: ReceivableItem[]; totalOwed: number; overdueCount: number; agingBuckets: AgingBucket[] } | null>(null);
   const [filter, setFilter] = useState('all');
+  const [agingFilter, setAgingFilter] = useState<AgingBucket['bucket'] | null>(null);
 
   const load = useCallback(() => fetch('/api/receivables').then(r => r.json()).then(setData), []);
   useEffect(() => { load(); }, [load]);
 
   if (!data) return <div className="flex items-center justify-center h-64 text-white/30 pt-14 md:pt-0">Loading...</div>;
 
-  const { items, totalOwed, overdueCount } = data;
-  const filtered = filter === 'all' ? items : items.filter(i => i.urgency === filter);
+  const { items, totalOwed, overdueCount, agingBuckets } = data;
+  const filtered = items
+    .filter(i => filter === 'all' || i.urgency === filter)
+    .filter(i => !agingFilter || i.agingBucket === agingFilter);
 
   const groups = (['critical','completed_unpaid','overdue','due_soon','upcoming'] as const).map(u => ({
     urgency: u,
@@ -215,6 +221,26 @@ export default function ReceivablesPage() {
           </button>
         ))}
       </div>
+
+      {/* Aging summary — classic A/R aging, bucketed by days overdue since the shoot date */}
+      {agingBuckets.length > 0 && (
+        <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-3 mb-4">
+          <div className="text-[10px] text-white/30 uppercase tracking-wider mb-2">Aging — days overdue</div>
+          <div className="flex flex-wrap gap-2">
+            {agingBuckets.map(b => (
+              <button key={b.bucket} onClick={() => setAgingFilter(agingFilter === b.bucket ? null : b.bucket)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
+                  agingFilter === b.bucket ? 'ring-2 ring-[#E32726] bg-[#E32726]/20 border-[#E32726]/30 text-[#E32726]'
+                  : b.bucket === '90+' ? 'bg-red-500/10 border-red-500/20 text-red-400 hover:bg-red-500/20'
+                  : b.bucket === '61-90' ? 'bg-orange-500/10 border-orange-500/20 text-orange-400 hover:bg-orange-500/20'
+                  : 'bg-[#0f0f0f] border-[#2a2a2a] text-white/50 hover:text-white'
+                }`}>
+                {b.bucket}d · {b.count} · {formatPHP(b.total)}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* List */}
       <div className="space-y-3">

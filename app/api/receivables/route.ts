@@ -35,6 +35,16 @@ export async function GET() {
     client_email: string; total_paid: number; balance_due: number;
   }[];
 
+  // Standard A/R aging buckets, by days overdue since the shoot date — only meaningful
+  // once a balance is actually overdue (shoot has passed and it's still unpaid).
+  function agingBucket(daysSinceShoot: number): '1-30' | '31-60' | '61-90' | '90+' | null {
+    if (daysSinceShoot <= 0) return null;
+    if (daysSinceShoot <= 30) return '1-30';
+    if (daysSinceShoot <= 60) return '31-60';
+    if (daysSinceShoot <= 90) return '61-90';
+    return '90+';
+  }
+
   const result = bookings.map(b => {
     const shootDate = new Date(b.booking_date + 'T00:00');
     const now = new Date(todayStr + 'T00:00');
@@ -48,7 +58,7 @@ export async function GET() {
     else if (daysToShoot <= 7) urgency = 'due_soon';
     else urgency = 'upcoming';
 
-    return { ...b, daysToShoot, daysSinceShoot, urgency };
+    return { ...b, daysToShoot, daysSinceShoot, urgency, agingBucket: agingBucket(daysSinceShoot) };
   });
 
   const order = { critical: 0, completed_unpaid: 1, overdue: 2, due_soon: 3, upcoming: 4 };
@@ -57,5 +67,13 @@ export async function GET() {
   const totalOwed = result.reduce((s, r) => s + r.balance_due, 0);
   const overdueCount = result.filter(r => r.urgency === 'overdue' || r.urgency === 'completed_unpaid').length;
 
-  return NextResponse.json({ items: result, totalOwed, overdueCount });
+  // Classic A/R aging summary — total owed per days-overdue bucket, for the operator's
+  // "who's the oldest debt" view, independent of the urgency-by-shoot-date grouping above.
+  const agingBuckets = (['1-30', '31-60', '61-90', '90+'] as const).map(bucket => ({
+    bucket,
+    total: result.filter(r => r.agingBucket === bucket).reduce((s, r) => s + r.balance_due, 0),
+    count: result.filter(r => r.agingBucket === bucket).length,
+  })).filter(b => b.count > 0);
+
+  return NextResponse.json({ items: result, totalOwed, overdueCount, agingBuckets });
 }
