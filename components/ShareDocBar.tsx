@@ -161,8 +161,8 @@ export default function ShareDocBar({ bookingId, docType, clientName, clientPhon
   }
 
   return (
-    <div className="no-print fixed bottom-6 left-6 flex flex-col items-start gap-1.5 z-50 max-w-[90vw]">
-      <div className="flex gap-1.5 flex-wrap">
+    <div className="no-print fixed bottom-14 left-0 right-0 md:bottom-6 md:left-6 md:right-auto flex flex-col items-stretch md:items-start gap-1.5 z-40 md:max-w-[60vw]">
+      <div className="flex gap-1.5 overflow-x-auto px-2 md:px-0 md:flex-wrap" style={{ WebkitOverflowScrolling: 'touch' }}>
         <button disabled={busy} onClick={async () => {
           setBusy(true); setStatus('📸 Generating image...');
           const file = await captureImage();
@@ -171,14 +171,14 @@ export default function ShareDocBar({ bookingId, docType, clientName, clientPhon
           const copied = await copyToClipboard(file);
           if (copied) { logSend('clipboard'); setStatus('✓ Image copied — press Ctrl+V in any chat to paste it'); }
           else { downloadFile(file); setStatus('✓ Clipboard not supported here — image downloaded instead'); }
-        }} className="bg-[#2a2a2a] text-white px-3 py-2 rounded-lg font-semibold shadow-xl hover:bg-[#3a3a3a] transition-colors text-xs disabled:opacity-50">📋 Copy Image</button>
-        <button disabled={busy} onClick={() => shareImage('Any')} className="bg-[#E32726] text-white px-3 py-2 rounded-lg font-semibold shadow-xl hover:bg-[#c41f1e] transition-colors text-xs disabled:opacity-50">📤 Share Image</button>
-        <button disabled={busy} onClick={() => shareImage('WhatsApp')} className="bg-[#25D366] text-white px-3 py-2 rounded-lg font-semibold shadow-xl hover:bg-[#20b558] transition-colors text-xs disabled:opacity-50">💬 WhatsApp</button>
-        <button disabled={busy} onClick={() => shareImage('Viber')} className="bg-[#7360F2] text-white px-3 py-2 rounded-lg font-semibold shadow-xl hover:bg-[#5d4ad1] transition-colors text-xs disabled:opacity-50">📱 Viber</button>
-        <button disabled={busy} onClick={() => shareImage('Messenger')} className="bg-[#0099FF] text-white px-3 py-2 rounded-lg font-semibold shadow-xl hover:bg-[#0084dd] transition-colors text-xs disabled:opacity-50">💙 Messenger</button>
-        <button disabled={busy} onClick={shareEmail} className="bg-blue-600 text-white px-3 py-2 rounded-lg font-semibold shadow-xl hover:bg-blue-700 transition-colors text-xs disabled:opacity-50">✉️ Email</button>
+        }} className="shrink-0 bg-[#2a2a2a] text-white px-3 py-2 rounded-lg font-semibold shadow-xl hover:bg-[#3a3a3a] transition-colors text-xs disabled:opacity-50">📋 Copy Image</button>
+        <button disabled={busy} onClick={() => shareImage('Any')} className="shrink-0 bg-[#E32726] text-white px-3 py-2 rounded-lg font-semibold shadow-xl hover:bg-[#c41f1e] transition-colors text-xs disabled:opacity-50">📤 Share Image</button>
+        <button disabled={busy} onClick={() => shareImage('WhatsApp')} className="shrink-0 bg-[#25D366] text-white px-3 py-2 rounded-lg font-semibold shadow-xl hover:bg-[#20b558] transition-colors text-xs disabled:opacity-50">💬 WhatsApp</button>
+        <button disabled={busy} onClick={() => shareImage('Viber')} className="shrink-0 bg-[#7360F2] text-white px-3 py-2 rounded-lg font-semibold shadow-xl hover:bg-[#5d4ad1] transition-colors text-xs disabled:opacity-50">📱 Viber</button>
+        <button disabled={busy} onClick={() => shareImage('Messenger')} className="shrink-0 bg-[#0099FF] text-white px-3 py-2 rounded-lg font-semibold shadow-xl hover:bg-[#0084dd] transition-colors text-xs disabled:opacity-50">💙 Messenger</button>
+        <button disabled={busy} onClick={shareEmail} className="shrink-0 bg-blue-600 text-white px-3 py-2 rounded-lg font-semibold shadow-xl hover:bg-blue-700 transition-colors text-xs disabled:opacity-50">✉️ Email</button>
       </div>
-      {status && <div className="text-xs bg-[#1a1a1a] text-white/80 border border-[#2a2a2a] rounded-lg px-3 py-1.5 shadow-xl">{status}</div>}
+      {status && <div className="mx-2 md:mx-0 text-xs bg-[#1a1a1a] text-white/80 border border-[#2a2a2a] rounded-lg px-3 py-1.5 shadow-xl">{status}</div>}
     </div>
   );
 }

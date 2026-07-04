@@ -446,17 +446,17 @@ function DocView({ bookingId }: { bookingId: string }) {
 
       {/* Buttons live outside the captured area */}
       <ShareDocBar bookingId={booking.id} docType="quotation" clientName={booking.client_name || ''} clientPhone={booking.client_phone} clientEmail={booking.client_email} docNumber={docNumber} />
-      <div className="no-print fixed bottom-6 right-6 flex gap-2 flex-wrap justify-end">
-        <button onClick={loadData} className="bg-[#2a2a2a] text-white px-4 py-2.5 rounded-lg font-semibold shadow-xl hover:bg-[#3a3a3a] transition-colors text-sm">
+      <div className="no-print fixed bottom-0 left-0 right-0 md:bottom-6 md:left-auto md:right-6 flex gap-2 overflow-x-auto px-2 py-2 md:p-0 md:flex-wrap md:justify-end z-50" style={{ WebkitOverflowScrolling: 'touch' }}>
+        <button onClick={loadData} className="shrink-0 bg-[#2a2a2a] text-white px-4 py-2.5 rounded-lg font-semibold shadow-xl hover:bg-[#3a3a3a] transition-colors text-sm">
           🔄 Refresh
         </button>
-        <button onClick={exportExcel} className="bg-[#1d6f42] text-white px-4 py-2.5 rounded-lg font-semibold shadow-xl hover:bg-[#155c36] transition-colors text-sm">
+        <button onClick={exportExcel} className="shrink-0 bg-[#1d6f42] text-white px-4 py-2.5 rounded-lg font-semibold shadow-xl hover:bg-[#155c36] transition-colors text-sm">
           📊 Excel
         </button>
-        <button onClick={exportWord} className="bg-[#2b579a] text-white px-4 py-2.5 rounded-lg font-semibold shadow-xl hover:bg-[#1e3f6f] transition-colors text-sm">
+        <button onClick={exportWord} className="shrink-0 bg-[#2b579a] text-white px-4 py-2.5 rounded-lg font-semibold shadow-xl hover:bg-[#1e3f6f] transition-colors text-sm">
           📄 Word
         </button>
-        <button onClick={() => window.print()} className="bg-[#E32726] text-white px-5 py-2.5 rounded-lg font-semibold shadow-xl hover:bg-[#c41f1e] transition-colors text-sm">
+        <button onClick={() => window.print()} className="shrink-0 bg-[#E32726] text-white px-5 py-2.5 rounded-lg font-semibold shadow-xl hover:bg-[#c41f1e] transition-colors text-sm">
           🖨️ Print / PDF
         </button>
       </div>

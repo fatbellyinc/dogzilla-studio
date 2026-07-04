@@ -130,7 +130,7 @@ export default function ReceiptPage({ params }: { params: Promise<{ id: string }
       </div>
 
       <ShareDocBar bookingId={payment.booking_id} docType="receipt" clientName={booking.client_name || ''} clientPhone={booking.client_phone} clientEmail={booking.client_email} docNumber={receiptNo} />
-      <button onClick={() => window.print()} className="no-print fixed bottom-6 right-6 bg-[#E32726] text-white px-5 py-2.5 rounded-lg font-semibold shadow-xl text-sm">
+      <button onClick={() => window.print()} className="no-print fixed bottom-0 left-0 right-0 md:bottom-6 md:left-auto md:right-6 bg-[#E32726] text-white px-5 py-2.5 md:rounded-lg font-semibold shadow-xl text-sm text-center z-50">
         🖨️ Print Receipt
       </button>
     </div>
