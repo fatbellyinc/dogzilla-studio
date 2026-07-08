@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { calcOT } from '@/lib/utils';
+import { recomputeBookingTotals } from '@/lib/booking-calc';
 
 // Sets or clears call/wrap time on a single shoot day, independent of every other day in a
 // multi-day booking. Work hours legitimately vary day to day (a setup day is short, a shoot
@@ -35,6 +36,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       }
     }
   }
+
+  recomputeBookingTotals(db, Number(id));
 
   const updatedDay = db.prepare('SELECT * FROM booking_days WHERE id = ?').get(dayId);
   return NextResponse.json({ day: updatedDay, updatedElec });

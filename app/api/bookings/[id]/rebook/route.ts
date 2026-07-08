@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { logActivity, ACTIONS } from '@/lib/activity';
+import { recomputeBookingTotals } from '@/lib/booking-calc';
 
 // Duplicates an existing booking onto a new date. Every detail — equipment, add-ons,
 // discounts, VAT/deposit flags, times, project info — carries over unchanged; only the
@@ -17,7 +18,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!booking) return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
 
   const oldDays = db.prepare('SELECT * FROM booking_days WHERE booking_id = ? ORDER BY date').all(id) as
-    { date: string; day_type: string; studio_rate: string; hours: number; subtotal: number }[];
+    { date: string; day_type: string; studio_rate: string; hours: number; subtotal: number; call_time: string | null; wrap_time: string | null }[];
   const equipment = db.prepare('SELECT * FROM booking_equipment WHERE booking_id = ? ORDER BY id').all(id) as
     { equipment_id: number | null; quantity: number; rate: number; name: string; item_type: string; is_complimentary: number; discount_pct: number; day_date: string | null }[];
 
@@ -33,7 +34,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const newDays = oldDays.length
     ? oldDays.map(d => ({ ...d, date: shift(d.date) }))
-    : [{ date: newFirstDate, day_type: 'shoot', studio_rate: booking.studio_rate as string, hours: booking.hours as number, subtotal: booking.subtotal as number }];
+    : [{ date: newFirstDate, day_type: 'shoot', studio_rate: booking.studio_rate as string, hours: booking.hours as number, subtotal: booking.subtotal as number, call_time: booking.call_time as string | null, wrap_time: booking.wrap_time as string | null }];
 
   const isEquipmentOnly = newDays.every(d => d.studio_rate === 'equipment_only');
   const allDates = newDays.map(d => d.date);
@@ -75,8 +76,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   );
   const newBookingId = result.lastInsertRowid;
 
-  const insDay = db.prepare('INSERT INTO booking_days (booking_id, date, day_type, studio_rate, hours, subtotal) VALUES (?, ?, ?, ?, ?, ?)');
-  for (const d of newDays) insDay.run(newBookingId, d.date, d.day_type, d.studio_rate, d.hours || 1, d.subtotal || 0);
+  const insDay = db.prepare('INSERT INTO booking_days (booking_id, date, day_type, studio_rate, hours, subtotal, call_time, wrap_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+  for (const d of newDays) insDay.run(newBookingId, d.date, d.day_type, d.studio_rate, d.hours || 1, d.subtotal || 0, d.call_time || null, d.wrap_time || null);
 
   if (equipment.length) {
     const insEq = db.prepare(`INSERT INTO booking_equipment (booking_id, equipment_id, quantity, rate, name, item_type, is_complimentary, discount_pct, day_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
@@ -85,6 +86,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         item.is_complimentary, item.discount_pct, item.day_date ? shift(item.day_date) : null);
     }
   }
+
+  recomputeBookingTotals(db, Number(newBookingId));
 
   const newBooking = db.prepare(`SELECT b.*, c.name as client_name FROM bookings b JOIN clients c ON c.id = b.client_id WHERE b.id = ?`).get(newBookingId);
   const b = newBooking as { id: number; client_name?: string; booking_date?: string; total?: number };

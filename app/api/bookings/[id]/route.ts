@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { logActivity, ACTIONS } from '@/lib/activity';
+import { recomputeBookingTotals } from '@/lib/booking-calc';
 
 export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const db = getDb();
@@ -49,22 +50,13 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   if (production_house !== undefined) db.prepare('UPDATE bookings SET production_house = ? WHERE id = ?').run(production_house || null, id);
   if (project_name !== undefined || shoot_type !== undefined || production_house !== undefined) logActivity(Number(id), ACTIONS.ITEMS_EDITED, 'Project details updated');
 
-  // Recalculate totals when discount changes
   if (discount_type !== undefined || discount_value !== undefined) {
-    const booking = db.prepare('SELECT * FROM bookings WHERE id = ?').get(id) as { subtotal: number; equipment_total: number } | undefined;
-    if (booking) {
-      const base = booking.subtotal + booking.equipment_total;
-      const dType = discount_type ?? null;
-      const dVal = discount_value ?? 0;
-      let discountAmount = 0;
-      if (dType === 'percent') discountAmount = base * (dVal / 100);
-      else if (dType === 'fixed') discountAmount = Math.min(dVal, base);
-      const newTotal = base - discountAmount;
-      const newDeposit = newTotal * 0.5;
-      db.prepare('UPDATE bookings SET discount_type=?, discount_value=?, discount_amount=?, total=?, deposit_amount=? WHERE id=?')
-        .run(dType, dVal, discountAmount, newTotal, newDeposit, id);
-    }
+    db.prepare('UPDATE bookings SET discount_type=?, discount_value=? WHERE id=?').run(discount_type ?? null, discount_value ?? 0, id);
   }
+
+  // Keep the stored total/deposit/discount_amount/overtime in sync with whatever changed above —
+  // call/wrap times, discount, or anything else that feeds into the booking's true total.
+  recomputeBookingTotals(db, Number(id));
 
   return NextResponse.json(db.prepare('SELECT * FROM bookings WHERE id = ?').get(id));
 }

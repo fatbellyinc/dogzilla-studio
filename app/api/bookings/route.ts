@@ -3,6 +3,7 @@ import { getDb } from '@/lib/db';
 import { STUDIO_RATES } from '@/lib/types';
 import { logActivity, ACTIONS } from '@/lib/activity';
 import { calcDiscountAmount } from '@/lib/utils';
+import { recomputeBookingTotals } from '@/lib/booking-calc';
 
 export async function GET(req: NextRequest) {
   const db = getDb();
@@ -127,6 +128,8 @@ export async function POST(req: NextRequest) {
         item.item_type || 'individual', item.is_complimentary ? 1 : 0, item.discount_pct || 0, item.day_date || null);
     }
   }
+
+  recomputeBookingTotals(db, Number(bookingId));
 
   // Generate recurring future bookings
   if (recurrence && recurrence_end && bookingDate) {

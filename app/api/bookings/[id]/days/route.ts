@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { logActivity, ACTIONS } from '@/lib/activity';
+import { recomputeBookingTotals } from '@/lib/booking-calc';
 
 interface DayInput { date: string; day_type: string; studio_rate: string; hours: number; subtotal: number }
 
@@ -44,30 +45,31 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     }
   }
 
+  // Preserve any per-day call/wrap times for dates that still exist after this edit — the
+  // incoming DayInput list doesn't carry times (the date-editor UI doesn't manage them), so
+  // without this, editing a booking's dates would silently wipe times set via the Shoot Times
+  // panel.
+  const existingTimes = new Map(
+    (db.prepare('SELECT date, call_time, wrap_time FROM booking_days WHERE booking_id = ?').all(bookingId) as
+      { date: string; call_time: string | null; wrap_time: string | null }[])
+      .map(d => [d.date, { call_time: d.call_time, wrap_time: d.wrap_time }])
+  );
+
   // Replace all days for this booking
   db.prepare('DELETE FROM booking_days WHERE booking_id = ?').run(bookingId);
-  const insDay = db.prepare('INSERT INTO booking_days (booking_id, date, day_type, studio_rate, hours, subtotal) VALUES (?, ?, ?, ?, ?, ?)');
-  for (const d of days) insDay.run(bookingId, d.date, d.day_type, d.studio_rate, d.hours || 1, d.subtotal || 0);
+  const insDay = db.prepare('INSERT INTO booking_days (booking_id, date, day_type, studio_rate, hours, subtotal, call_time, wrap_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+  for (const d of days) {
+    const preserved = existingTimes.get(d.date);
+    insDay.run(bookingId, d.date, d.day_type, d.studio_rate, d.hours || 1, d.subtotal || 0, preserved?.call_time || null, preserved?.wrap_time || null);
+  }
 
-  const studioSubtotal = days.reduce((s, d) => s + (d.subtotal || 0), 0);
   const bookingDate = days[0].date;
   const endDate = days.length > 1 ? days[days.length - 1].date : null;
   const hours = days[0].hours || 1;
 
-  const booking = db.prepare('SELECT equipment_total, discount_type, discount_value FROM bookings WHERE id = ?').get(bookingId) as
-    { equipment_total: number; discount_type: string | null; discount_value: number } | undefined;
-  if (!booking) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-
-  const base = studioSubtotal + (booking.equipment_total || 0);
-  let discountAmount = 0;
-  if (booking.discount_type === 'percent') discountAmount = base * (booking.discount_value / 100);
-  else if (booking.discount_type === 'fixed') discountAmount = Math.min(booking.discount_value, base);
-  const total = base - discountAmount;
-
-  db.prepare(`
-    UPDATE bookings SET booking_date=?, end_date=?, studio_rate=?, hours=?, subtotal=?, total=?, deposit_amount=?, discount_amount=?
-    WHERE id=?
-  `).run(bookingDate, endDate, representativeRate, hours, studioSubtotal, total, total * 0.5, discountAmount, bookingId);
+  db.prepare(`UPDATE bookings SET booking_date=?, end_date=?, studio_rate=?, hours=? WHERE id=?`)
+    .run(bookingDate, endDate, representativeRate, hours, bookingId);
+  recomputeBookingTotals(db, bookingId);
 
   logActivity(bookingId, ACTIONS.ITEMS_EDITED, `Booking dates updated — ${days.length} day(s)`);
   return NextResponse.json({ ok: true });

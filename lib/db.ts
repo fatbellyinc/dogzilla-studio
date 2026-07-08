@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
+import { recomputeBookingTotals } from './booking-calc';
 
 const DB_PATH = path.join(process.cwd(), 'data', 'dogzilla.db');
 
@@ -357,6 +358,19 @@ function initSchema(db: Database.Database) {
   // so existing rows get a stable, unique order instead of all sitting at 0
   try {
     db.exec(`UPDATE equipment SET sort_order = id WHERE sort_order = 0`);
+  } catch { /* ignore */ }
+
+  // One-time backfill: recompute every booking's stored total/deposit/overtime using the
+  // shared recomputeBookingTotals function, so historical bookings created before per-day
+  // overtime and per-item equipment discounts were factored into the stored total self-heal
+  // to match what the invoice/quotation actually show. Runs once per DB (flagged in settings).
+  try {
+    const alreadyRun = db.prepare("SELECT value FROM settings WHERE key = 'totals_backfill_v1'").get();
+    if (!alreadyRun) {
+      const ids = db.prepare('SELECT id FROM bookings').all() as { id: number }[];
+      for (const { id } of ids) recomputeBookingTotals(db, id);
+      db.prepare("INSERT INTO settings (key, value) VALUES ('totals_backfill_v1', '1')").run();
+    }
   } catch { /* ignore */ }
 
   // Data sync: flag bookings as fully_paid when payments cover the invoice total.
