@@ -45,8 +45,14 @@ function DocView({ bookingId }: { bookingId: string }) {
   type Line = { code: string; desc: string; qty: number; unit: number; total: number; bold?: boolean; indent?: boolean; comp?: boolean; disc?: number };
   const lines: Line[] = [];
 
+  // Overtime is computed per day from each day's own call/wrap times — a booking-level
+  // call_time/wrap_time no longer applies once a booking has more than one day, since each
+  // day can run different hours.
+  let otHrs = 0;
+  let otAmount = 0;
+
   if (isMultiDay) {
-    // Multi-day: show each day as a separate studio line
+    // Multi-day: show each day as a separate studio line, with that day's own OT right under it
     bookingDays.forEach((d, i) => {
       const dayRate = STUDIO_RATES[d.studio_rate as keyof typeof STUDIO_RATES];
       const dayLabel = d.day_type === 'setup' ? '🔧 Set-Up Day' : '🎬 Shoot Day';
@@ -59,6 +65,16 @@ function DocView({ bookingId }: { bookingId: string }) {
         total: d.subtotal,
         bold: true,
       });
+      const dayOT = calcOT(d.studio_rate, d.call_time || null, d.wrap_time || null);
+      if (dayOT.otHrs > 0) {
+        otHrs += dayOT.otHrs;
+        otAmount += dayOT.otAmount;
+        lines.push({
+          code: 'OT',
+          desc: `Overtime — Day ${i + 1} · ${dayOT.otHrs.toFixed(2)} hr${dayOT.otHrs > 1 ? 's' : ''} × ₱${dayOT.otRate.toLocaleString()}/hr (${fmt24(d.call_time!)} – ${fmt24(d.wrap_time!)})`,
+          qty: 1, unit: dayOT.otAmount, total: dayOT.otAmount, indent: true,
+        });
+      }
     });
   } else {
     // Single day
@@ -102,16 +118,18 @@ function DocView({ bookingId }: { bookingId: string }) {
     });
   }
 
-  // OT
-  const otCalc = calcOT(booking.studio_rate, booking.call_time, booking.wrap_time);
-  const otHrs = booking.overtime_hours || otCalc.otHrs;
-  const otAmount = booking.overtime_amount || otCalc.otAmount;
-  if (otHrs > 0) {
-    lines.push({
-      code: 'OT',
-      desc: `Overtime — ${otHrs.toFixed(2)} hr${otHrs > 1 ? 's' : ''} × ₱${OT_RATE.toLocaleString()}/hr${booking.call_time && booking.wrap_time ? ` (${fmt24(booking.call_time)} – ${fmt24(booking.wrap_time)})` : ''}`,
-      qty: 1, unit: otAmount, total: otAmount,
-    });
+  // OT — single-day only; multi-day OT is already added per-day above
+  if (!isMultiDay) {
+    const otCalc = calcOT(booking.studio_rate, booking.call_time, booking.wrap_time);
+    otHrs = booking.overtime_hours || otCalc.otHrs;
+    otAmount = booking.overtime_amount || otCalc.otAmount;
+    if (otHrs > 0) {
+      lines.push({
+        code: 'OT',
+        desc: `Overtime — ${otHrs.toFixed(2)} hr${otHrs > 1 ? 's' : ''} × ₱${OT_RATE.toLocaleString()}/hr${booking.call_time && booking.wrap_time ? ` (${fmt24(booking.call_time)} – ${fmt24(booking.wrap_time)})` : ''}`,
+        qty: 1, unit: otAmount, total: otAmount,
+      });
+    }
   }
 
   // Recompute totals from line items — lines already include discount (negative) and OT

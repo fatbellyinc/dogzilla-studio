@@ -55,6 +55,12 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
   type Line = { desc: string; qty: number; unit: number; total: number; bold?: boolean; indent?: boolean; comp?: boolean; disc?: number };
   const lines: Line[] = [];
 
+  // Overtime is computed per day from each day's own call/wrap times — a booking-level
+  // call_time/wrap_time no longer applies once a booking has more than one day, since each
+  // day can run different hours. Multi-day OT is shown as its own line right under that day.
+  let otHrs = 0;
+  let otAmount = 0;
+
   if (isMultiDay) {
     bookingDays.forEach((d, i) => {
       const dayRate = STUDIO_RATES[d.studio_rate as keyof typeof STUDIO_RATES];
@@ -64,12 +70,30 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
         desc: `Day ${i + 1} — ${dayLabel} · ${dateStr} · ${dayRate?.label || d.studio_rate}`,
         qty: 1, unit: d.subtotal, total: d.subtotal, bold: true,
       });
+      const dayOT = calcOT(d.studio_rate, d.call_time || null, d.wrap_time || null);
+      if (dayOT.otHrs > 0) {
+        otHrs += dayOT.otHrs;
+        otAmount += dayOT.otAmount;
+        lines.push({
+          desc: `Overtime — Day ${i + 1} · ${dayOT.otHrs.toFixed(2)} hr${dayOT.otHrs > 1 ? 's' : ''} × ₱${dayOT.otRate.toLocaleString()}/hr (${fmt24(d.call_time!)} – ${fmt24(d.wrap_time!)})`,
+          qty: 1, unit: dayOT.otAmount, total: dayOT.otAmount, indent: true,
+        });
+      }
     });
   } else {
     lines.push({
       desc: `Studio — ${studioRate.label}${booking.studio_rate === 'hourly' ? ` (${booking.hours} hrs × ${formatPHP(studioRate.price)}/hr)` : ''}`,
       qty: 1, unit: booking.subtotal, total: booking.subtotal, bold: true,
     });
+    const otCalc = calcOT(booking.studio_rate, booking.call_time, booking.wrap_time);
+    otHrs = booking.overtime_hours || otCalc.otHrs;
+    otAmount = booking.overtime_amount || otCalc.otAmount;
+    if (otHrs > 0) {
+      lines.push({
+        desc: `Overtime — ${otHrs.toFixed(2)} hr${otHrs > 1 ? 's' : ''} × ₱${OT_RATE.toLocaleString()}/hr${booking.call_time && booking.wrap_time ? ` (${fmt24(booking.call_time)} – ${fmt24(booking.wrap_time)})` : ''}`,
+        qty: 1, unit: otAmount, total: otAmount,
+      });
+    }
   }
 
   equipment.forEach(e => {
@@ -78,16 +102,6 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
     const lineTotal = comp ? 0 : e.rate * e.quantity * (1 - discPct / 100);
     lines.push({ desc: e.name, qty: e.quantity, unit: e.rate, total: lineTotal, indent: true, comp, disc: discPct > 0 ? discPct : undefined });
   });
-
-  const otCalc = calcOT(booking.studio_rate, booking.call_time, booking.wrap_time);
-  const otHrs = booking.overtime_hours || otCalc.otHrs;
-  const otAmount = booking.overtime_amount || otCalc.otAmount;
-  if (otHrs > 0) {
-    lines.push({
-      desc: `Overtime — ${otHrs.toFixed(2)} hr${otHrs > 1 ? 's' : ''} × ₱${OT_RATE.toLocaleString()}/hr${booking.call_time && booking.wrap_time ? ` (${fmt24(booking.call_time)} – ${fmt24(booking.wrap_time)})` : ''}`,
-      qty: 1, unit: otAmount, total: otAmount,
-    });
-  }
 
   // Recompute totals from line items so the document stays accurate even when
   // booking data is edited — never trust stale stored totals for display
