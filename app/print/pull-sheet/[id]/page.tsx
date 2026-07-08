@@ -2,6 +2,7 @@
 import { use, useEffect, useState } from 'react';
 import { formatDate, fmt24 } from '@/lib/utils';
 import { Booking, BookingEquipment, STUDIO_RATES, CATEGORY_LABELS } from '@/lib/types';
+import BackButton from '@/components/BackButton';
 
 interface Crew { id: number; name: string; role: string; phone: string; }
 
@@ -132,6 +133,7 @@ export default function PullSheetPage({ params }: { params: Promise<{ id: string
         ))}
       </div>
 
+      <BackButton fallbackHref={`/bookings/${id}`} />
       <button onClick={() => window.print()} className="no-print fixed bottom-6 right-6 bg-[#E32726] text-white px-5 py-2.5 rounded-lg font-semibold shadow-xl hover:bg-[#c41f1e] text-sm">
         🖨️ Print Pull Sheet
       </button>

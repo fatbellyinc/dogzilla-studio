@@ -3,6 +3,7 @@ import React, { use, useEffect, useState, useCallback } from 'react';
 import { formatPHP, formatDate, STUDIO_WHATSAPP, fmt24, calcOT, OT_RATE } from '@/lib/utils';
 import { Booking, BookingEquipment, BookingDay, Payment, Invoice, STUDIO_RATES, VAT_RATE, PAYMENT_ACCOUNTS } from '@/lib/types';
 import ShareDocBar from '@/components/ShareDocBar';
+import BackButton from '@/components/BackButton';
 import * as XLSX from 'xlsx';
 
 interface BookingDetail {
@@ -248,6 +249,7 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
                     {d.day_type === 'setup' ? '🔧 SET-UP' : '🎬 SHOOT'}
                   </span>
                   <span style={{ color: '#888' }}>{new Date(d.date + 'T00:00').toLocaleDateString('en-PH', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+                  {d.call_time && d.wrap_time && <span style={{ color: '#aaa' }}>· {fmt24(d.call_time)} – {fmt24(d.wrap_time)}</span>}
                 </div>
               ))}
             </div>
@@ -430,6 +432,7 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
       </div>{/* end doc-shell */}
 
       {/* Buttons live outside the captured area */}
+      <BackButton fallbackHref={`/bookings/${booking.id}`} />
       <ShareDocBar bookingId={booking.id} docType="invoice" clientName={booking.client_name || ''} clientPhone={booking.client_phone} clientEmail={booking.client_email} docNumber={invoiceNumber} />
       <div className="no-print fixed bottom-0 left-0 right-0 md:bottom-6 md:left-auto md:right-6 flex gap-2 overflow-x-auto px-2 py-2 md:p-0 md:flex-wrap md:justify-end z-50" style={{ WebkitOverflowScrolling: 'touch' }}>
         <button onClick={loadBooking}

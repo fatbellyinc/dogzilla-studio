@@ -1,6 +1,7 @@
 'use client';
 import { STUDIO_RATES, EQUIPMENT_PACKAGES, ADDON_ITEMS, CATEGORY_LABELS } from '@/lib/types';
 import { formatPHP } from '@/lib/utils';
+import BackButton from '@/components/BackButton';
 
 const CATEGORY_ICONS: Record<string, string> = { camera: '🎥', lighting: '💡', beauty: '💄', vtr: '📺' };
 
@@ -155,6 +156,7 @@ export default function RateCardPage() {
         </div>
       </div>
 
+      <BackButton />
       <button onClick={() => window.print()} className="no-print fixed bottom-6 right-6 bg-[#E32726] text-white px-5 py-2.5 rounded-lg font-semibold shadow-xl hover:bg-[#c41f1e] text-sm">
         🖨️ Print Rate Card
       </button>

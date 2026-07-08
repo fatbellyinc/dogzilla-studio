@@ -74,6 +74,8 @@ export interface BookingDay {
   studio_rate: string;
   hours: number;
   subtotal: number;
+  call_time?: string | null;
+  wrap_time?: string | null;
 }
 
 export interface BookingEquipment {

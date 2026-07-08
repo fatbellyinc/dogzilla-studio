@@ -258,6 +258,116 @@ function ShootTimesPanel({ callTime, wrapTime, wrapDate, studioRate, bookingDate
   );
 }
 
+function PerDayShootTimesPanel({ bookingDays, onSaveDay }: {
+  bookingDays: BookingDay[];
+  onSaveDay: (dayId: number, ct: string | null, wt: string | null) => Promise<void>;
+}) {
+  const [selectedId, setSelectedId] = useState<number>(bookingDays[0]?.id);
+  const day = bookingDays.find(d => d.id === selectedId) || bookingDays[0];
+  const [ct, setCt] = useState<string | null>(day?.call_time || null);
+  const [wt, setWt] = useState<string | null>(day?.wrap_time || null);
+  const [dirty, setDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const d = bookingDays.find(x => x.id === selectedId) || bookingDays[0];
+    setCt(d?.call_time || null);
+    setWt(d?.wrap_time || null);
+    setDirty(false);
+  }, [selectedId, bookingDays]);
+
+  if (!day) return null;
+  const ot = calcOT(day.studio_rate, ct, wt);
+  const dayLabel = new Date(day.date + 'T00:00').toLocaleDateString('en-PH', { weekday: 'short', month: 'short', day: 'numeric' });
+
+  function handleChange(newCt: string | null, newWt: string | null) {
+    setCt(newCt); setWt(newWt); setDirty(true);
+  }
+
+  async function save() {
+    setSaving(true);
+    await onSaveDay(day.id, ct, wt);
+    setSaving(false);
+    setDirty(false);
+  }
+
+  async function clearTimes() {
+    setCt(null); setWt(null);
+    setSaving(true);
+    await onSaveDay(day.id, null, null);
+    setSaving(false);
+    setDirty(false);
+  }
+
+  return (
+    <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4">
+      <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+        <h2 className="text-xs text-white/40 uppercase tracking-wider">Shoot Times — per day</h2>
+        <select value={selectedId} onChange={e => setSelectedId(Number(e.target.value))}
+          className="bg-[#0f0f0f] border border-[#2a2a2a] rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-[#E32726]">
+          {bookingDays.map((d, i) => (
+            <option key={d.id} value={d.id}>
+              Day {i + 1} — {new Date(d.date + 'T00:00').toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })} ({d.day_type === 'setup' ? 'Setup' : 'Shoot'})
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="text-xs text-white/30 mb-2">{dayLabel} — {day.day_type === 'setup' ? '🔧 Setup Day' : '🎬 Shoot Day'}</div>
+
+      <div className="grid grid-cols-2 gap-3 mb-3">
+        <TimePicker label="Call Time (In)" value={ct} onChange={v => handleChange(v, wt)} placeholder="Set call time" />
+        <TimePicker label="Wrap Time (Out)" value={wt} onChange={v => handleChange(ct, v)} placeholder="Set wrap time" />
+      </div>
+
+      {ct && wt && (
+        <div className="bg-[#0f0f0f] rounded-lg p-3 space-y-1.5 text-sm mb-3">
+          <div className="flex justify-between text-white/60">
+            <span>Call → Wrap</span>
+            <span className="text-white font-medium">{fmt24(ct)} → {fmt24(wt)}</span>
+          </div>
+          <div className="flex justify-between text-white/60">
+            <span>Total duration</span>
+            <span className="text-white">{ot.durationHrs.toFixed(2)} hrs</span>
+          </div>
+          {ot.otHrs > 0 ? (
+            <div className="flex justify-between text-[#E32726] font-semibold border-t border-[#2a2a2a] pt-1.5">
+              <span>Overtime {ot.otHrs.toFixed(2)} hrs × ₱{(ot.otRate ?? OT_RATE).toLocaleString()}/hr</span>
+              <span>{formatPHP(ot.otAmount)}</span>
+            </div>
+          ) : ot.durationHrs > 0 ? (
+            <div className="flex justify-between text-green-400 border-t border-[#2a2a2a] pt-1.5">
+              <span>No overtime ✓</span>
+              <span>Within {ot.includedShootHrs}hr shoot limit</span>
+            </div>
+          ) : null}
+        </div>
+      )}
+
+      {ct && wt && (
+        <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg px-3 py-2 text-[10px] text-yellow-400 mb-3">
+          ⚡ This day&apos;s electricity line item (if any) auto-updates to {ot.durationHrs.toFixed(1)}hrs × ₱850 = <strong>{formatPHP(Math.round(ot.durationHrs * 850))}</strong> when saved.
+        </div>
+      )}
+
+      <div className="flex gap-2">
+        {dirty && (
+          <button onClick={save} disabled={saving}
+            className="flex-1 bg-[#E32726] text-white text-xs py-2 rounded font-medium disabled:opacity-50">
+            {saving ? 'Saving…' : 'Save This Day'}
+          </button>
+        )}
+        {(day.call_time || day.wrap_time) && (
+          <button onClick={clearTimes} disabled={saving}
+            className="px-3 text-xs text-white/40 hover:text-red-400 border border-[#2a2a2a] rounded transition-colors">
+            ✕ Clear
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function StatusBadge({ status }: { status: string }) {
   const colors: Record<string, string> = {
     pending: 'bg-yellow-500/20 text-yellow-400',
@@ -483,6 +593,14 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
       }
     }
 
+    await load();
+  }
+
+  async function saveDayTimes(dayId: number, ct: string | null, wt: string | null) {
+    await fetch(`/api/bookings/${id}/days/${dayId}/times`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ call_time: ct, wrap_time: wt }),
+    });
     await load();
   }
 
@@ -720,6 +838,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                       <span className={d.day_type === 'setup' ? 'text-yellow-400' : 'text-white/60'}>
                         Day {i + 1} — {new Date(d.date + 'T00:00').toLocaleDateString('en-PH', { weekday: 'short', month: 'short', day: 'numeric' })}
                         {' '}({d.day_type === 'setup' ? '🔧 Setup' : '🎬 Shoot'})
+                        {d.call_time && d.wrap_time && <span className="text-white/30"> · {fmt24(d.call_time)} → {fmt24(d.wrap_time)}</span>}
                       </span>
                       <span className="text-white">{formatPHP(d.subtotal)}</span>
                     </div>
@@ -851,15 +970,19 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
             )}
           </div>
 
-          {/* Shoot Times & OT */}
-          <ShootTimesPanel
-            callTime={callTime}
-            wrapTime={wrapTime}
-            wrapDate={booking.wrap_date || null}
-            studioRate={booking.studio_rate}
-            bookingDate={booking.booking_date}
-            onSave={saveTimes}
-          />
+          {/* Shoot Times & OT — per-day picker for multi-day bookings, single panel otherwise */}
+          {bookingDays && bookingDays.length > 1 ? (
+            <PerDayShootTimesPanel bookingDays={bookingDays} onSaveDay={saveDayTimes} />
+          ) : (
+            <ShootTimesPanel
+              callTime={callTime}
+              wrapTime={wrapTime}
+              wrapDate={booking.wrap_date || null}
+              studioRate={booking.studio_rate}
+              bookingDate={booking.booking_date}
+              onSave={saveTimes}
+            />
+          )}
 
           {/* Payments */}
           <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4">

@@ -3,6 +3,7 @@ import { use, useEffect, useState } from 'react';
 import { formatDate } from '@/lib/utils';
 import { Booking, BookingEquipment, STUDIO_RATES } from '@/lib/types';
 import ShareDocBar from '@/components/ShareDocBar';
+import BackButton from '@/components/BackButton';
 
 interface BIRData {
   booking: Booking & { client_tin?: string; client_company?: string; client_address?: string };
@@ -163,6 +164,8 @@ export default function BIRInvoicePage({ params }: { params: Promise<{ id: strin
 
   return (
     <div style={{ background: 'white', color: '#111', fontFamily: 'Arial, sans-serif', maxWidth: '794px', margin: '0 auto', padding: '20px', fontSize: '11px' }}>
+
+      <BackButton fallbackHref={`/bookings/${id}`} />
 
       {/* Controls — no-print */}
       <div className="no-print mb-4 flex flex-wrap gap-3 items-center bg-gray-100 p-3 rounded-lg">
