@@ -420,6 +420,10 @@ function initSchema(db: Database.Database) {
     ['MON-011', 'Mars 400S Pro', 'monitor', 2000, 2, '', 0],
     ['RIG-001', 'Mofage Talos Damping Magic Arm', 'rigging', 500, 1, '', 0],
     ['RIG-002', 'iFootage Spider Crab Magic Arm with QR', 'rigging', 300, 1, '', 0],
+    ['MON-012', 'Sony 42" TV', 'monitor', 1000, 1, '', 150],
+    ['MON-013', 'Sony 32" TV', 'monitor', 750, 1, '', 100],
+    ['MON-014', 'Yokohama 32" TV', 'monitor', 500, 1, '', 100],
+    ['GRP-030', '20x20 Green/Blue Screen — Back to Back', 'grip', 6000, 1, '', 0],
   ];
   for (const [code, name, category, daily_rate, quantity, description, wattage] of equipmentUpserts) {
     try {
@@ -691,6 +695,7 @@ function seedEquipment(db: Database.Database) {
     ['GRP-027', '8x8 Bleached Muslin (Modern Studio)', 'grip', 1500, 1, '', 0],
     ['GRP-028', '12x12 Chroma Key Green/Blue with Bag', 'grip', 5000, 1, '', 0],
     ['GRP-029', 'Chroma Flexible', 'grip', 1500, 1, '', 0],
+    ['GRP-030', '20x20 Green/Blue Screen — Back to Back', 'grip', 6000, 1, '', 0],
 
     // TRIPODS — passive
     ['TRP-001', 'Smallrig Tripod', 'tripod', 1000, 2, '', 0],
@@ -723,6 +728,9 @@ function seedEquipment(db: Database.Database) {
     ['MON-009', 'Accsoon Cineview SE Wireless Video', 'monitor', 2500, 2, 'TX/RX ~5W each', 5],
     ['MON-010', 'Vaxis Atom 500 Wireless Video TX/RX', 'monitor', 2500, 1, 'TX/RX ~5W', 5],
     ['MON-011', 'Mars 400S Pro', 'monitor', 2000, 2, '', 0],
+    ['MON-012', 'Sony 42" TV', 'monitor', 1000, 1, '', 150],
+    ['MON-013', 'Sony 32" TV', 'monitor', 750, 1, '', 100],
+    ['MON-014', 'Yokohama 32" TV', 'monitor', 500, 1, '', 100],
 
     // CAMERA / RIGGING ACCESSORIES
     ['RIG-001', 'Mofage Talos Damping Magic Arm', 'rigging', 500, 1, '', 0],
