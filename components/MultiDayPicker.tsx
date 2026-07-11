@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import CalendarPicker from './CalendarPicker';
 import { formatPHP } from '@/lib/utils';
-import { STUDIO_RATES } from '@/lib/types';
+import { STUDIO_RATES, NO_DATE_SENTINEL } from '@/lib/types';
 
 export interface DayConfig {
   date: string;
@@ -45,8 +45,18 @@ function calcSubtotal(day: DayConfig): number {
 }
 
 function dayLabel(dateStr: string) {
+  if (dateStr === NO_DATE_SENTINEL) return '📌 No date yet';
   const d = new Date(dateStr + 'T00:00');
   return d.toLocaleDateString('en-PH', { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+// Sort real dates chronologically but always keep a no-date-yet placeholder day last,
+// regardless of its sentinel value's literal (very old) date string.
+function daySortKey(date: string) {
+  return date === NO_DATE_SENTINEL ? '9999-99-99' : date;
+}
+function sortDays(list: DayConfig[]) {
+  return [...list].sort((a, b) => daySortKey(a.date).localeCompare(daySortKey(b.date)));
 }
 
 const DAY_RATES_SETUP: (keyof typeof STUDIO_RATES)[] = ['setup'];
@@ -61,27 +71,40 @@ export default function MultiDayPicker({ days, onChange, bookedDates = [], block
     const defaultType: 'setup' | 'shoot' = 'shoot';
     const defaultRate: keyof typeof STUDIO_RATES = 'fullday';
     const day: DayConfig = { date, day_type: defaultType, studio_rate: defaultRate, hours: 8, subtotal: STUDIO_RATES[defaultRate].price, is_pencil: false };
-    const newDays = [...days, day].sort((a, b) => a.date.localeCompare(b.date));
-    onChange(newDays);
+    onChange(sortDays([...days, day]));
     setPickerDate('');
+  }
+
+  // A day with a known price but no date yet — e.g. two days are already locked in and a
+  // third is planned but not yet scheduled. Only one at a time (there's nothing to key it by
+  // once a second placeholder exists); assign it a real date via the picker on its own card,
+  // or add another placeholder once this one has a date.
+  function addTBDDay() {
+    if (days.some(d => d.date === NO_DATE_SENTINEL)) return;
+    const defaultRate: keyof typeof STUDIO_RATES = 'fullday';
+    const day: DayConfig = { date: NO_DATE_SENTINEL, day_type: 'shoot', studio_rate: defaultRate, hours: 8, subtotal: STUDIO_RATES[defaultRate].price, is_pencil: true };
+    onChange(sortDays([...days, day]));
   }
 
   function removeDay(date: string) {
     onChange(days.filter(d => d.date !== date));
   }
 
-  // Fill every date between the first day and a chosen end date — for the common
+  // Fill every date between the first real day and a chosen end date — for the common
   // consecutive-range case, without forcing all multi-day bookings to be contiguous
   function fillRange() {
-    if (!days[0] || !fillRangeEnd) return;
-    const dates = datesBetween(days[0].date, fillRangeEnd);
-    const newDays = dates.map(date => {
+    const firstReal = days.find(d => d.date !== NO_DATE_SENTINEL);
+    if (!firstReal || !fillRangeEnd) return;
+    const dates = datesBetween(firstReal.date, fillRangeEnd);
+    const filled = dates.map(date => {
       const existing = days.find(d => d.date === date);
       if (existing) return existing;
       const defaultRate: keyof typeof STUDIO_RATES = 'fullday';
       return { date, day_type: 'shoot' as const, studio_rate: defaultRate, hours: 8, subtotal: STUDIO_RATES[defaultRate].price, is_pencil: false };
     });
-    onChange(newDays.sort((a, b) => a.date.localeCompare(b.date)));
+    // Keep any existing no-date-yet placeholder — filling a range shouldn't drop it
+    const tbd = days.filter(d => d.date === NO_DATE_SENTINEL);
+    onChange(sortDays([...filled, ...tbd]));
     setFillRangeEnd('');
   }
 
@@ -93,6 +116,14 @@ export default function MultiDayPicker({ days, onChange, bookedDates = [], block
       return updated;
     });
     onChange(newDays);
+  }
+
+  // Assign a real date to a no-date-yet placeholder — re-sorts since it moves out of the
+  // always-last TBD slot into chronological order with the rest.
+  function setDayDate(index: number, date: string) {
+    if (!date || days.some((d, i) => i !== index && d.date === date)) return;
+    const newDays = days.map((d, i) => i === index ? { ...d, date } : d);
+    onChange(sortDays(newDays));
   }
 
   function setDayType(index: number, type: 'setup' | 'shoot') {
@@ -120,35 +151,43 @@ export default function MultiDayPicker({ days, onChange, bookedDates = [], block
           pencilDates={pencilDates}
         />
       ) : (
-        <div className="grid grid-cols-2 gap-3">
-          <CalendarPicker
-            label="+ Add Another Day"
-            value={pickerDate}
-            onChange={d => addDay(d)}
-            bookedDates={bookedDates}
-            blockoutDates={blockoutDates}
-            pencilDates={pencilDates}
-            placeholder="Pick any date — doesn't have to be consecutive"
-          />
-          <div>
-            <label className="text-xs text-white/40 mb-1 block">Or fill a consecutive range up to...</label>
-            <div className="flex gap-1.5">
-              <CalendarPicker
-                value={fillRangeEnd}
-                onChange={setFillRangeEnd}
-                bookedDates={bookedDates}
-                blockoutDates={blockoutDates}
-                pencilDates={pencilDates}
-                minDate={days[days.length - 1]?.date}
-                placeholder="End date"
-                className="flex-1"
-              />
-              <button type="button" onClick={fillRange} disabled={!fillRangeEnd}
-                className="shrink-0 px-3 py-2 bg-[#2a2a2a] text-white text-xs rounded-lg disabled:opacity-40 hover:bg-[#3a3a3a]">
-                Fill
-              </button>
+        <div className="space-y-2">
+          <div className="grid grid-cols-2 gap-3">
+            <CalendarPicker
+              label="+ Add Another Day"
+              value={pickerDate}
+              onChange={d => addDay(d)}
+              bookedDates={bookedDates}
+              blockoutDates={blockoutDates}
+              pencilDates={pencilDates}
+              placeholder="Pick any date — doesn't have to be consecutive"
+            />
+            <div>
+              <label className="text-xs text-white/40 mb-1 block">Or fill a consecutive range up to...</label>
+              <div className="flex gap-1.5">
+                <CalendarPicker
+                  value={fillRangeEnd}
+                  onChange={setFillRangeEnd}
+                  bookedDates={bookedDates}
+                  blockoutDates={blockoutDates}
+                  pencilDates={pencilDates}
+                  minDate={[...days].reverse().find(d => d.date !== NO_DATE_SENTINEL)?.date}
+                  placeholder="End date"
+                  className="flex-1"
+                />
+                <button type="button" onClick={fillRange} disabled={!fillRangeEnd}
+                  className="shrink-0 px-3 py-2 bg-[#2a2a2a] text-white text-xs rounded-lg disabled:opacity-40 hover:bg-[#3a3a3a]">
+                  Fill
+                </button>
+              </div>
             </div>
           </div>
+          {!days.some(d => d.date === NO_DATE_SENTINEL) && (
+            <button type="button" onClick={addTBDDay}
+              className="w-full py-2 rounded-lg text-xs font-semibold border border-dashed border-yellow-500/30 text-yellow-400/70 hover:bg-yellow-500/10 hover:text-yellow-400 transition-all">
+              📌 + Add Another Day — No Date Yet
+            </button>
+          )}
         </div>
       )}
 
@@ -179,12 +218,28 @@ export default function MultiDayPicker({ days, onChange, bookedDates = [], block
                 </div>
               </div>
 
-              {/* Confirmed vs tentative — independent per day, since some dates in a multi-day
-                  booking may be locked in while others are still being held */}
-              <button type="button" onClick={() => togglePencil(i)}
-                className={`w-full mb-2 py-1.5 rounded-lg text-xs font-semibold transition-all border ${day.is_pencil ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/40' : 'bg-green-500/10 text-green-400 border-green-500/30 hover:bg-yellow-500/10 hover:text-yellow-400 hover:border-yellow-500/30'}`}>
-                {day.is_pencil ? '✏️ Tentative — tap to confirm' : '✓ Confirmed — tap to mark tentative'}
-              </button>
+              {day.date === NO_DATE_SENTINEL ? (
+                /* No date assigned yet — pick one whenever it's confirmed, instead of a
+                   confirmed/tentative toggle that wouldn't mean anything without a date */
+                <div className="mb-2">
+                  <CalendarPicker
+                    label="Set the date once known"
+                    value=""
+                    onChange={d => setDayDate(i, d)}
+                    bookedDates={bookedDates}
+                    blockoutDates={blockoutDates}
+                    pencilDates={pencilDates}
+                    placeholder="No date yet — tap to assign"
+                  />
+                </div>
+              ) : (
+                /* Confirmed vs tentative — independent per day, since some dates in a multi-day
+                    booking may be locked in while others are still being held */
+                <button type="button" onClick={() => togglePencil(i)}
+                  className={`w-full mb-2 py-1.5 rounded-lg text-xs font-semibold transition-all border ${day.is_pencil ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/40' : 'bg-green-500/10 text-green-400 border-green-500/30 hover:bg-yellow-500/10 hover:text-yellow-400 hover:border-yellow-500/30'}`}>
+                  {day.is_pencil ? '✏️ Tentative — tap to confirm' : '✓ Confirmed — tap to mark tentative'}
+                </button>
+              )}
 
               {/* Setup vs Shoot toggle */}
               <div className="flex gap-1.5 mb-2">

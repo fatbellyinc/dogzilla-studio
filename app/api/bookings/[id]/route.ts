@@ -16,7 +16,12 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
   const payments = db.prepare('SELECT * FROM payments WHERE booking_id = ? ORDER BY paid_at').all(id);
   const quotation = db.prepare('SELECT * FROM quotations WHERE booking_id = ? ORDER BY created_at DESC LIMIT 1').get(id);
   const invoice = db.prepare('SELECT * FROM invoices WHERE booking_id = ? ORDER BY created_at DESC LIMIT 1').get(id);
-  const bookingDays = db.prepare('SELECT * FROM booking_days WHERE booking_id = ? ORDER BY date').all(id);
+  // Real dates sort chronologically first; any "no date yet" placeholder (sentinel date, which
+  // is alphabetically earliest) is pushed to the end instead of appearing to be the first day.
+  const bookingDays = db.prepare(`
+    SELECT * FROM booking_days WHERE booking_id = ?
+    ORDER BY CASE WHEN date = ? THEN 1 ELSE 0 END, date
+  `).all(id, NO_DATE_SENTINEL);
   return NextResponse.json({ booking, equipment, payments, quotation, invoice, bookingDays });
 }
 

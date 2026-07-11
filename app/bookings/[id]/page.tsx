@@ -4,7 +4,16 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { formatPHP, formatDate, fmt24, calcOT, OT_RATE, SETUP_OT_RATE } from '@/lib/utils';
-import { Booking, BookingEquipment, Payment, Quotation, Invoice, BookingDay, STUDIO_RATES, VAT_RATE, SHOOT_TYPES } from '@/lib/types';
+import { Booking, BookingEquipment, Payment, Quotation, Invoice, BookingDay, STUDIO_RATES, VAT_RATE, SHOOT_TYPES, NO_DATE_SENTINEL } from '@/lib/types';
+
+function shortDayLabel(date: string) {
+  if (date === NO_DATE_SENTINEL) return '📌 No date yet';
+  return new Date(date + 'T00:00').toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
+}
+function fullDayLabel(date: string) {
+  if (date === NO_DATE_SENTINEL) return '📌 No date yet';
+  return new Date(date + 'T00:00').toLocaleDateString('en-PH', { weekday: 'short', month: 'short', day: 'numeric' });
+}
 import OverheadPanel from '@/components/OverheadPanel';
 import TimePicker from '@/components/TimePicker';
 import BookingEditor from '@/components/BookingEditor';
@@ -278,7 +287,7 @@ function PerDayShootTimesPanel({ bookingDays, onSaveDay }: {
 
   if (!day) return null;
   const ot = calcOT(day.studio_rate, ct, wt);
-  const dayLabel = new Date(day.date + 'T00:00').toLocaleDateString('en-PH', { weekday: 'short', month: 'short', day: 'numeric' });
+  const dayLabel = fullDayLabel(day.date);
 
   function handleChange(newCt: string | null, newWt: string | null) {
     setCt(newCt); setWt(newWt); setDirty(true);
@@ -307,7 +316,7 @@ function PerDayShootTimesPanel({ bookingDays, onSaveDay }: {
           className="bg-[#0f0f0f] border border-[#2a2a2a] rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-[#E32726]">
           {bookingDays.map((d, i) => (
             <option key={d.id} value={d.id}>
-              Day {i + 1} — {new Date(d.date + 'T00:00').toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })} ({d.day_type === 'setup' ? 'Setup' : 'Shoot'})
+              Day {i + 1} — {shortDayLabel(d.date)} ({d.day_type === 'setup' ? 'Setup' : 'Shoot'})
             </option>
           ))}
         </select>
@@ -866,7 +875,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                   {bookingDays.map((d, i) => (
                     <div key={d.id} className="flex justify-between text-xs py-0.5">
                       <span className={d.day_type === 'setup' ? 'text-yellow-400' : 'text-white/60'}>
-                        Day {i + 1} — {new Date(d.date + 'T00:00').toLocaleDateString('en-PH', { weekday: 'short', month: 'short', day: 'numeric' })}
+                        Day {i + 1} — {fullDayLabel(d.date)}
                         {' '}({d.day_type === 'setup' ? '🔧 Setup' : '🎬 Shoot'})
                         {d.call_time && d.wrap_time && <span className="text-white/30"> · {fmt24(d.call_time)} → {fmt24(d.wrap_time)}</span>}
                         {!!d.is_pencil && <span className="text-yellow-400"> · ✏️ tentative</span>}

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { logActivity, ACTIONS } from '@/lib/activity';
 import { recomputeBookingTotals } from '@/lib/booking-calc';
+import { NO_DATE_SENTINEL } from '@/lib/types';
 
 // Duplicates an existing booking onto a new date. Every detail — equipment, add-ons,
 // discounts, VAT/deposit flags, times, project info — carries over unchanged; only the
@@ -22,11 +23,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const equipment = db.prepare('SELECT * FROM booking_equipment WHERE booking_id = ? ORDER BY id').all(id) as
     { equipment_id: number | null; quantity: number; rate: number; name: string; item_type: string; is_complimentary: number; discount_pct: number; day_date: string | null }[];
 
-  const oldFirstDate = oldDays[0]?.date || (booking.booking_date as string);
+  // First REAL day, not literally oldDays[0] — a "no date yet" placeholder's sentinel value
+  // sorts alphabetically first and would otherwise corrupt the offset calculation.
+  const oldFirstDate = oldDays.find(d => d.date !== NO_DATE_SENTINEL)?.date || (booking.booking_date as string);
   const offsetMs = new Date(newFirstDate + 'T00:00').getTime() - new Date(oldFirstDate + 'T00:00').getTime();
   const offsetDays = Math.round(offsetMs / 86400000);
 
   function shift(dateStr: string) {
+    if (dateStr === NO_DATE_SENTINEL) return dateStr; // placeholder days carry over as still-unset
     const d = new Date(dateStr + 'T00:00');
     d.setDate(d.getDate() + offsetDays);
     return d.toISOString().slice(0, 10);
@@ -37,7 +41,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     : [{ date: newFirstDate, day_type: 'shoot', studio_rate: booking.studio_rate as string, hours: booking.hours as number, subtotal: booking.subtotal as number, call_time: booking.call_time as string | null, wrap_time: booking.wrap_time as string | null, is_pencil: 0 }];
 
   const isEquipmentOnly = newDays.every(d => d.studio_rate === 'equipment_only');
-  const allDates = newDays.map(d => d.date);
+  const allDates = newDays.map(d => d.date).filter(d => d !== NO_DATE_SENTINEL);
 
   // Same double-booking guard as normal booking creation
   if (allDates.length > 0 && !isEquipmentOnly) {
@@ -63,8 +67,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
   }
 
-  const newBookingDate = newDays[0].date;
-  const newEndDate = newDays.length > 1 ? newDays[newDays.length - 1].date : null;
+  const newRealDays = newDays.filter(d => d.date !== NO_DATE_SENTINEL);
+  const newBookingDate = newRealDays[0]?.date || NO_DATE_SENTINEL;
+  const newEndDate = newRealDays.length > 1 ? newRealDays[newRealDays.length - 1].date : null;
 
   const result = db.prepare(`
     INSERT INTO bookings (client_id, booking_date, end_date, studio_rate, hours, subtotal, equipment_total, total, deposit_amount, discount_type, discount_value, discount_amount, status, notes, project_name, shoot_type, production_house, is_pencil, no_deposit, vat_exempt, call_time, wrap_time)

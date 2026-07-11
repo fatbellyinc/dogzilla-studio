@@ -41,8 +41,8 @@ export async function GET(req: NextRequest) {
   // of those dates are still tentative (per-day is_pencil) vs confirmed, since a multi-day
   // booking can have some days locked in and others still held.
   const dayRows = bookings.length
-    ? db.prepare(`SELECT booking_id, date, is_pencil FROM booking_days WHERE booking_id IN (${bookings.map(() => '?').join(',')}) AND studio_rate != 'equipment_only'`)
-        .all(...bookings.map(b => b.id)) as { booking_id: number; date: string; is_pencil: number }[]
+    ? db.prepare(`SELECT booking_id, date, is_pencil FROM booking_days WHERE booking_id IN (${bookings.map(() => '?').join(',')}) AND studio_rate != 'equipment_only' AND date != ?`)
+        .all(...bookings.map(b => b.id), NO_DATE_SENTINEL) as { booking_id: number; date: string; is_pencil: number }[]
     : [];
   const daysByBooking = new Map<number, string[]>();
   const pencilDaysByBooking = new Map<number, string[]>();
@@ -78,8 +78,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'At least one date is required (or mark this booking as date TBD)' }, { status: 400 });
   }
   const studioSubtotal = days.reduce((s, d) => s + (d.subtotal || 0), 0);
-  const bookingDate = days[0]?.date || body.booking_date || NO_DATE_SENTINEL;
-  const endDate = days.length > 1 ? days[days.length - 1].date : null;
+  // Booking-level date range is derived from real (non-placeholder) days only — a mixed
+  // booking with e.g. two confirmed days and one "no date yet" day shouldn't have its
+  // end_date corrupted by the placeholder's sentinel value.
+  const realDays = days.filter(d => d.date !== NO_DATE_SENTINEL);
+  const bookingDate = realDays[0]?.date || body.booking_date || NO_DATE_SENTINEL;
+  const endDate = realDays.length > 1 ? realDays[realDays.length - 1].date : null;
   // For single-day backwards compat
   const studio_rate = days[0]?.studio_rate || body.studio_rate || 'fullday';
   const hours = days[0]?.hours || body.hours || 1;
@@ -102,7 +106,9 @@ export async function POST(req: NextRequest) {
   // selections don't get falsely blocked by, or falsely block, gaps between someone else's days.
   // Equipment-only bookings/days don't occupy the studio, so they never conflict.
   const isEquipmentOnly = days.every(d => d.studio_rate === 'equipment_only') || representativeRate === 'equipment_only';
-  const allDates = days.map(d => d.date);
+  // Placeholder "no date yet" days never occupy the studio and must never be checked for
+  // conflicts — their sentinel date isn't a real date.
+  const allDates = realDays.map(d => d.date);
   if (allDates.length > 0 && !isEquipmentOnly) {
     const placeholders = allDates.map(() => '?').join(',');
     const conflicts = db.prepare(`
@@ -154,7 +160,7 @@ export async function POST(req: NextRequest) {
   // Generate recurring future bookings
   if (recurrence && recurrence_end && bookingDate) {
     const endRecur = new Date(recurrence_end + 'T00:00');
-    let nextDate = new Date(bookingDate + 'T00:00');
+    const nextDate = new Date(bookingDate + 'T00:00');
     const insRecur = db.prepare(`INSERT INTO bookings (client_id, booking_date, studio_rate, hours, subtotal, equipment_total, total, deposit_amount, discount_type, discount_value, discount_amount, status, notes, project_name, shoot_type, production_house, is_pencil, recurrence, series_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,'pending',?,?,?,?,?,?,?)`);
     const insEq = db.prepare(`INSERT INTO booking_equipment (booking_id, equipment_id, quantity, rate, name, item_type, is_complimentary, discount_pct) VALUES (?,?,?,?,?,?,?,?)`);
 

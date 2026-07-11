@@ -2,7 +2,12 @@
 import { use, useEffect, useState, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { formatPHP, formatDate, fmt24, calcOT, OT_RATE } from '@/lib/utils';
-import { Booking, BookingEquipment, Quotation, BookingDay, Payment, STUDIO_RATES, VAT_RATE, PAYMENT_ACCOUNTS } from '@/lib/types';
+import { Booking, BookingEquipment, Quotation, BookingDay, Payment, STUDIO_RATES, VAT_RATE, PAYMENT_ACCOUNTS, NO_DATE_SENTINEL } from '@/lib/types';
+
+function fullDayLabel(date: string) {
+  if (date === NO_DATE_SENTINEL) return '📌 No date yet';
+  return new Date(date + 'T00:00').toLocaleDateString('en-PH', { weekday: 'short', month: 'short', day: 'numeric' });
+}
 import ShareDocBar from '@/components/ShareDocBar';
 import BackButton from '@/components/BackButton';
 import * as XLSX from 'xlsx';
@@ -56,7 +61,7 @@ function DocView({ bookingId }: { bookingId: string }) {
     bookingDays.forEach((d, i) => {
       const dayRate = STUDIO_RATES[d.studio_rate as keyof typeof STUDIO_RATES];
       const dayLabel = d.day_type === 'setup' ? '🔧 Set-Up Day' : '🎬 Shoot Day';
-      const dateStr = new Date(d.date + 'T00:00').toLocaleDateString('en-PH', { weekday: 'short', month: 'short', day: 'numeric' });
+      const dateStr = fullDayLabel(d.date);
       lines.push({
         code: d.studio_rate.toUpperCase(),
         desc: `Day ${i + 1} — ${dayLabel} · ${dateStr} · ${dayRate?.label || d.studio_rate}`,
@@ -271,7 +276,7 @@ function DocView({ bookingId }: { bookingId: string }) {
                   <span style={{ color: d.day_type === 'setup' ? '#b45309' : '#1d4ed8', fontWeight: 600, fontSize: '10px', background: d.day_type === 'setup' ? '#fef3c7' : '#dbeafe', padding: '1px 5px', borderRadius: '3px' }}>
                     {d.day_type === 'setup' ? '🔧 SET-UP' : '🎬 SHOOT'}
                   </span>
-                  <span style={{ color: '#888' }}>{new Date(d.date + 'T00:00').toLocaleDateString('en-PH', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+                  <span style={{ color: '#888' }}>{fullDayLabel(d.date)}</span>
                   {d.call_time && d.wrap_time && <span style={{ color: '#aaa' }}>· {fmt24(d.call_time)} – {fmt24(d.wrap_time)}</span>}
                 </div>
               ))}

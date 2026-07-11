@@ -3,15 +3,22 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { logActivity, ACTIONS } from '@/lib/activity';
 import { recomputeBookingTotals } from '@/lib/booking-calc';
+import { NO_DATE_SENTINEL } from '@/lib/types';
 
 interface DayInput { date: string; day_type: string; studio_rate: string; hours: number; subtotal: number; is_pencil?: boolean }
+
+// Sort real dates chronologically but keep any "no date yet" placeholder day last, regardless
+// of its sentinel value's literal (very old) date string.
+function daySortKey(date: string) {
+  return date === NO_DATE_SENTINEL ? '9999-99-99' : date;
+}
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const db = getDb();
   const { id } = await params;
   const bookingId = Number(id);
   const { booking_days } = await req.json();
-  const days: DayInput[] = (booking_days || []).slice().sort((a: DayInput, b: DayInput) => a.date.localeCompare(b.date));
+  const days: DayInput[] = (booking_days || []).slice().sort((a: DayInput, b: DayInput) => daySortKey(a.date).localeCompare(daySortKey(b.date)));
 
   if (days.length === 0) {
     return NextResponse.json({ error: 'A booking needs at least one day' }, { status: 400 });
@@ -21,9 +28,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   const representativeRate = shootDay.studio_rate;
   const isEquipmentOnly = days.every(d => d.studio_rate === 'equipment_only');
 
-  // Double-booking guard — same exact-date logic as creation, excluding this booking itself
-  const allDates = days.map(d => d.date);
-  if (!isEquipmentOnly) {
+  // Double-booking guard — same exact-date logic as creation, excluding this booking itself.
+  // Placeholder "no date yet" days never occupy the studio and must never be checked.
+  const realDays = days.filter(d => d.date !== NO_DATE_SENTINEL);
+  const allDates = realDays.map(d => d.date);
+  if (!isEquipmentOnly && allDates.length > 0) {
     const placeholders = allDates.map(() => '?').join(',');
     const conflicts = db.prepare(`
       SELECT b.id, bd.date as conflict_date FROM bookings b
@@ -64,13 +73,14 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     insDay.run(bookingId, d.date, d.day_type, d.studio_rate, d.hours || 1, d.subtotal || 0, preserved?.call_time || null, preserved?.wrap_time || null, d.is_pencil ? 1 : 0);
   }
 
-  const bookingDate = days[0].date;
-  const endDate = days.length > 1 ? days[days.length - 1].date : null;
+  // Booking-level date range comes from real days only — if every day is still a "no date
+  // yet" placeholder (all real dates removed), the booking itself reverts to date-TBD.
+  const bookingDate = realDays[0]?.date || NO_DATE_SENTINEL;
+  const endDate = realDays.length > 1 ? realDays[realDays.length - 1].date : null;
   const hours = days[0].hours || 1;
 
-  // Saving real dates always means the booking is no longer "date TBD"
-  db.prepare(`UPDATE bookings SET booking_date=?, end_date=?, studio_rate=?, hours=?, date_tbd=0 WHERE id=?`)
-    .run(bookingDate, endDate, representativeRate, hours, bookingId);
+  db.prepare(`UPDATE bookings SET booking_date=?, end_date=?, studio_rate=?, hours=?, date_tbd=? WHERE id=?`)
+    .run(bookingDate, endDate, representativeRate, hours, realDays.length === 0 ? 1 : 0, bookingId);
   recomputeBookingTotals(db, bookingId);
 
   logActivity(bookingId, ACTIONS.ITEMS_EDITED, `Booking dates updated — ${days.length} day(s)`);
