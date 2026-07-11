@@ -349,6 +349,7 @@ function initSchema(db: Database.Database) {
     `ALTER TABLE booking_equipment ADD COLUMN day_date TEXT`,
     `ALTER TABLE booking_days ADD COLUMN call_time TEXT`,
     `ALTER TABLE booking_days ADD COLUMN wrap_time TEXT`,
+    `ALTER TABLE bookings ADD COLUMN date_tbd INTEGER DEFAULT 0`,
   ];
   for (const sql of migrations) {
     try { db.exec(sql); } catch { /* column already exists */ }

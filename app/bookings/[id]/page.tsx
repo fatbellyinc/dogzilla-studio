@@ -439,8 +439,9 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
       hours: d.hours,
       subtotal: d.subtotal,
     })));
-    // Load other bookings' dates (excluding this one) so the picker can warn about conflicts
-    const center = new Date((data!.booking.booking_date) + 'T00:00');
+    // Load other bookings' dates (excluding this one) so the picker can warn about conflicts.
+    // A date-TBD booking has no real booking_date (just a placeholder), so center on today instead.
+    const center = data!.booking.date_tbd ? new Date() : new Date((data!.booking.booking_date) + 'T00:00');
     const months = [-1, 0, 1, 2].map(offset => {
       const d = new Date(center.getFullYear(), center.getMonth() + offset, 1);
       return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -688,7 +689,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
         <h1 className="text-xl font-bold text-white">Booking #{id}</h1>
         <StatusBadge status={booking.status} />
       </div>
-      <p className="text-white/40 text-sm mb-6 ml-6">{formatDate(booking.booking_date)}</p>
+      <p className="text-white/40 text-sm mb-6 ml-6">{booking.date_tbd ? '📌 No date set yet' : formatDate(booking.booking_date)}</p>
 
       <div className="grid grid-cols-1 md:grid-cols-[1fr_280px] gap-4 min-w-0">
         <div className="space-y-4">
@@ -803,12 +804,22 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
               {booking.series_id && <SeriesPanel bookingId={Number(id)} seriesId={booking.series_id} />}
               <div className="flex justify-between items-center">
                 <span className="text-white/40">Date</span>
-                <div className="flex items-center gap-2">
-                  <span className="text-white">{formatDate(booking.booking_date)}{booking.end_date && booking.end_date !== booking.booking_date ? ` – ${formatDate(booking.end_date)}` : ''}</span>
-                  <button onClick={() => editingDates ? setEditingDates(false) : startEditDates()} className="text-xs text-[#E32726] hover:underline">
-                    {editingDates ? '✕' : '✏️ Edit'}
-                  </button>
-                </div>
+                {booking.date_tbd ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-purple-400 text-sm">📌 No date set yet</span>
+                    <button onClick={() => editingDates ? setEditingDates(false) : startEditDates()}
+                      className="text-xs bg-purple-500/20 text-purple-400 border border-purple-500/30 px-2 py-1 rounded font-medium hover:bg-purple-500/30">
+                      {editingDates ? '✕ Cancel' : 'Set Date'}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <span className="text-white">{formatDate(booking.booking_date)}{booking.end_date && booking.end_date !== booking.booking_date ? ` – ${formatDate(booking.end_date)}` : ''}</span>
+                    <button onClick={() => editingDates ? setEditingDates(false) : startEditDates()} className="text-xs text-[#E32726] hover:underline">
+                      {editingDates ? '✕' : '✏️ Edit'}
+                    </button>
+                  </div>
+                )}
               </div>
 
               {editingDates && (

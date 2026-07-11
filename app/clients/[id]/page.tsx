@@ -103,7 +103,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
                 {bookings.map(b => (
                   <Link key={b.id} href={`/bookings/${b.id}`} className="flex items-center justify-between p-3 bg-[#0f0f0f] rounded-lg hover:bg-[#222] transition-colors">
                     <div>
-                      <div className="text-sm text-white">{formatDateShort(b.booking_date)}</div>
+                      <div className="text-sm text-white">{b.date_tbd ? '📌 No date yet' : formatDateShort(b.booking_date)}</div>
                       <div className="text-xs text-white/40">{b.studio_rate === 'hourly' ? `${b.hours}hr` : b.studio_rate}</div>
                     </div>
                     <div className="text-right">

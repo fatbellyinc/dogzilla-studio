@@ -23,6 +23,7 @@ export async function GET() {
     LEFT JOIN payments p ON p.booking_id = b.id
     WHERE b.status NOT IN ('cancelled')
       AND COALESCE(b.fully_paid, 0) = 0
+      AND COALESCE(b.date_tbd, 0) = 0
     GROUP BY b.id
     HAVING balance_due > 0.01
     ORDER BY b.booking_date

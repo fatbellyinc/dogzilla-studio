@@ -31,6 +31,9 @@ export default function BookingsPage() {
   const [selectedBookings, setSelectedBookings] = useState<Booking[]>([]);
   const [showBlockoutForm, setShowBlockoutForm] = useState(false);
   const [blockoutForm, setBlockoutForm] = useState({ date: '', end_date: '', reason: '' });
+  const [tbdBookings, setTbdBookings] = useState<Booking[]>([]);
+
+  useEffect(() => { fetch('/api/bookings?tbd=1').then(r => r.json()).then(setTbdBookings); }, []);
 
   const monthStr = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}`;
 
@@ -290,6 +293,28 @@ export default function BookingsPage() {
           )}
         </div>
       </div>
+
+      {/* Inquiries with no confirmed date yet — never mixed into the calendar itself */}
+      {tbdBookings.length > 0 && (
+        <div className="mt-4 bg-purple-500/10 border border-purple-500/20 rounded-xl">
+          <div className="p-4 border-b border-purple-500/20">
+            <h2 className="font-semibold text-purple-400 text-sm">📌 No Date Yet — {tbdBookings.length} inquir{tbdBookings.length === 1 ? 'y' : 'ies'}</h2>
+          </div>
+          <div className="divide-y divide-purple-500/10">
+            {tbdBookings.map(b => (
+              <Link key={b.id} href={`/bookings/${b.id}`} className="flex items-center justify-between p-4 hover:bg-purple-500/5 transition-colors">
+                <div>
+                  <div className="text-sm font-medium text-white">{b.client_name}</div>
+                  <div className="text-xs text-white/40">
+                    {b.shoot_type || 'No shoot type set'}{b.project_name ? ` · ${b.project_name}` : ''}
+                  </div>
+                </div>
+                <span className="text-xs text-purple-400 bg-purple-500/20 border border-purple-500/30 px-2 py-1 rounded-full">Set date →</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* All bookings list */}
       <div className="mt-4 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl">

@@ -67,7 +67,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   const endDate = days.length > 1 ? days[days.length - 1].date : null;
   const hours = days[0].hours || 1;
 
-  db.prepare(`UPDATE bookings SET booking_date=?, end_date=?, studio_rate=?, hours=? WHERE id=?`)
+  // Saving real dates always means the booking is no longer "date TBD"
+  db.prepare(`UPDATE bookings SET booking_date=?, end_date=?, studio_rate=?, hours=?, date_tbd=0 WHERE id=?`)
     .run(bookingDate, endDate, representativeRate, hours, bookingId);
   recomputeBookingTotals(db, bookingId);
 

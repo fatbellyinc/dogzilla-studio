@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
-import { STUDIO_RATES } from '@/lib/types';
+import { STUDIO_RATES, NO_DATE_SENTINEL } from '@/lib/types';
 import { logActivity, ACTIONS } from '@/lib/activity';
 import { calcDiscountAmount } from '@/lib/utils';
 import { recomputeBookingTotals } from '@/lib/booking-calc';
@@ -10,10 +10,15 @@ export async function GET(req: NextRequest) {
   const date = req.nextUrl.searchParams.get('date');
   const month = req.nextUrl.searchParams.get('month');
   const status = req.nextUrl.searchParams.get('status');
+  const tbd = req.nextUrl.searchParams.get('tbd');
 
   let query = `SELECT b.*, c.name as client_name, c.phone as client_phone, c.email as client_email FROM bookings b JOIN clients c ON c.id = b.client_id`;
   const conditions: string[] = [];
   const args: unknown[] = [];
+
+  // Inquiries with no confirmed date yet — a separate list, never mixed into calendar/month views
+  if (tbd) { conditions.push(`b.date_tbd = 1`); }
+  else conditions.push(`COALESCE(b.date_tbd, 0) = 0`);
 
   if (date) { conditions.push(`b.booking_date = ?`); args.push(date); }
   if (month) {
@@ -54,12 +59,16 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const db = getDb();
   const body = await req.json();
-  const { client_id, booking_days, equipment_items, notes, discount_type, discount_value, project_name, shoot_type, production_house, is_pencil, no_deposit, vat_exempt, recurrence, recurrence_end } = body;
+  const { client_id, booking_days, equipment_items, notes, discount_type, discount_value, project_name, shoot_type, production_house, is_pencil, no_deposit, vat_exempt, recurrence, recurrence_end, date_tbd } = body;
 
   // Multi-day: studioSubtotal = sum of all day subtotals
   const days: { date: string; day_type: string; studio_rate: string; hours: number; subtotal: number }[] = booking_days || [];
+  const isDateTBD = !!date_tbd && days.length === 0;
+  if (!isDateTBD && days.length === 0 && !body.booking_date) {
+    return NextResponse.json({ error: 'At least one date is required (or mark this booking as date TBD)' }, { status: 400 });
+  }
   const studioSubtotal = days.reduce((s, d) => s + (d.subtotal || 0), 0);
-  const bookingDate = days[0]?.date || body.booking_date;
+  const bookingDate = days[0]?.date || body.booking_date || NO_DATE_SENTINEL;
   const endDate = days.length > 1 ? days[days.length - 1].date : null;
   // For single-day backwards compat
   const studio_rate = days[0]?.studio_rate || body.studio_rate || 'fullday';
@@ -107,11 +116,11 @@ export async function POST(req: NextRequest) {
   }
 
   const result = db.prepare(`
-    INSERT INTO bookings (client_id, booking_date, end_date, studio_rate, hours, subtotal, equipment_total, total, deposit_amount, discount_type, discount_value, discount_amount, status, notes, project_name, shoot_type, production_house, is_pencil, no_deposit, vat_exempt)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO bookings (client_id, booking_date, end_date, studio_rate, hours, subtotal, equipment_total, total, deposit_amount, discount_type, discount_value, discount_amount, status, notes, project_name, shoot_type, production_house, is_pencil, no_deposit, vat_exempt, date_tbd)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(client_id, bookingDate, endDate, representativeRate, hours, studioSubtotal, eqTotal, total, deposit,
     discount_type || null, discount_value || 0, discountAmount, notes || null,
-    project_name || null, shoot_type || null, production_house || null, is_pencil ? 1 : 0, no_deposit ? 1 : 0, vat_exempt ? 1 : 0);
+    project_name || null, shoot_type || null, production_house || null, is_pencil ? 1 : 0, no_deposit ? 1 : 0, vat_exempt ? 1 : 0, isDateTBD ? 1 : 0);
 
   const bookingId = result.lastInsertRowid;
 

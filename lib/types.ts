@@ -12,6 +12,12 @@ export const SHOOT_TYPES = [
 
 export type ShootType = typeof SHOOT_TYPES[number];
 
+// Placeholder booking_date for bookings with date_tbd=1 — the schema requires a real date
+// string, but a "no date yet" inquiry has none. Far enough in the past that it never collides
+// with any real calendar/dashboard/receivables date-range query, so those pages naturally
+// exclude it without needing explicit filters everywhere.
+export const NO_DATE_SENTINEL = '1900-01-01';
+
 export interface Client {
   id: number;
   name: string;
@@ -48,6 +54,7 @@ export interface Booking {
   no_deposit: number;
   series_id: number | null;
   recurrence: string | null;
+  date_tbd?: number;
   call_time: string | null;
   wrap_time: string | null;
   wrap_date: string | null;

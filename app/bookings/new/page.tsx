@@ -130,6 +130,7 @@ function NewBookingForm() {
     vat_exempt: false,
     recurrence: '',
     recurrence_end: '',
+    date_tbd: false,
   });
 
   const initDate = params.get('date') || '';
@@ -295,7 +296,8 @@ function NewBookingForm() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.client_id || bookingDays.length === 0) { setError('Client and at least one date are required'); return; }
+    if (!form.client_id) { setError('Client is required'); return; }
+    if (!form.date_tbd && bookingDays.length === 0) { setError('At least one date is required (or check "No definite date yet")'); return; }
     setSaving(true);
     try {
       const equipment_items = selectedItems.map(item => ({
@@ -313,7 +315,8 @@ function NewBookingForm() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           client_id: Number(form.client_id),
-          booking_days: bookingDays,
+          booking_days: form.date_tbd ? [] : bookingDays,
+          date_tbd: form.date_tbd,
           equipment_items,
           discount_type: discount.type || null,
           discount_value: Number(discount.value) || 0,
@@ -470,6 +473,10 @@ function NewBookingForm() {
                     className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs font-medium transition-all ${form.vat_exempt ? 'bg-blue-500/20 text-blue-400 border-blue-500/40' : 'text-white/40 border-[#2a2a2a] hover:border-blue-500/30 hover:text-blue-400'}`}>
                     🔵 {form.vat_exempt ? 'VAT Exempt' : 'VAT Exempt'}
                   </button>
+                  <button type="button" onClick={() => setForm(f => ({ ...f, date_tbd: !f.date_tbd }))}
+                    className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs font-medium transition-all ${form.date_tbd ? 'bg-purple-500/20 text-purple-400 border-purple-500/40' : 'text-white/40 border-[#2a2a2a] hover:border-purple-500/30 hover:text-purple-400'}`}>
+                    📌 No Date Yet
+                  </button>
                 </div>
               </div>
               {form.is_pencil && (
@@ -477,12 +484,18 @@ function NewBookingForm() {
                   Pencil / Tentative — date is held but not yet confirmed. Shown differently on the calendar.
                 </div>
               )}
-              <MultiDayPicker
-                days={bookingDays}
-                onChange={setBookingDays}
-                bookedDates={bookedDates}
-                blockoutDates={blockoutDates}
-              />
+              {form.date_tbd ? (
+                <div className="text-xs bg-purple-500/10 border border-purple-500/20 rounded-lg px-3 py-2 text-purple-400">
+                  📌 This is an inquiry with no confirmed date yet — you can still add project details and equipment interest below. Set a real date anytime from the booking page once confirmed.
+                </div>
+              ) : (
+                <MultiDayPicker
+                  days={bookingDays}
+                  onChange={setBookingDays}
+                  bookedDates={bookedDates}
+                  blockoutDates={blockoutDates}
+                />
+              )}
             </div>
 
             {/* Equipment — packages or individual */}
