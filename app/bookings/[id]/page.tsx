@@ -472,6 +472,19 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
     toast.success('Booking dates updated');
   }
 
+  async function markDateTBD() {
+    if (!confirm('Clear the confirmed date(s) and mark this booking as "no date yet"? This removes all committed shoot days — you can set a new date anytime.')) return;
+    setSavingDates(true);
+    await fetch(`/api/bookings/${id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date_tbd: true }),
+    });
+    setSavingDates(false);
+    setEditingDates(false);
+    await load();
+    toast.success('Booking marked as no date yet');
+  }
+
   function startRebook() {
     setRebookDate('');
     setRebookError('');
@@ -818,6 +831,11 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                     <button onClick={() => editingDates ? setEditingDates(false) : startEditDates()} className="text-xs text-[#E32726] hover:underline">
                       {editingDates ? '✕' : '✏️ Edit'}
                     </button>
+                    {booking.status !== 'completed' && booking.status !== 'cancelled' && (
+                      <button onClick={markDateTBD} disabled={savingDates} className="text-xs text-purple-400 hover:underline disabled:opacity-40">
+                        📌 No Date Yet
+                      </button>
+                    )}
                   </div>
                 )}
               </div>

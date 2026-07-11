@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { logActivity, ACTIONS } from '@/lib/activity';
 import { recomputeBookingTotals } from '@/lib/booking-calc';
+import { NO_DATE_SENTINEL } from '@/lib/types';
 
 export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const db = getDb();
@@ -23,7 +24,18 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   const db = getDb();
   const { id } = await params;
   const body = await req.json();
-  const { status, notes, deposit_paid, fully_paid, discount_type, discount_value, is_pencil, vat_exempt, no_deposit, call_time, wrap_time, overtime_hours, overtime_amount, client_id, project_name, shoot_type, production_house } = body;
+  const { status, notes, deposit_paid, fully_paid, discount_type, discount_value, is_pencil, vat_exempt, no_deposit, call_time, wrap_time, overtime_hours, overtime_amount, client_id, project_name, shoot_type, production_house, date_tbd } = body;
+
+  // Revert a booking back to "no confirmed date yet" — clears all committed days and resets
+  // to the sentinel date, mirroring how a date-TBD booking is created in the first place.
+  if (date_tbd === true) {
+    db.prepare('DELETE FROM booking_days WHERE booking_id = ?').run(id);
+    // Also zero subtotal here — recomputeBookingTotals falls back to the stored subtotal when
+    // there are no booking_days rows (for legacy pre-migration bookings), which would otherwise
+    // preserve the old studio charge instead of clearing it.
+    db.prepare('UPDATE bookings SET booking_date = ?, end_date = NULL, date_tbd = 1, subtotal = 0 WHERE id = ?').run(NO_DATE_SENTINEL, id);
+    logActivity(Number(id), ACTIONS.ITEMS_EDITED, 'Booking reverted to no confirmed date yet');
+  }
 
   if (client_id !== undefined) {
     const newClient = db.prepare('SELECT name FROM clients WHERE id = ?').get(client_id) as { name: string } | undefined;
