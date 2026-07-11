@@ -791,7 +791,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                 <div className="flex items-center gap-2 mb-2 flex-wrap">
                   {booking.is_pencil ? <span className="text-xs bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 px-2 py-0.5 rounded font-semibold">✏️ PENCIL</span> : null}
                   {booking.no_deposit ? <span className="text-xs bg-green-500/20 text-green-400 border border-green-500/30 px-2 py-0.5 rounded font-semibold">🤝 NO DEPOSIT</span> : null}
-                  {booking.vat_exempt ? <span className="text-xs bg-blue-500/20 text-blue-400 border border-blue-500/30 px-2 py-0.5 rounded font-semibold">🔵 VAT EXEMPT</span> : null}
+                  {booking.vat_exempt ? <span className="text-xs bg-blue-500/20 text-blue-400 border border-blue-500/30 px-2 py-0.5 rounded font-semibold">🔵 NO VAT</span> : null}
                   {booking.fully_paid ? <span className="text-xs bg-green-500/20 text-green-400 border border-green-500/30 px-2 py-0.5 rounded font-semibold">💰 FULLY PAID</span> : null}
                   {!booking.fully_paid && booking.deposit_paid ? <span className="text-xs bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded font-semibold">✓ DEPOSIT PAID</span> : null}
                 </div>
@@ -1186,7 +1186,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                 await load(); setSaving(false);
               }} disabled={saving}
                 className={`w-full text-sm py-2 rounded-lg border transition-colors ${booking.vat_exempt ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' : 'bg-[#2a2a2a] text-white/60 border-[#2a2a2a] hover:text-blue-400 hover:border-blue-500/30'}`}>
-                🔵 {booking.vat_exempt ? 'VAT Exempt (no VAT on docs)' : 'Mark as VAT Exempt'}
+                🔵 {booking.vat_exempt ? 'No VAT (excluded from docs)' : 'Mark as No VAT'}
               </button>
               {booking.status !== 'cancelled' ? (
                 <button onClick={() => {

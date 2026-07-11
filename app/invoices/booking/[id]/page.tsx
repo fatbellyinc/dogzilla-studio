@@ -158,7 +158,7 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
       ['Regular Price', '', '', '', regularPrice],
       totalSavings > 0 ? ['Total Discount', '', '', '', -totalSavings] : null,
       ['Subtotal (VAT-exclusive)', '', '', '', subtotalExVAT],
-      vatExempt ? ['VAT Exempt', '', '', '', 0] : ['VAT 12%', '', '', '', vatAmount],
+      vatExempt ? ['No VAT', '', '', '', 0] : ['VAT 12%', '', '', '', vatAmount],
       ['TOTAL (VAT-inclusive)', '', '', '', totalIncVAT],
       ['', '', '', '', ''],
       totalPaid > 0 ? ['Total Paid', '', '', '', totalPaid] : null,
@@ -331,7 +331,7 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
             </tr>
             {vatExempt ? (
               <tr>
-                <td style={{ padding: '4px 10px', color: '#1d4ed8' }}>VAT Exempt</td>
+                <td style={{ padding: '4px 10px', color: '#1d4ed8' }}>No VAT</td>
                 <td style={{ padding: '4px 10px', textAlign: 'right', color: '#1d4ed8' }}>₱0</td>
               </tr>
             ) : (

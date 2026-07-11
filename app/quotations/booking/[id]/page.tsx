@@ -182,7 +182,7 @@ function DocView({ bookingId }: { bookingId: string }) {
       ['Regular Price', '', '', '', regularPrice],
       totalSavings > 0 ? ['Total Discount', '', '', '', -totalSavings] : null,
       ['Subtotal (VAT-exclusive)', '', '', '', subtotalExVAT],
-      vatExempt ? ['VAT Exempt', '', '', '', 0] : ['VAT 12%', '', '', '', vatAmount],
+      vatExempt ? ['No VAT', '', '', '', 0] : ['VAT 12%', '', '', '', vatAmount],
       ['TOTAL (VAT-inclusive)', '', '', '', totalIncVAT],
       !booking.no_deposit ? ['50% Deposit Required', '', '', '', depositAmount] : null,
       !booking.no_deposit ? ['Balance Due on Shoot Day', '', '', '', balanceDue] : null,
@@ -342,7 +342,7 @@ function DocView({ bookingId }: { bookingId: string }) {
             </tr>
             {vatExempt ? (
               <tr>
-                <td style={{ padding: '4px 10px', color: '#1d4ed8' }}>VAT Exempt</td>
+                <td style={{ padding: '4px 10px', color: '#1d4ed8' }}>No VAT</td>
                 <td style={{ padding: '4px 10px', textAlign: 'right', color: '#1d4ed8' }}>₱0</td>
               </tr>
             ) : (

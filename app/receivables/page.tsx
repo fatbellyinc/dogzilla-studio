@@ -79,7 +79,7 @@ function PaymentRow({ item, onPaid }: { item: ReceivableItem; onPaid: () => void
               <span className="text-[10px] bg-green-500/20 text-green-400 border border-green-500/30 px-2 py-0.5 rounded-full">🤝 no deposit</span>
             )}
             {!!item.vat_exempt && (
-              <span className="text-[10px] bg-blue-500/20 text-blue-400 border border-blue-500/30 px-2 py-0.5 rounded-full">VAT exempt</span>
+              <span className="text-[10px] bg-blue-500/20 text-blue-400 border border-blue-500/30 px-2 py-0.5 rounded-full">No VAT</span>
             )}
             {!item.deposit_paid && !item.no_deposit && item.total_paid < item.deposit_amount - 0.01 && (
               <span className="text-[10px] bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 px-2 py-0.5 rounded-full">⚠ deposit unpaid</span>

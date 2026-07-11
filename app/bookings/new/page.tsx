@@ -471,7 +471,7 @@ function NewBookingForm() {
                   </button>
                   <button type="button" onClick={() => setForm(f => ({ ...f, vat_exempt: !f.vat_exempt }))}
                     className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs font-medium transition-all ${form.vat_exempt ? 'bg-blue-500/20 text-blue-400 border-blue-500/40' : 'text-white/40 border-[#2a2a2a] hover:border-blue-500/30 hover:text-blue-400'}`}>
-                    🔵 {form.vat_exempt ? 'VAT Exempt' : 'VAT Exempt'}
+                    🔵 No VAT
                   </button>
                   <button type="button" onClick={() => setForm(f => ({ ...f, date_tbd: !f.date_tbd }))}
                     className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs font-medium transition-all ${form.date_tbd ? 'bg-purple-500/20 text-purple-400 border-purple-500/40' : 'text-white/40 border-[#2a2a2a] hover:border-purple-500/30 hover:text-purple-400'}`}>
