@@ -55,7 +55,25 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   if (deposit_paid !== undefined) db.prepare('UPDATE bookings SET deposit_paid = ? WHERE id = ?').run(deposit_paid ? 1 : 0, id);
   if (body.deposit_amount !== undefined) { db.prepare('UPDATE bookings SET deposit_amount = ? WHERE id = ?').run(Number(body.deposit_amount) || 0, id); logActivity(Number(id), ACTIONS.ITEMS_EDITED, `Deposit amount set to ₱${(Number(body.deposit_amount) || 0).toLocaleString()}`); }
   if (body.wrap_date !== undefined) db.prepare('UPDATE bookings SET wrap_date = ? WHERE id = ?').run(body.wrap_date || null, id);
-  if (fully_paid !== undefined) db.prepare('UPDATE bookings SET fully_paid = ? WHERE id = ?').run(fully_paid ? 1 : 0, id);
+  if (fully_paid !== undefined) {
+    db.prepare('UPDATE bookings SET fully_paid = ? WHERE id = ?').run(fully_paid ? 1 : 0, id);
+    // Auto-log a payment for whatever's left unpaid so Reconciliation (which only trusts the
+    // payments table) doesn't flag this as underpaid — this button is meant to mean "the money
+    // is in," so make that true in the one place that actually tracks money received.
+    if (fully_paid) {
+      const b = db.prepare('SELECT total, vat_exempt FROM bookings WHERE id = ?').get(id) as { total: number; vat_exempt: number } | undefined;
+      if (b) {
+        const invoiceTotal = b.vat_exempt ? b.total : Math.round(b.total * 1.12 * 100) / 100;
+        const { paid } = db.prepare('SELECT COALESCE(SUM(amount), 0) as paid FROM payments WHERE booking_id = ?').get(id) as { paid: number };
+        const remaining = Math.round((invoiceTotal - paid) * 100) / 100;
+        if (remaining > 0.01) {
+          db.prepare(`INSERT INTO payments (booking_id, amount, type, method, reference, notes) VALUES (?, ?, 'full', NULL, NULL, ?)`)
+            .run(id, remaining, 'Auto-logged — marked Fully Paid');
+          logActivity(Number(id), ACTIONS.PAYMENT_RECORDED, `₱${remaining.toLocaleString()} auto-logged (marked as Fully Paid)`);
+        }
+      }
+    }
+  }
   if (vat_exempt !== undefined) db.prepare("UPDATE bookings SET vat_exempt = ? WHERE id = ?").run(vat_exempt ? 1 : 0, id);
   if (no_deposit !== undefined) db.prepare("UPDATE bookings SET no_deposit = ? WHERE id = ?").run(no_deposit ? 1 : 0, id);
   if (is_pencil !== undefined) { db.prepare('UPDATE bookings SET is_pencil = ? WHERE id = ?').run(is_pencil ? 1 : 0, id); logActivity(Number(id), ACTIONS.PENCIL_TOGGLED, is_pencil ? 'Marked as pencil booking' : 'Pencil removed — confirmed'); }

@@ -421,6 +421,29 @@ function initSchema(db: Database.Database) {
     `);
   } catch { /* ignore */ }
 
+  // One-time backfill: the reverse of the sync above — bookings that were marked fully_paid
+  // via the button (before it auto-logged a payment) but have no payment rows covering the
+  // invoice total. Without this, Reconciliation flags them as fully underpaid even though the
+  // studio already considers them paid. Runs once (flagged in settings).
+  try {
+    const alreadyRun = db.prepare("SELECT value FROM settings WHERE key = 'fully_paid_backfill_v1'").get();
+    if (!alreadyRun) {
+      const unlogged = db.prepare(`
+        SELECT id, total, vat_exempt,
+          (SELECT COALESCE(SUM(p.amount), 0) FROM payments p WHERE p.booking_id = bookings.id) as paid
+        FROM bookings
+        WHERE fully_paid = 1 AND status != 'cancelled' AND total > 0
+      `).all() as { id: number; total: number; vat_exempt: number; paid: number }[];
+      const insPayment = db.prepare(`INSERT INTO payments (booking_id, amount, type, method, reference, notes) VALUES (?, ?, 'full', NULL, NULL, ?)`);
+      for (const b of unlogged) {
+        const invoiceTotal = b.vat_exempt ? b.total : Math.round(b.total * 1.12 * 100) / 100;
+        const remaining = Math.round((invoiceTotal - b.paid) * 100) / 100;
+        if (remaining > 0.01) insPayment.run(b.id, remaining, 'Auto-logged — backfilled from Fully Paid flag');
+      }
+      db.prepare("INSERT INTO settings (key, value) VALUES ('fully_paid_backfill_v1', '1')").run();
+    }
+  } catch { /* ignore */ }
+
   // Equipment upserts — add new items to existing databases
   const equipmentUpserts: [string, string, string, number, number, string, number][] = [
     ['LED-032', 'Rectangular Softbox', 'lighting', 500, 2, 'Passive modifier', 0],
