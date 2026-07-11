@@ -60,7 +60,6 @@ export interface Booking {
   wrap_date: string | null;
   overtime_hours: number;
   overtime_amount: number;
-  cancellation_fee_amount?: number;
   deposit_paid: number;
   fully_paid: number;
   discount_type: 'percent' | 'fixed' | null;
@@ -76,22 +75,11 @@ export interface Booking {
   pencil_dates?: string[];
 }
 
-export interface CancellationFee {
-  id: number;
-  original_booking_id: number | null;
-  new_booking_id: number | null;
-  amount: number;
-  notes: string | null;
-  created_at: string;
-  original_booking_date?: string;
-  new_booking_date?: string;
-}
-
 export interface BookingDay {
   id: number;
   booking_id: number;
   date: string;
-  day_type: 'setup' | 'shoot';
+  day_type: 'setup' | 'shoot' | 'cancelled';
   studio_rate: string;
   hours: number;
   subtotal: number;

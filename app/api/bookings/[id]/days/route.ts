@@ -38,6 +38,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       SELECT b.id, bd.date as conflict_date FROM bookings b
       JOIN booking_days bd ON bd.booking_id = b.id
       WHERE b.id != ? AND b.status = 'confirmed' AND b.is_pencil = 0 AND bd.studio_rate != 'equipment_only'
+        AND bd.day_type != 'cancelled'
         AND COALESCE(bd.is_pencil, 0) = 0
         AND bd.date IN (${placeholders})
       UNION

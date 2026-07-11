@@ -60,7 +60,7 @@ function DocView({ bookingId }: { bookingId: string }) {
     // Multi-day: show each day as a separate studio line, with that day's own OT right under it
     bookingDays.forEach((d, i) => {
       const dayRate = STUDIO_RATES[d.studio_rate as keyof typeof STUDIO_RATES];
-      const dayLabel = d.day_type === 'setup' ? '🔧 Set-Up Day' : '🎬 Shoot Day';
+      const dayLabel = d.day_type === 'setup' ? '🔧 Set-Up Day' : d.day_type === 'cancelled' ? '🚫 Cancelled' : '🎬 Shoot Day';
       const dateStr = fullDayLabel(d.date);
       lines.push({
         code: d.studio_rate.toUpperCase(),
@@ -70,7 +70,7 @@ function DocView({ bookingId }: { bookingId: string }) {
         total: d.subtotal,
         bold: true,
       });
-      const dayOT = calcOT(d.studio_rate, d.call_time || null, d.wrap_time || null);
+      const dayOT = d.day_type === 'cancelled' ? { otHrs: 0, otAmount: 0, otRate: 0 } : calcOT(d.studio_rate, d.call_time || null, d.wrap_time || null);
       if (dayOT.otHrs > 0) {
         otHrs += dayOT.otHrs;
         otAmount += dayOT.otAmount;
@@ -120,17 +120,6 @@ function DocView({ bookingId }: { bookingId: string }) {
       qty: 1,
       unit: -booking.discount_amount,
       total: -booking.discount_amount,
-    });
-  }
-
-  // Cancellation fee — flat non-discountable add-on, same treatment as overtime
-  if (booking.cancellation_fee_amount && booking.cancellation_fee_amount > 0) {
-    lines.push({
-      code: 'CANCEL',
-      desc: 'Cancellation fee',
-      qty: 1,
-      unit: booking.cancellation_fee_amount,
-      total: booking.cancellation_fee_amount,
     });
   }
 
@@ -284,8 +273,8 @@ function DocView({ bookingId }: { bookingId: string }) {
               {bookingDays.map((d, i) => (
                 <div key={d.id} style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '2px' }}>
                   <span style={{ fontWeight: 700, color: '#111' }}>Day {i + 1}</span>
-                  <span style={{ color: d.day_type === 'setup' ? '#b45309' : '#1d4ed8', fontWeight: 600, fontSize: '10px', background: d.day_type === 'setup' ? '#fef3c7' : '#dbeafe', padding: '1px 5px', borderRadius: '3px' }}>
-                    {d.day_type === 'setup' ? '🔧 SET-UP' : '🎬 SHOOT'}
+                  <span style={{ color: d.day_type === 'setup' ? '#b45309' : d.day_type === 'cancelled' ? '#c2410c' : '#1d4ed8', fontWeight: 600, fontSize: '10px', background: d.day_type === 'setup' ? '#fef3c7' : d.day_type === 'cancelled' ? '#ffedd5' : '#dbeafe', padding: '1px 5px', borderRadius: '3px' }}>
+                    {d.day_type === 'setup' ? '🔧 SET-UP' : d.day_type === 'cancelled' ? '🚫 CANCELLED' : '🎬 SHOOT'}
                   </span>
                   <span style={{ color: '#888' }}>{fullDayLabel(d.date)}</span>
                   {d.call_time && d.wrap_time && <span style={{ color: '#aaa' }}>· {fmt24(d.call_time)} – {fmt24(d.wrap_time)}</span>}

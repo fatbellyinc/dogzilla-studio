@@ -36,12 +36,13 @@ export async function GET(req: NextRequest) {
   const bookings = db.prepare(query).all(...args) as { id: number; booking_date: string; studio_rate: string; is_pencil: number }[];
 
   // Attach each booking's exact occupied dates (from booking_days, excluding equipment-only
-  // days that don't occupy the studio) so calendar views don't fill in gaps for non-consecutive
-  // multi-day bookings, or mark equipment-only rentals as occupying the studio. Also split which
-  // of those dates are still tentative (per-day is_pencil) vs confirmed, since a multi-day
-  // booking can have some days locked in and others still held.
+  // days and cancelled days — neither actually occupies the studio) so calendar views don't
+  // fill in gaps for non-consecutive multi-day bookings, or mark a cancelled/equipment-only
+  // day as blocking the studio. Also split which of those dates are still tentative (per-day
+  // is_pencil) vs confirmed, since a multi-day booking can have some days locked in and others
+  // still held.
   const dayRows = bookings.length
-    ? db.prepare(`SELECT booking_id, date, is_pencil FROM booking_days WHERE booking_id IN (${bookings.map(() => '?').join(',')}) AND studio_rate != 'equipment_only' AND date != ?`)
+    ? db.prepare(`SELECT booking_id, date, is_pencil FROM booking_days WHERE booking_id IN (${bookings.map(() => '?').join(',')}) AND studio_rate != 'equipment_only' AND day_type != 'cancelled' AND date != ?`)
         .all(...bookings.map(b => b.id), NO_DATE_SENTINEL) as { booking_id: number; date: string; is_pencil: number }[]
     : [];
   const daysByBooking = new Map<number, string[]>();
@@ -115,6 +116,7 @@ export async function POST(req: NextRequest) {
       SELECT b.id, bd.date as conflict_date FROM bookings b
       JOIN booking_days bd ON bd.booking_id = b.id
       WHERE b.status = 'confirmed' AND b.is_pencil = 0 AND bd.studio_rate != 'equipment_only'
+        AND bd.day_type != 'cancelled'
         AND COALESCE(bd.is_pencil, 0) = 0
         AND bd.date IN (${placeholders})
       UNION

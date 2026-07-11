@@ -294,15 +294,6 @@ function initSchema(db: Database.Database) {
       status TEXT DEFAULT 'new',
       created_at TEXT DEFAULT (datetime('now'))
     );
-
-    CREATE TABLE IF NOT EXISTS cancellation_fees (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      original_booking_id INTEGER REFERENCES bookings(id) ON DELETE SET NULL,
-      new_booking_id INTEGER REFERENCES bookings(id) ON DELETE SET NULL,
-      amount REAL NOT NULL DEFAULT 0,
-      notes TEXT,
-      created_at TEXT DEFAULT (datetime('now'))
-    );
   `);
 
   // Migration: add new columns if upgrading from old schema
@@ -360,11 +351,15 @@ function initSchema(db: Database.Database) {
     `ALTER TABLE booking_days ADD COLUMN wrap_time TEXT`,
     `ALTER TABLE bookings ADD COLUMN date_tbd INTEGER DEFAULT 0`,
     `ALTER TABLE booking_days ADD COLUMN is_pencil INTEGER DEFAULT 0`,
-    `ALTER TABLE bookings ADD COLUMN cancellation_fee_amount REAL DEFAULT 0`,
   ];
   for (const sql of migrations) {
     try { db.exec(sql); } catch { /* column already exists */ }
   }
+  // Undo the short-lived separate cancellation-fee table/column from an earlier iteration —
+  // superseded by a 'cancelled' day_type with a percentage-of-rate subtotal, computed inline
+  // with no separate schema needed.
+  try { db.exec(`ALTER TABLE bookings DROP COLUMN cancellation_fee_amount`); } catch { /* already gone */ }
+  try { db.exec(`DROP TABLE IF EXISTS cancellation_fees`); } catch { /* already gone */ }
 
   // Backfill sort_order from id on first run after the column is added,
   // so existing rows get a stable, unique order instead of all sitting at 0

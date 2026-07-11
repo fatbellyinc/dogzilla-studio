@@ -14,8 +14,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const body = await req.json();
   const newFirstDate: string = body.new_date;
   if (!newFirstDate) return NextResponse.json({ error: 'new_date is required' }, { status: 400 });
-  const cancellationFee = Number(body.cancellation_fee) || 0;
-  const cancellationFeeNotes: string | null = body.cancellation_fee_notes || null;
 
   const booking = db.prepare('SELECT * FROM bookings WHERE id = ?').get(id) as Record<string, unknown> | undefined;
   if (!booking) return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
@@ -52,6 +50,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       SELECT b.id, bd.date as conflict_date FROM bookings b
       JOIN booking_days bd ON bd.booking_id = b.id
       WHERE b.status = 'confirmed' AND b.is_pencil = 0 AND bd.studio_rate != 'equipment_only'
+        AND bd.day_type != 'cancelled'
         AND COALESCE(bd.is_pencil, 0) = 0
         AND bd.date IN (${placeholders})
       UNION
@@ -93,13 +92,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       insEq.run(newBookingId, item.equipment_id, item.quantity, item.rate, item.name, item.item_type,
         item.is_complimentary, item.discount_pct, item.day_date ? shift(item.day_date) : null);
     }
-  }
-
-  if (cancellationFee > 0) {
-    db.prepare(
-      'INSERT INTO cancellation_fees (original_booking_id, new_booking_id, amount, notes) VALUES (?, ?, ?, ?)'
-    ).run(Number(id), newBookingId, cancellationFee, cancellationFeeNotes);
-    logActivity(Number(id), ACTIONS.CANCELLATION_FEE_ADDED, `Cancellation fee ₱${cancellationFee.toLocaleString()} logged — billed to rebooked booking #${newBookingId}`);
   }
 
   recomputeBookingTotals(db, Number(newBookingId));

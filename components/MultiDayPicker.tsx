@@ -6,13 +6,17 @@ import { STUDIO_RATES, NO_DATE_SENTINEL } from '@/lib/types';
 
 export interface DayConfig {
   date: string;
-  day_type: 'setup' | 'shoot';
+  day_type: 'setup' | 'shoot' | 'cancelled';
   studio_rate: keyof typeof STUDIO_RATES;
   hours: number;
   subtotal: number;
   /** Tentative/held date for this specific day — independent of any other day in the same
    * booking, so a 3-day booking can have day 1 confirmed and days 2-3 still tentative. */
   is_pencil?: boolean;
+  /** Only meaningful when day_type is 'cancelled' — what % of the normal rate to charge as a
+   * cancellation fee for holding the date (e.g. 50 = half of what that date would have cost).
+   * Derived back from subtotal/rate when loading existing days, not persisted separately. */
+  cancellation_pct?: number;
 }
 
 interface Props {
@@ -40,8 +44,9 @@ function datesBetween(start: string, end: string): string[] {
 
 function calcSubtotal(day: DayConfig): number {
   const rate = STUDIO_RATES[day.studio_rate];
-  if (day.studio_rate === 'hourly') return rate.price * day.hours;
-  return rate.price;
+  const base = day.studio_rate === 'hourly' ? rate.price * day.hours : rate.price;
+  if (day.day_type === 'cancelled') return base * ((day.cancellation_pct ?? 50) / 100);
+  return base;
 }
 
 function dayLabel(dateStr: string) {
@@ -61,6 +66,10 @@ function sortDays(list: DayConfig[]) {
 
 const DAY_RATES_SETUP: (keyof typeof STUDIO_RATES)[] = ['setup'];
 const DAY_RATES_SHOOT: (keyof typeof STUDIO_RATES)[] = ['fullday', 'hourly', 'event', 'equipment_only'];
+// Cancelled days charge a percentage of whatever rate the date would have been — same rate
+// choices as a shoot day, minus equipment-only (nothing to hold a % discount against there).
+const DAY_RATES_CANCELLED: (keyof typeof STUDIO_RATES)[] = ['fullday', 'hourly', 'event'];
+const CANCELLATION_PCT_PRESETS = [25, 50, 75, 100];
 
 export default function MultiDayPicker({ days, onChange, bookedDates = [], blockoutDates = [], pencilDates = [] }: Props) {
   const [pickerDate, setPickerDate] = useState('');
@@ -126,9 +135,17 @@ export default function MultiDayPicker({ days, onChange, bookedDates = [], block
     onChange(sortDays(newDays));
   }
 
-  function setDayType(index: number, type: 'setup' | 'shoot') {
+  function setDayType(index: number, type: 'setup' | 'shoot' | 'cancelled') {
     const rate = type === 'setup' ? 'setup' : 'fullday';
-    updateDay(index, { day_type: type, studio_rate: rate as keyof typeof STUDIO_RATES });
+    updateDay(index, {
+      day_type: type,
+      studio_rate: rate as keyof typeof STUDIO_RATES,
+      cancellation_pct: type === 'cancelled' ? (days[index].cancellation_pct ?? 50) : days[index].cancellation_pct,
+    });
+  }
+
+  function setCancellationPct(index: number, pct: number) {
+    updateDay(index, { cancellation_pct: Math.max(0, Math.min(100, pct)) });
   }
 
   function togglePencil(index: number) {
@@ -204,7 +221,7 @@ export default function MultiDayPicker({ days, onChange, bookedDates = [], block
           </div>
 
           {days.map((day, i) => (
-            <div key={day.date} className={`rounded-xl border p-3 ${day.is_pencil ? 'border-dashed border-yellow-500/40 bg-yellow-500/5' : day.day_type === 'setup' ? 'border-yellow-500/30 bg-yellow-500/5' : 'border-[#E32726]/30 bg-[#E32726]/5'}`}>
+            <div key={day.date} className={`rounded-xl border p-3 ${day.is_pencil ? 'border-dashed border-yellow-500/40 bg-yellow-500/5' : day.day_type === 'setup' ? 'border-yellow-500/30 bg-yellow-500/5' : day.day_type === 'cancelled' ? 'border-orange-500/30 bg-orange-500/5' : 'border-[#E32726]/30 bg-[#E32726]/5'}`}>
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-semibold text-white">Day {i + 1} — {dayLabel(day.date)}</span>
@@ -241,21 +258,25 @@ export default function MultiDayPicker({ days, onChange, bookedDates = [], block
                 </button>
               )}
 
-              {/* Setup vs Shoot toggle */}
+              {/* Setup / Shoot / Cancelled toggle */}
               <div className="flex gap-1.5 mb-2">
                 <button type="button" onClick={() => setDayType(i, 'setup')}
                   className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all border ${day.day_type === 'setup' ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/40' : 'bg-transparent text-white/40 border-[#2a2a2a] hover:border-yellow-500/30 hover:text-yellow-400'}`}>
-                  🔧 Setup Day
+                  🔧 Setup
                 </button>
                 <button type="button" onClick={() => setDayType(i, 'shoot')}
                   className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all border ${day.day_type === 'shoot' ? 'bg-[#E32726]/20 text-[#E32726] border-[#E32726]/40' : 'bg-transparent text-white/40 border-[#2a2a2a] hover:border-[#E32726]/30 hover:text-[#E32726]'}`}>
-                  🎬 Shoot Day
+                  🎬 Shoot
+                </button>
+                <button type="button" onClick={() => setDayType(i, 'cancelled')}
+                  className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all border ${day.day_type === 'cancelled' ? 'bg-orange-500/20 text-orange-400 border-orange-500/40' : 'bg-transparent text-white/40 border-[#2a2a2a] hover:border-orange-500/30 hover:text-orange-400'}`}>
+                  🚫 Cancelled
                 </button>
               </div>
 
               {/* Rate selector for this day */}
               <div className="flex gap-1.5 flex-wrap">
-                {(day.day_type === 'setup' ? DAY_RATES_SETUP : DAY_RATES_SHOOT).map(rateKey => {
+                {(day.day_type === 'setup' ? DAY_RATES_SETUP : day.day_type === 'cancelled' ? DAY_RATES_CANCELLED : DAY_RATES_SHOOT).map(rateKey => {
                   const rate = STUDIO_RATES[rateKey];
                   return (
                     <button key={rateKey} type="button" onClick={() => updateDay(i, { studio_rate: rateKey })}
@@ -274,9 +295,30 @@ export default function MultiDayPicker({ days, onChange, bookedDates = [], block
                 )}
               </div>
 
+              {/* Cancellation charge: what % of that rate to bill for holding the date */}
+              {day.day_type === 'cancelled' && (
+                <div className="flex items-center gap-1.5 flex-wrap mt-2">
+                  <span className="text-[10px] text-white/40">Charge:</span>
+                  {CANCELLATION_PCT_PRESETS.map(pct => (
+                    <button key={pct} type="button" onClick={() => setCancellationPct(i, pct)}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] border transition-all ${(day.cancellation_pct ?? 50) === pct ? 'bg-orange-500/20 text-orange-400 border-orange-500/50' : 'text-white/40 border-[#2a2a2a] hover:border-orange-500/30 hover:text-orange-400'}`}>
+                      {pct}%
+                    </button>
+                  ))}
+                  <div className="flex items-center gap-1">
+                    <input type="number" min={0} max={100} value={day.cancellation_pct ?? 50}
+                      onChange={e => setCancellationPct(i, Number(e.target.value))}
+                      className="w-14 bg-[#0f0f0f] border border-[#2a2a2a] rounded px-2 py-0.5 text-xs text-white focus:outline-none focus:border-orange-500/50" />
+                    <span className="text-[10px] text-white/40">% of {STUDIO_RATES[day.studio_rate].label}</span>
+                  </div>
+                </div>
+              )}
+
               {/* Day type description */}
               <div className="text-[10px] text-white/30 mt-1.5">
-                {day.day_type === 'setup' ? '↑ Ingress & prep only — no filming' : '↑ Full production shoot day'}
+                {day.day_type === 'setup' ? '↑ Ingress & prep only — no filming'
+                  : day.day_type === 'cancelled' ? `↑ Cancellation charge — ${day.cancellation_pct ?? 50}% of the normal rate for holding this date`
+                  : '↑ Full production shoot day'}
               </div>
             </div>
           ))}
@@ -287,8 +329,8 @@ export default function MultiDayPicker({ days, onChange, bookedDates = [], block
               <div className="text-xs text-white/40 mb-1.5 uppercase tracking-wider">Day Breakdown</div>
               {days.map((d, i) => (
                 <div key={d.date} className="flex justify-between text-xs py-0.5">
-                  <span className={d.day_type === 'setup' ? 'text-yellow-400' : 'text-white/60'}>
-                    Day {i + 1} — {dayLabel(d.date)} ({d.day_type === 'setup' ? 'Setup' : 'Shoot'}){d.is_pencil ? ' · ✏️ tentative' : ''}
+                  <span className={d.day_type === 'setup' ? 'text-yellow-400' : d.day_type === 'cancelled' ? 'text-orange-400' : 'text-white/60'}>
+                    Day {i + 1} — {dayLabel(d.date)} ({d.day_type === 'setup' ? 'Setup' : d.day_type === 'cancelled' ? `Cancelled — ${d.cancellation_pct ?? 50}%` : 'Shoot'}){d.is_pencil ? ' · ✏️ tentative' : ''}
                   </span>
                   <span className="text-white">{formatPHP(d.subtotal)}</span>
                 </div>

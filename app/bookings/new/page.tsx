@@ -829,8 +829,8 @@ function NewBookingForm() {
                   </div>
                 ) : bookingDays.map((d, i) => (
                   <div key={d.date} className="flex justify-between items-center text-white/60 text-xs">
-                    <span className={d.day_type === 'setup' ? 'text-yellow-400' : ''}>
-                      Day {i + 1} {d.day_type === 'setup' ? '🔧' : '🎬'} {STUDIO_RATES[d.studio_rate as keyof typeof STUDIO_RATES]?.label}
+                    <span className={d.day_type === 'setup' ? 'text-yellow-400' : d.day_type === 'cancelled' ? 'text-orange-400' : ''}>
+                      Day {i + 1} {d.day_type === 'setup' ? '🔧' : d.day_type === 'cancelled' ? '🚫' : '🎬'} {STUDIO_RATES[d.studio_rate as keyof typeof STUDIO_RATES]?.label}
                     </span>
                     <div className="flex items-center gap-1 bg-[#0f0f0f] rounded px-1.5 py-0.5 border border-[#2a2a2a]">
                       <span className="text-[10px] text-white/30">₱</span>
