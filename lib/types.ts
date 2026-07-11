@@ -71,6 +71,8 @@ export interface Booking {
   equipment?: BookingEquipment[];
   /** Exact dates this booking occupies the studio (excludes equipment-only days/bookings). Set by GET /api/bookings. */
   occupied_dates?: string[];
+  /** Subset of occupied_dates still tentative (per-day is_pencil, or every date if the whole booking is pencil). Set by GET /api/bookings. */
+  pencil_dates?: string[];
 }
 
 export interface BookingDay {
@@ -83,6 +85,9 @@ export interface BookingDay {
   subtotal: number;
   call_time?: string | null;
   wrap_time?: string | null;
+  /** Tentative/held date for this specific day, independent of the booking's own is_pencil —
+   * a multi-day booking can have some days confirmed and others still tentative. */
+  is_pencil?: number;
 }
 
 export interface BookingEquipment {

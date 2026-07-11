@@ -33,25 +33,35 @@ export async function GET(req: NextRequest) {
   if (conditions.length) query += ' WHERE ' + conditions.join(' AND ');
   query += ' ORDER BY b.booking_date DESC, b.created_at DESC';
 
-  const bookings = db.prepare(query).all(...args) as { id: number; booking_date: string; studio_rate: string }[];
+  const bookings = db.prepare(query).all(...args) as { id: number; booking_date: string; studio_rate: string; is_pencil: number }[];
 
   // Attach each booking's exact occupied dates (from booking_days, excluding equipment-only
   // days that don't occupy the studio) so calendar views don't fill in gaps for non-consecutive
-  // multi-day bookings, or mark equipment-only rentals as occupying the studio.
+  // multi-day bookings, or mark equipment-only rentals as occupying the studio. Also split which
+  // of those dates are still tentative (per-day is_pencil) vs confirmed, since a multi-day
+  // booking can have some days locked in and others still held.
   const dayRows = bookings.length
-    ? db.prepare(`SELECT booking_id, date FROM booking_days WHERE booking_id IN (${bookings.map(() => '?').join(',')}) AND studio_rate != 'equipment_only'`)
-        .all(...bookings.map(b => b.id)) as { booking_id: number; date: string }[]
+    ? db.prepare(`SELECT booking_id, date, is_pencil FROM booking_days WHERE booking_id IN (${bookings.map(() => '?').join(',')}) AND studio_rate != 'equipment_only'`)
+        .all(...bookings.map(b => b.id)) as { booking_id: number; date: string; is_pencil: number }[]
     : [];
   const daysByBooking = new Map<number, string[]>();
+  const pencilDaysByBooking = new Map<number, string[]>();
   for (const row of dayRows) {
     if (!daysByBooking.has(row.booking_id)) daysByBooking.set(row.booking_id, []);
     daysByBooking.get(row.booking_id)!.push(row.date);
+    if (row.is_pencil) {
+      if (!pencilDaysByBooking.has(row.booking_id)) pencilDaysByBooking.set(row.booking_id, []);
+      pencilDaysByBooking.get(row.booking_id)!.push(row.date);
+    }
   }
 
-  const result = bookings.map(b => ({
-    ...b,
-    occupied_dates: b.studio_rate === 'equipment_only' ? [] : (daysByBooking.get(b.id) ?? [b.booking_date]),
-  }));
+  const result = bookings.map(b => {
+    const occupied = b.studio_rate === 'equipment_only' ? [] : (daysByBooking.get(b.id) ?? [b.booking_date]);
+    // Whole-booking pencil means every occupied date is tentative; otherwise only the
+    // specific days flagged is_pencil are.
+    const pencilDates = b.is_pencil ? occupied : (pencilDaysByBooking.get(b.id) ?? []);
+    return { ...b, occupied_dates: occupied, pencil_dates: pencilDates };
+  });
 
   return NextResponse.json(result);
 }
@@ -62,7 +72,7 @@ export async function POST(req: NextRequest) {
   const { client_id, booking_days, equipment_items, notes, discount_type, discount_value, project_name, shoot_type, production_house, is_pencil, no_deposit, vat_exempt, recurrence, recurrence_end, date_tbd } = body;
 
   // Multi-day: studioSubtotal = sum of all day subtotals
-  const days: { date: string; day_type: string; studio_rate: string; hours: number; subtotal: number }[] = booking_days || [];
+  const days: { date: string; day_type: string; studio_rate: string; hours: number; subtotal: number; is_pencil?: boolean }[] = booking_days || [];
   const isDateTBD = !!date_tbd && days.length === 0;
   if (!isDateTBD && days.length === 0 && !body.booking_date) {
     return NextResponse.json({ error: 'At least one date is required (or mark this booking as date TBD)' }, { status: 400 });
@@ -99,6 +109,7 @@ export async function POST(req: NextRequest) {
       SELECT b.id, bd.date as conflict_date FROM bookings b
       JOIN booking_days bd ON bd.booking_id = b.id
       WHERE b.status = 'confirmed' AND b.is_pencil = 0 AND bd.studio_rate != 'equipment_only'
+        AND COALESCE(bd.is_pencil, 0) = 0
         AND bd.date IN (${placeholders})
       UNION
       SELECT b.id, b.booking_date as conflict_date FROM bookings b
@@ -126,8 +137,8 @@ export async function POST(req: NextRequest) {
 
   // Save day configs
   if (days.length) {
-    const insDay = db.prepare('INSERT INTO booking_days (booking_id, date, day_type, studio_rate, hours, subtotal) VALUES (?, ?, ?, ?, ?, ?)');
-    for (const d of days) insDay.run(bookingId, d.date, d.day_type, d.studio_rate, d.hours || 1, d.subtotal || 0);
+    const insDay = db.prepare('INSERT INTO booking_days (booking_id, date, day_type, studio_rate, hours, subtotal, is_pencil) VALUES (?, ?, ?, ?, ?, ?, ?)');
+    for (const d of days) insDay.run(bookingId, d.date, d.day_type, d.studio_rate, d.hours || 1, d.subtotal || 0, d.is_pencil ? 1 : 0);
   }
 
   if (equipment_items?.length) {

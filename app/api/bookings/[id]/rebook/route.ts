@@ -18,7 +18,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!booking) return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
 
   const oldDays = db.prepare('SELECT * FROM booking_days WHERE booking_id = ? ORDER BY date').all(id) as
-    { date: string; day_type: string; studio_rate: string; hours: number; subtotal: number; call_time: string | null; wrap_time: string | null }[];
+    { date: string; day_type: string; studio_rate: string; hours: number; subtotal: number; call_time: string | null; wrap_time: string | null; is_pencil: number | null }[];
   const equipment = db.prepare('SELECT * FROM booking_equipment WHERE booking_id = ? ORDER BY id').all(id) as
     { equipment_id: number | null; quantity: number; rate: number; name: string; item_type: string; is_complimentary: number; discount_pct: number; day_date: string | null }[];
 
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const newDays = oldDays.length
     ? oldDays.map(d => ({ ...d, date: shift(d.date) }))
-    : [{ date: newFirstDate, day_type: 'shoot', studio_rate: booking.studio_rate as string, hours: booking.hours as number, subtotal: booking.subtotal as number, call_time: booking.call_time as string | null, wrap_time: booking.wrap_time as string | null }];
+    : [{ date: newFirstDate, day_type: 'shoot', studio_rate: booking.studio_rate as string, hours: booking.hours as number, subtotal: booking.subtotal as number, call_time: booking.call_time as string | null, wrap_time: booking.wrap_time as string | null, is_pencil: 0 }];
 
   const isEquipmentOnly = newDays.every(d => d.studio_rate === 'equipment_only');
   const allDates = newDays.map(d => d.date);
@@ -46,6 +46,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       SELECT b.id, bd.date as conflict_date FROM bookings b
       JOIN booking_days bd ON bd.booking_id = b.id
       WHERE b.status = 'confirmed' AND b.is_pencil = 0 AND bd.studio_rate != 'equipment_only'
+        AND COALESCE(bd.is_pencil, 0) = 0
         AND bd.date IN (${placeholders})
       UNION
       SELECT b.id, b.booking_date as conflict_date FROM bookings b
@@ -76,8 +77,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   );
   const newBookingId = result.lastInsertRowid;
 
-  const insDay = db.prepare('INSERT INTO booking_days (booking_id, date, day_type, studio_rate, hours, subtotal, call_time, wrap_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
-  for (const d of newDays) insDay.run(newBookingId, d.date, d.day_type, d.studio_rate, d.hours || 1, d.subtotal || 0, d.call_time || null, d.wrap_time || null);
+  const insDay = db.prepare('INSERT INTO booking_days (booking_id, date, day_type, studio_rate, hours, subtotal, call_time, wrap_time, is_pencil) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
+  for (const d of newDays) insDay.run(newBookingId, d.date, d.day_type, d.studio_rate, d.hours || 1, d.subtotal || 0, d.call_time || null, d.wrap_time || null, d.is_pencil ? 1 : 0);
 
   if (equipment.length) {
     const insEq = db.prepare(`INSERT INTO booking_equipment (booking_id, equipment_id, quantity, rate, name, item_type, is_complimentary, discount_pct, day_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);

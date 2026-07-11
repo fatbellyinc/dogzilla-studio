@@ -66,13 +66,16 @@ export default function BookingsPage() {
   // Use each booking's exact occupied_dates (from booking_days) rather than expanding the
   // booking_date→end_date range — that range-fill wrongly marked gap days as booked for
   // non-consecutive multi-day bookings, and equipment-only rentals don't occupy the studio at all.
-  const confirmedDates = new Set(
-    bookings.filter(b => b.status !== 'cancelled' && !b.is_pencil)
-      .flatMap(b => b.occupied_dates ?? expandDates(b.booking_date, b.end_date))
-  );
+  // Split confirmed vs tentative per exact date, not per whole booking — a multi-day booking
+  // can have some days locked in and others still held (pencil_dates is the tentative subset).
+  const activeBookings = bookings.filter(b => b.status !== 'cancelled');
   const pencilDates = new Set(
-    bookings.filter(b => b.status !== 'cancelled' && b.is_pencil)
+    activeBookings.flatMap(b => b.pencil_dates ?? (b.is_pencil ? (b.occupied_dates ?? expandDates(b.booking_date, b.end_date)) : []))
+  );
+  const confirmedDates = new Set(
+    activeBookings
       .flatMap(b => b.occupied_dates ?? expandDates(b.booking_date, b.end_date))
+      .filter(d => !pencilDates.has(d))
   );
   const bookedDates = new Set([...confirmedDates, ...pencilDates]);
   const blockoutSet = new Set(blockouts.map(b => b.date));
@@ -371,6 +374,7 @@ export default function BookingsPage() {
                 </div>
                 <div className="flex items-center gap-3">
                   {b.is_pencil && <span className="text-xs text-yellow-400">✏️ pencil</span>}
+                  {!b.is_pencil && (b.pencil_dates?.length ?? 0) > 0 && <span className="text-xs text-yellow-400">✏️ {b.pencil_dates!.length} tentative day{b.pencil_dates!.length > 1 ? 's' : ''}</span>}
                   {!b.deposit_paid && !b.no_deposit && b.status !== 'completed' && b.status !== 'cancelled' && <span className="text-xs text-yellow-400">⚠️ deposit</span>}
                   {!!b.deposit_paid && !b.fully_paid && b.status !== 'cancelled' && <span className="text-xs text-emerald-400">✓ deposit</span>}
                   {!!b.fully_paid && <span className="text-xs text-green-400">💰 paid</span>}

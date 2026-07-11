@@ -10,6 +10,9 @@ export interface DayConfig {
   studio_rate: keyof typeof STUDIO_RATES;
   hours: number;
   subtotal: number;
+  /** Tentative/held date for this specific day — independent of any other day in the same
+   * booking, so a 3-day booking can have day 1 confirmed and days 2-3 still tentative. */
+  is_pencil?: boolean;
 }
 
 interface Props {
@@ -57,7 +60,7 @@ export default function MultiDayPicker({ days, onChange, bookedDates = [], block
     if (!date || days.some(d => d.date === date)) return;
     const defaultType: 'setup' | 'shoot' = 'shoot';
     const defaultRate: keyof typeof STUDIO_RATES = 'fullday';
-    const day: DayConfig = { date, day_type: defaultType, studio_rate: defaultRate, hours: 8, subtotal: STUDIO_RATES[defaultRate].price };
+    const day: DayConfig = { date, day_type: defaultType, studio_rate: defaultRate, hours: 8, subtotal: STUDIO_RATES[defaultRate].price, is_pencil: false };
     const newDays = [...days, day].sort((a, b) => a.date.localeCompare(b.date));
     onChange(newDays);
     setPickerDate('');
@@ -76,7 +79,7 @@ export default function MultiDayPicker({ days, onChange, bookedDates = [], block
       const existing = days.find(d => d.date === date);
       if (existing) return existing;
       const defaultRate: keyof typeof STUDIO_RATES = 'fullday';
-      return { date, day_type: 'shoot' as const, studio_rate: defaultRate, hours: 8, subtotal: STUDIO_RATES[defaultRate].price };
+      return { date, day_type: 'shoot' as const, studio_rate: defaultRate, hours: 8, subtotal: STUDIO_RATES[defaultRate].price, is_pencil: false };
     });
     onChange(newDays.sort((a, b) => a.date.localeCompare(b.date)));
     setFillRangeEnd('');
@@ -95,6 +98,10 @@ export default function MultiDayPicker({ days, onChange, bookedDates = [], block
   function setDayType(index: number, type: 'setup' | 'shoot') {
     const rate = type === 'setup' ? 'setup' : 'fullday';
     updateDay(index, { day_type: type, studio_rate: rate as keyof typeof STUDIO_RATES });
+  }
+
+  function togglePencil(index: number) {
+    updateDay(index, { is_pencil: !days[index].is_pencil });
   }
 
   const studioTotal = days.reduce((s, d) => s + d.subtotal, 0);
@@ -158,7 +165,7 @@ export default function MultiDayPicker({ days, onChange, bookedDates = [], block
           </div>
 
           {days.map((day, i) => (
-            <div key={day.date} className={`rounded-xl border p-3 ${day.day_type === 'setup' ? 'border-yellow-500/30 bg-yellow-500/5' : 'border-[#E32726]/30 bg-[#E32726]/5'}`}>
+            <div key={day.date} className={`rounded-xl border p-3 ${day.is_pencil ? 'border-dashed border-yellow-500/40 bg-yellow-500/5' : day.day_type === 'setup' ? 'border-yellow-500/30 bg-yellow-500/5' : 'border-[#E32726]/30 bg-[#E32726]/5'}`}>
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-semibold text-white">Day {i + 1} — {dayLabel(day.date)}</span>
@@ -171,6 +178,13 @@ export default function MultiDayPicker({ days, onChange, bookedDates = [], block
                   )}
                 </div>
               </div>
+
+              {/* Confirmed vs tentative — independent per day, since some dates in a multi-day
+                  booking may be locked in while others are still being held */}
+              <button type="button" onClick={() => togglePencil(i)}
+                className={`w-full mb-2 py-1.5 rounded-lg text-xs font-semibold transition-all border ${day.is_pencil ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/40' : 'bg-green-500/10 text-green-400 border-green-500/30 hover:bg-yellow-500/10 hover:text-yellow-400 hover:border-yellow-500/30'}`}>
+                {day.is_pencil ? '✏️ Tentative — tap to confirm' : '✓ Confirmed — tap to mark tentative'}
+              </button>
 
               {/* Setup vs Shoot toggle */}
               <div className="flex gap-1.5 mb-2">
@@ -219,7 +233,7 @@ export default function MultiDayPicker({ days, onChange, bookedDates = [], block
               {days.map((d, i) => (
                 <div key={d.date} className="flex justify-between text-xs py-0.5">
                   <span className={d.day_type === 'setup' ? 'text-yellow-400' : 'text-white/60'}>
-                    Day {i + 1} — {dayLabel(d.date)} ({d.day_type === 'setup' ? 'Setup' : 'Shoot'})
+                    Day {i + 1} — {dayLabel(d.date)} ({d.day_type === 'setup' ? 'Setup' : 'Shoot'}){d.is_pencil ? ' · ✏️ tentative' : ''}
                   </span>
                   <span className="text-white">{formatPHP(d.subtotal)}</span>
                 </div>

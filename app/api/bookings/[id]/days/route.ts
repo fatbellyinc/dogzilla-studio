@@ -4,7 +4,7 @@ import { getDb } from '@/lib/db';
 import { logActivity, ACTIONS } from '@/lib/activity';
 import { recomputeBookingTotals } from '@/lib/booking-calc';
 
-interface DayInput { date: string; day_type: string; studio_rate: string; hours: number; subtotal: number }
+interface DayInput { date: string; day_type: string; studio_rate: string; hours: number; subtotal: number; is_pencil?: boolean }
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const db = getDb();
@@ -29,6 +29,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       SELECT b.id, bd.date as conflict_date FROM bookings b
       JOIN booking_days bd ON bd.booking_id = b.id
       WHERE b.id != ? AND b.status = 'confirmed' AND b.is_pencil = 0 AND bd.studio_rate != 'equipment_only'
+        AND COALESCE(bd.is_pencil, 0) = 0
         AND bd.date IN (${placeholders})
       UNION
       SELECT b.id, b.booking_date as conflict_date FROM bookings b
@@ -57,10 +58,10 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
   // Replace all days for this booking
   db.prepare('DELETE FROM booking_days WHERE booking_id = ?').run(bookingId);
-  const insDay = db.prepare('INSERT INTO booking_days (booking_id, date, day_type, studio_rate, hours, subtotal, call_time, wrap_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+  const insDay = db.prepare('INSERT INTO booking_days (booking_id, date, day_type, studio_rate, hours, subtotal, call_time, wrap_time, is_pencil) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
   for (const d of days) {
     const preserved = existingTimes.get(d.date);
-    insDay.run(bookingId, d.date, d.day_type, d.studio_rate, d.hours || 1, d.subtotal || 0, preserved?.call_time || null, preserved?.wrap_time || null);
+    insDay.run(bookingId, d.date, d.day_type, d.studio_rate, d.hours || 1, d.subtotal || 0, preserved?.call_time || null, preserved?.wrap_time || null, d.is_pencil ? 1 : 0);
   }
 
   const bookingDate = days[0].date;

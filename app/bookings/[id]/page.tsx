@@ -438,6 +438,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
       studio_rate: d.studio_rate as DayConfig['studio_rate'],
       hours: d.hours,
       subtotal: d.subtotal,
+      is_pencil: !!d.is_pencil,
     })));
     // Load other bookings' dates (excluding this one) so the picker can warn about conflicts.
     // A date-TBD booking has no real booking_date (just a placeholder), so center on today instead.
@@ -868,6 +869,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                         Day {i + 1} — {new Date(d.date + 'T00:00').toLocaleDateString('en-PH', { weekday: 'short', month: 'short', day: 'numeric' })}
                         {' '}({d.day_type === 'setup' ? '🔧 Setup' : '🎬 Shoot'})
                         {d.call_time && d.wrap_time && <span className="text-white/30"> · {fmt24(d.call_time)} → {fmt24(d.wrap_time)}</span>}
+                        {!!d.is_pencil && <span className="text-yellow-400"> · ✏️ tentative</span>}
                       </span>
                       <span className="text-white">{formatPHP(d.subtotal)}</span>
                     </div>
