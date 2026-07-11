@@ -44,17 +44,22 @@ export function recomputeBookingTotals(db: Database.Database, bookingId: number)
     otAmount = booking.overtime_amount || ot.otAmount;
   }
 
-  // Discount applies to studio + equipment only, not overtime — matches how invoice/quotation
-  // documents already display it (a separate, non-discountable line).
+  // Cancellation fees charged onto this booking (e.g. it's the rebook of a date the client
+  // cancelled) — a flat non-discountable add-on, same treatment as overtime.
+  const feeRow = db.prepare('SELECT COALESCE(SUM(amount), 0) as t FROM cancellation_fees WHERE new_booking_id = ?').get(bookingId) as { t: number };
+  const cancellationFee = feeRow.t;
+
+  // Discount applies to studio + equipment only, not overtime or cancellation fees — matches
+  // how invoice/quotation documents already display it (separate, non-discountable lines).
   const subtotalBeforeDiscount = studioSubtotal + eqTotal;
   const discountAmount = calcDiscountAmount(subtotalBeforeDiscount, booking.discount_type as 'percent' | 'fixed' | null, booking.discount_value);
-  const total = subtotalBeforeDiscount - discountAmount + otAmount;
+  const total = subtotalBeforeDiscount - discountAmount + otAmount + cancellationFee;
   const deposit = total * 0.5;
 
   db.prepare(`
     UPDATE bookings
     SET subtotal = ?, equipment_total = ?, overtime_hours = ?, overtime_amount = ?,
-        discount_amount = ?, total = ?, deposit_amount = ?
+        discount_amount = ?, total = ?, deposit_amount = ?, cancellation_fee_amount = ?
     WHERE id = ?
-  `).run(studioSubtotal, eqTotal, otHrs, otAmount, discountAmount, total, deposit, bookingId);
+  `).run(studioSubtotal, eqTotal, otHrs, otAmount, discountAmount, total, deposit, cancellationFee, bookingId);
 }

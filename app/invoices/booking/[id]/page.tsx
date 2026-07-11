@@ -108,6 +108,12 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
     lines.push({ desc: e.name, qty: e.quantity, unit: e.rate, total: lineTotal, indent: true, comp, disc: discPct > 0 ? discPct : undefined });
   });
 
+  // Cancellation fee — flat non-discountable add-on, same treatment as overtime
+  const cancellationFee = booking.cancellation_fee_amount || 0;
+  if (cancellationFee > 0) {
+    lines.push({ desc: 'Cancellation fee', qty: 1, unit: cancellationFee, total: cancellationFee });
+  }
+
   // Recompute totals from line items so the document stays accurate even when
   // booking data is edited — never trust stale stored totals for display
   const bookingDiscount = booking.discount_amount || 0;

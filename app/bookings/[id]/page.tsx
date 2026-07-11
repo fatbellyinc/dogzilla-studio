@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { formatPHP, formatDate, fmt24, calcOT, OT_RATE, SETUP_OT_RATE } from '@/lib/utils';
-import { Booking, BookingEquipment, Payment, Quotation, Invoice, BookingDay, STUDIO_RATES, VAT_RATE, SHOOT_TYPES, NO_DATE_SENTINEL } from '@/lib/types';
+import { Booking, BookingEquipment, Payment, Quotation, Invoice, BookingDay, STUDIO_RATES, VAT_RATE, SHOOT_TYPES, NO_DATE_SENTINEL, CancellationFee } from '@/lib/types';
 
 function shortDayLabel(date: string) {
   if (date === NO_DATE_SENTINEL) return '📌 No date yet';
@@ -422,6 +422,17 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
   const [rebookDate, setRebookDate] = useState('');
   const [rebooking, setRebooking] = useState(false);
   const [rebookError, setRebookError] = useState('');
+  const [rebookFee, setRebookFee] = useState('');
+  const [rebookFeeNotes, setRebookFeeNotes] = useState('');
+  const [showCancelFee, setShowCancelFee] = useState(false);
+  const [cancelFeeAmount, setCancelFeeAmount] = useState('');
+  const [cancelFeeNotes, setCancelFeeNotes] = useState('');
+  const [savingCancelFee, setSavingCancelFee] = useState(false);
+  const [cancellationFees, setCancellationFees] = useState<CancellationFee[]>([]);
+
+  const loadCancellationFees = useCallback(() => {
+    fetch(`/api/bookings/${id}/cancellation-fee`).then(r => r.json()).then(setCancellationFees);
+  }, [id]);
 
   const loadCrew = useCallback(() => { fetch(`/api/bookings/${id}/crew`).then(r => r.json()).then(setCrew); }, [id]);
   const load = () => fetch(`/api/bookings/${id}`).then(r => r.json()).then((d: BookingDetail) => {
@@ -438,7 +449,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
     });
   });
 
-  useEffect(() => { load(); loadCrew(); }, [id, loadCrew]);
+  useEffect(() => { load(); loadCrew(); loadCancellationFees(); }, [id, loadCrew, loadCancellationFees]);
 
   function startEditDates() {
     setEditDays((data!.bookingDays || []).map(d => ({
@@ -498,6 +509,8 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
   function startRebook() {
     setRebookDate('');
     setRebookError('');
+    setRebookFee('');
+    setRebookFeeNotes('');
     const center = new Date((data!.booking.booking_date) + 'T00:00');
     const months = [-1, 0, 1, 2, 3].map(offset => {
       const d = new Date(center.getFullYear(), center.getMonth() + offset, 1);
@@ -647,9 +660,10 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
     if (!rebookDate) return;
     setRebooking(true);
     setRebookError('');
+    const fee = Number(rebookFee) || 0;
     const res = await fetch(`/api/bookings/${id}/rebook`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ new_date: rebookDate }),
+      body: JSON.stringify({ new_date: rebookDate, cancellation_fee: fee, cancellation_fee_notes: rebookFeeNotes || null }),
     });
     const result = await res.json();
     setRebooking(false);
@@ -657,8 +671,33 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
       setRebookError(result.message || 'Could not rebook — that date conflicts with an existing booking.');
       return;
     }
-    toast.success('Booking duplicated to new date ✓');
+    toast.success(fee > 0 ? `Booking duplicated to new date — ₱${fee.toLocaleString()} cancellation fee added ✓` : 'Booking duplicated to new date ✓');
     router.push(`/bookings/${result.id}`);
+  }
+
+  async function submitCancelFee() {
+    const amount = Number(cancelFeeAmount);
+    if (!amount || amount <= 0) return;
+    setSavingCancelFee(true);
+    const res = await fetch(`/api/bookings/${id}/cancellation-fee`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount, notes: cancelFeeNotes || null }),
+    });
+    setSavingCancelFee(false);
+    if (!res.ok) { toast.error('Failed to log cancellation fee'); return; }
+    setShowCancelFee(false);
+    setCancelFeeAmount('');
+    setCancelFeeNotes('');
+    await loadCancellationFees();
+    toast.success('Cancellation fee logged ✓');
+  }
+
+  async function deleteCancelFee(feeId: number) {
+    if (!confirm('Remove this cancellation fee?')) return;
+    await fetch(`/api/bookings/${id}/cancellation-fee?fee_id=${feeId}`, { method: 'DELETE' });
+    await loadCancellationFees();
+    await load();
+    toast.success('Cancellation fee removed');
   }
 
   function logMessageSent(channel: string) {
@@ -920,6 +959,13 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                 </div>
               )}
 
+              {!!booking.cancellation_fee_amount && booking.cancellation_fee_amount > 0 && (
+                <div className="flex justify-between text-orange-400 font-medium">
+                  <span>Cancellation fee</span>
+                  <span>+{formatPHP(booking.cancellation_fee_amount)}</span>
+                </div>
+              )}
+
               <div className="border-t border-[#2a2a2a] pt-2 space-y-1">
                 <div className="flex justify-between font-semibold text-white">
                   <span>Total (VAT-excl.)</span>
@@ -1177,6 +1223,17 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                     blockoutDates={blockoutDates}
                     minDate={new Date().toISOString().slice(0, 10)}
                   />
+                  <div className="pt-1 border-t border-white/10 space-y-1.5">
+                    <div className="text-xs text-white/50">Cancellation fee (optional) — for turning away other clients who wanted the original date</div>
+                    <input type="number" min="0" value={rebookFee} onChange={e => setRebookFee(e.target.value)}
+                      placeholder="₱ amount, leave blank for none"
+                      className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-purple-500/50" />
+                    {Number(rebookFee) > 0 && (
+                      <input type="text" value={rebookFeeNotes} onChange={e => setRebookFeeNotes(e.target.value)}
+                        placeholder="Notes (optional)"
+                        className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-purple-500/50" />
+                    )}
+                  </div>
                   {rebookError && <div className="text-xs text-red-400">{rebookError}</div>}
                   <div className="flex gap-2">
                     <button onClick={submitRebook} disabled={!rebookDate || rebooking}
@@ -1188,6 +1245,48 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                       Cancel
                     </button>
                   </div>
+                </div>
+              )}
+              {/* Cancellation fee — standalone, usable without rebooking */}
+              <button onClick={() => { setShowCancelFee(v => !v); setCancelFeeAmount(''); setCancelFeeNotes(''); }} disabled={saving}
+                className="w-full bg-orange-500/20 text-orange-400 border border-orange-500/30 text-sm py-2 rounded-lg hover:bg-orange-500/30 transition-colors">
+                💸 Add Cancellation Charge
+              </button>
+              {showCancelFee && (
+                <div className="bg-[#0f0f0f] border border-orange-500/30 rounded-lg p-3 space-y-2">
+                  <div className="text-xs text-white/50">Logs a fee for this booking (e.g. a date it cancelled that turned away other clients). Not tied to any invoice.</div>
+                  <input type="number" min="0" value={cancelFeeAmount} onChange={e => setCancelFeeAmount(e.target.value)}
+                    placeholder="₱ amount"
+                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-orange-500/50" />
+                  <input type="text" value={cancelFeeNotes} onChange={e => setCancelFeeNotes(e.target.value)}
+                    placeholder="Notes (optional)"
+                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-orange-500/50" />
+                  <div className="flex gap-2">
+                    <button onClick={submitCancelFee} disabled={!cancelFeeAmount || savingCancelFee}
+                      className="flex-1 bg-orange-500 text-white text-sm py-2 rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-40">
+                      {savingCancelFee ? 'Saving…' : 'Log Fee'}
+                    </button>
+                    <button onClick={() => setShowCancelFee(false)} disabled={savingCancelFee}
+                      className="px-4 bg-[#2a2a2a] text-white/60 text-sm py-2 rounded-lg hover:text-white transition-colors">
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+              {cancellationFees.length > 0 && (
+                <div className="bg-[#0f0f0f] border border-[#2a2a2a] rounded-lg p-3 space-y-1.5">
+                  <div className="text-xs text-white/50 font-medium">Cancellation Fees</div>
+                  {cancellationFees.map(f => (
+                    <div key={f.id} className="flex items-center justify-between text-xs text-white/70">
+                      <span>
+                        ₱{f.amount.toLocaleString()}
+                        {f.original_booking_id === Number(id) && f.new_booking_id ? ` — billed to booking #${f.new_booking_id}` : ''}
+                        {f.new_booking_id === Number(id) && f.original_booking_id ? ` — from cancelled booking #${f.original_booking_id}` : ''}
+                        {f.notes ? ` (${f.notes})` : ''}
+                      </span>
+                      <button onClick={() => deleteCancelFee(f.id)} className="text-red-400/70 hover:text-red-400 ml-2">✕</button>
+                    </div>
+                  ))}
                 </div>
               )}
               {/* Pencil toggle */}

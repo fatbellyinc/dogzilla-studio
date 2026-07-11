@@ -123,6 +123,17 @@ function DocView({ bookingId }: { bookingId: string }) {
     });
   }
 
+  // Cancellation fee — flat non-discountable add-on, same treatment as overtime
+  if (booking.cancellation_fee_amount && booking.cancellation_fee_amount > 0) {
+    lines.push({
+      code: 'CANCEL',
+      desc: 'Cancellation fee',
+      qty: 1,
+      unit: booking.cancellation_fee_amount,
+      total: booking.cancellation_fee_amount,
+    });
+  }
+
   // OT — single-day only; multi-day OT is already added per-day above
   if (!isMultiDay) {
     const otCalc = calcOT(booking.studio_rate, booking.call_time, booking.wrap_time);

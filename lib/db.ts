@@ -294,6 +294,15 @@ function initSchema(db: Database.Database) {
       status TEXT DEFAULT 'new',
       created_at TEXT DEFAULT (datetime('now'))
     );
+
+    CREATE TABLE IF NOT EXISTS cancellation_fees (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      original_booking_id INTEGER REFERENCES bookings(id) ON DELETE SET NULL,
+      new_booking_id INTEGER REFERENCES bookings(id) ON DELETE SET NULL,
+      amount REAL NOT NULL DEFAULT 0,
+      notes TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
   `);
 
   // Migration: add new columns if upgrading from old schema
@@ -351,6 +360,7 @@ function initSchema(db: Database.Database) {
     `ALTER TABLE booking_days ADD COLUMN wrap_time TEXT`,
     `ALTER TABLE bookings ADD COLUMN date_tbd INTEGER DEFAULT 0`,
     `ALTER TABLE booking_days ADD COLUMN is_pencil INTEGER DEFAULT 0`,
+    `ALTER TABLE bookings ADD COLUMN cancellation_fee_amount REAL DEFAULT 0`,
   ];
   for (const sql of migrations) {
     try { db.exec(sql); } catch { /* column already exists */ }

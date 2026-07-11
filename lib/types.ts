@@ -60,6 +60,7 @@ export interface Booking {
   wrap_date: string | null;
   overtime_hours: number;
   overtime_amount: number;
+  cancellation_fee_amount?: number;
   deposit_paid: number;
   fully_paid: number;
   discount_type: 'percent' | 'fixed' | null;
@@ -73,6 +74,17 @@ export interface Booking {
   occupied_dates?: string[];
   /** Subset of occupied_dates still tentative (per-day is_pencil, or every date if the whole booking is pencil). Set by GET /api/bookings. */
   pencil_dates?: string[];
+}
+
+export interface CancellationFee {
+  id: number;
+  original_booking_id: number | null;
+  new_booking_id: number | null;
+  amount: number;
+  notes: string | null;
+  created_at: string;
+  original_booking_date?: string;
+  new_booking_date?: string;
 }
 
 export interface BookingDay {

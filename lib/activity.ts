@@ -30,4 +30,5 @@ export const ACTIONS = {
   OR_SET: 'or_set',
   OT_LOGGED: 'ot_logged',
   PRICE_BULK_UPDATED: 'price_bulk_updated',
+  CANCELLATION_FEE_ADDED: 'cancellation_fee_added',
 } as const;
