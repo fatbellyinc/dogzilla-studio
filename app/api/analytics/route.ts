@@ -8,8 +8,8 @@ export async function GET() {
   const monthlyRevenue = db.prepare(`
     SELECT strftime('%Y-%m', booking_date) as month,
       COUNT(CASE WHEN status != 'cancelled' THEN 1 END) as booking_count,
-      SUM(CASE WHEN status = 'completed' THEN total + COALESCE(overtime_amount, 0) ELSE 0 END) as revenue,
-      SUM(CASE WHEN status = 'completed' THEN (total + COALESCE(overtime_amount, 0)) * 0.12 ELSE 0 END) as vat
+      SUM(CASE WHEN status = 'completed' THEN total ELSE 0 END) as revenue,
+      SUM(CASE WHEN status = 'completed' THEN total * 0.12 ELSE 0 END) as vat
     FROM bookings
     WHERE booking_date >= date('now', '-18 months')
     GROUP BY month ORDER BY month

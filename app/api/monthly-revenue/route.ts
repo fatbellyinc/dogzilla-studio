@@ -12,8 +12,8 @@ export async function GET(req: NextRequest) {
       SELECT
         CAST(strftime('%m', booking_date) AS INTEGER) as month,
         COUNT(CASE WHEN status = 'completed' THEN 1 END) as shoot_count,
-        COALESCE(SUM(CASE WHEN status = 'completed' THEN total + COALESCE(overtime_amount, 0) ELSE 0 END), 0) as revenue,
-        COALESCE(SUM(CASE WHEN status = 'completed' THEN (total + COALESCE(overtime_amount, 0)) * 0.12 ELSE 0 END), 0) as vat,
+        COALESCE(SUM(CASE WHEN status = 'completed' THEN total ELSE 0 END), 0) as revenue,
+        COALESCE(SUM(CASE WHEN status = 'completed' THEN total * 0.12 ELSE 0 END), 0) as vat,
         COUNT(CASE WHEN status = 'cancelled' THEN 1 END) as cancelled_count
       FROM bookings
       WHERE strftime('%Y', booking_date) = ?
@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
     SELECT
       CAST(strftime('%Y', booking_date) AS INTEGER) as year,
       COUNT(CASE WHEN status = 'completed' THEN 1 END) as shoot_count,
-      COALESCE(SUM(CASE WHEN status = 'completed' THEN total + COALESCE(overtime_amount, 0) ELSE 0 END), 0) as revenue
+      COALESCE(SUM(CASE WHEN status = 'completed' THEN total ELSE 0 END), 0) as revenue
     FROM bookings
     GROUP BY year
     ORDER BY year DESC

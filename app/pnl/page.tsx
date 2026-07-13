@@ -35,8 +35,8 @@ export default function PnLPage() {
     ]).then(([bookings, utilities, analytics, historicalSales]) => {
       // Only completed bookings count as realised revenue
       const completedBookings = bookings.filter((b: { status: string }) => b.status === 'completed');
-      // Include overtime_amount — it's charged to client (appears on invoice)
-      const appRevenue = completedBookings.reduce((s: number, b: { total: number; overtime_amount?: number }) => s + b.total + (b.overtime_amount || 0), 0);
+      // booking.total already includes overtime_amount (folded in by recomputeBookingTotals)
+      const appRevenue = completedBookings.reduce((s: number, b: { total: number }) => s + b.total, 0);
       // Fall back to historical/manual entry only when no completed app bookings exist for the month
       const histRow = historicalSales.find((h: { month: number }) => h.month === parseInt(m));
       const histRevenue = histRow?.revenue || 0;
