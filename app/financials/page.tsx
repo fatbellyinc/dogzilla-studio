@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { formatPHP } from '@/lib/utils';
 
 const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -15,7 +15,7 @@ const ic = 'bg-[#0f0f0f] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm te
 
 // ─── MONTHLY SALES TAB ───────────────────────────────────────────────────────
 interface LiveMonthData { revenue: number; shoot_count: number; vat: number; cancelled_count: number; }
-interface HistoricalMonthData { revenue: string; shoots: string; }
+interface HistoricalMonthData { id?: number; revenue: string; shoots: string; }
 interface YearSummary { year: number; total: number; shoots: number; source: 'live' | 'historical' | 'both'; }
 
 function MonthlySalesTab() {
@@ -32,36 +32,17 @@ function MonthlySalesTab() {
   const [saved, setSaved] = useState(false);
   const [yearSummaries, setYearSummaries] = useState<YearSummary[]>([]);
 
-  useEffect(() => {
-    // Load LIVE booking revenue month-by-month for this year
-    fetch(`/api/monthly-revenue?year=${year}`)
-      .then(r => r.json())
-      .then((data: Record<number, LiveMonthData>) => {
-        setLiveData(data);
-        // Sync live portion of this year's total into yearSummaries
-        // The full total (live + manual) is computed in the Promise.all below
-        // Here we just ensure the live portion is up to date
-        const liveTotal = Object.values(data).reduce((s, d) => s + (d?.revenue || 0), 0);
-        const liveShoots = Object.values(data).reduce((s, d) => s + (d?.shoot_count || 0), 0);
-        setYearSummaries(prev => {
-          const exists = prev.find(ys => ys.year === year);
-          if (!exists && (liveTotal > 0 || liveShoots > 0)) {
-            return [...prev, { year, total: liveTotal, shoots: liveShoots, source: 'live' as const }].sort((a, b) => b.year - a.year);
-          }
-          return prev;
-        });
-      });
-
-    // Load historical (manual) entries for this year
+  const loadHistorical = useCallback(() => {
     fetch(`/api/historical-sales?year=${year}`)
       .then(r => r.json())
-      .then((rows: { month: number; revenue: number; shoot_count: number }[]) => {
+      .then((rows: { id: number; month: number; revenue: number; shoot_count: number }[]) => {
         const g: Record<number, HistoricalMonthData> = {};
-        for (const r of rows) g[r.month] = { revenue: String(r.revenue || ''), shoots: String(r.shoot_count || '') };
+        for (const r of rows) g[r.month] = { id: r.id, revenue: String(r.revenue || ''), shoots: String(r.shoot_count || '') };
         setHistGrid(g);
       });
+  }, [year]);
 
-    // Load all-years summary — merge live + historical (initial population)
+  const loadSummaries = useCallback(() => {
     Promise.all([
       fetch('/api/monthly-revenue').then(r => r.json()) as Promise<{ year: number; revenue: number; shoot_count: number }[]>,
       fetch('/api/historical-sales').then(r => r.json()) as Promise<{ year: number; month: number; revenue: number; shoot_count: number }[]>,
@@ -94,7 +75,17 @@ function MonthlySalesTab() {
       // Always use the fully merged result — live + historical combined
       setYearSummaries(Object.values(byYear).sort((a, b) => b.year - a.year));
     });
-  }, [year]);
+  }, []);
+
+  useEffect(() => {
+    // Load LIVE booking revenue month-by-month for this year
+    fetch(`/api/monthly-revenue?year=${year}`)
+      .then(r => r.json())
+      .then((data: Record<number, LiveMonthData>) => setLiveData(data));
+
+    loadHistorical();
+    loadSummaries();
+  }, [year, loadHistorical, loadSummaries]);
 
   async function saveHistorical() {
     setSaving(true);
@@ -103,6 +94,16 @@ function MonthlySalesTab() {
       .filter(r => r.revenue > 0 || r.shoot_count > 0);
     await fetch('/api/historical-sales', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(rows) });
     setSaving(false); setSaved(true); setTimeout(() => setSaved(false), 2000);
+    loadHistorical(); loadSummaries();
+  }
+
+  // Removes a manual entry entirely — needed for months that now also have real itemized
+  // bookings, where the leftover manual row would otherwise silently double-count into the
+  // "All Years Summary" total (which adds live + historical together per year).
+  async function clearHistorical(month: number, id?: number) {
+    if (id) await fetch(`/api/historical-sales?id=${id}`, { method: 'DELETE' });
+    setHistGrid(g => { const next = { ...g }; delete next[month]; return next; });
+    loadSummaries();
   }
 
   const liveYearTotal = Object.values(liveData).reduce((s, d) => s + (d?.revenue || 0), 0);
@@ -148,16 +149,29 @@ function MonthlySalesTab() {
                   <div className="text-[10px] text-white/40">{live.shoot_count} shoot{live.shoot_count !== 1 ? 's' : ''}</div>
                   {live.vat > 0 && <div className="text-[10px] text-white/30">+{formatPHP(live.vat)} VAT</div>}
                   {live.cancelled_count > 0 && <div className="text-[10px] text-red-400/60">{live.cancelled_count} cancelled</div>}
+                  {/* A leftover manual entry for this same month double-counts into the All
+                      Years Summary total (it adds live + historical together per year) —
+                      surface it here since the input above is hidden once LIVE data exists. */}
+                  {hist.id && (
+                    <div className="mt-1.5 pt-1.5 border-t border-yellow-500/20 flex items-center justify-between gap-1">
+                      <span className="text-[9px] text-yellow-400/80">⚠ old manual: {formatPHP(Number(hist.revenue) || 0)}</span>
+                      <button onClick={() => clearHistorical(month, hist.id)}
+                        className="text-[9px] text-yellow-400 hover:text-yellow-300 underline shrink-0">Clear</button>
+                    </div>
+                  )}
                 </div>
               ) : !isFuture ? (
                 /* Manual entry for months with no live data */
                 <div className="space-y-1.5">
-                  <div>
+                  <div className="flex items-center justify-between">
                     <label className="text-[10px] text-white/30">Revenue (₱)</label>
-                    <input type="number" value={hist.revenue} placeholder="0" min="0"
-                      onChange={e => setHistGrid(g => ({ ...g, [month]: { ...hist, revenue: e.target.value } }))}
-                      className="w-full bg-[#0f0f0f] border border-[#2a2a2a] rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-[#E32726]" />
+                    {hist.id && (
+                      <button onClick={() => clearHistorical(month, hist.id)} className="text-[9px] text-white/30 hover:text-red-400 underline">Clear</button>
+                    )}
                   </div>
+                  <input type="number" value={hist.revenue} placeholder="0" min="0"
+                    onChange={e => setHistGrid(g => ({ ...g, [month]: { ...hist, revenue: e.target.value } }))}
+                    className="w-full bg-[#0f0f0f] border border-[#2a2a2a] rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-[#E32726]" />
                   <div>
                     <label className="text-[10px] text-white/30">Shoots</label>
                     <input type="number" value={hist.shoots} placeholder="0" min="0"
