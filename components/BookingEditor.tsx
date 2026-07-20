@@ -182,7 +182,9 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
 
   function addCustom() {
     if (!customItem.name || !customItem.rate) return;
-    setItems(prev => [...prev, { key: `custom-${Date.now()}`, name: customItem.name, rate: Number(customItem.rate), quantity: Number(customItem.quantity) || 1, is_complimentary: false, discount_pct: 0, item_type: 'custom' }]);
+    const day = isMultiDay ? effectiveAddonDay : undefined;
+    const name = customItem.name + (day ? ` — ${dayShortLabel(day)}` : '');
+    setItems(prev => [...prev, { key: `custom-${Date.now()}`, name, rate: Number(customItem.rate), quantity: Number(customItem.quantity) || 1, is_complimentary: false, discount_pct: 0, item_type: 'custom', day_date: day }]);
     setCustomItem({ name: '', rate: '', quantity: '1' });
     setShowCustom(false);
   }
