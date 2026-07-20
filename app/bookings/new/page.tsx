@@ -207,24 +207,30 @@ function NewBookingForm() {
   const deposit = total * 0.5;
 
   function togglePackage(cat: PackageCategory, pkg: (typeof EQUIPMENT_PACKAGES)[PackageCategory][number]) {
+    const day = isMultiDay ? effectiveAddonDay : undefined;
+    const key = day ? `${pkg.id}::${day}` : pkg.id;
+    const name = `${pkg.label} Package — ${pkg.subtitle}` + (day ? ` (${dayLabel(day)})` : '');
     setSelectedItems(prev => {
-      const existing = prev.find(e => e.key === pkg.id);
-      if (existing) return prev.filter(e => e.key !== pkg.id);
-      // remove other packages of same category first
+      const existing = prev.find(e => e.key === key);
+      if (existing) return prev.filter(e => e.key !== key);
+      // remove other packages of same category for this same day only, so different days
+      // can carry different packages of the same category concurrently
       const filtered = prev.filter(e => {
-        const sameCat = EQUIPMENT_PACKAGES[cat].some((p: { id: string }) => p.id === e.key);
+        const sameCat = EQUIPMENT_PACKAGES[cat].some((p: { id: string }) => e.key === p.id || (day && e.key === `${p.id}::${day}`));
         return !sameCat;
       });
-      return [...filtered, { key: pkg.id, name: `${pkg.label} Package — ${pkg.subtitle}`, rate: pkg.price, quantity: 1, is_package: true }];
+      return [...filtered, { key, name, rate: pkg.price, quantity: 1, is_package: true, day_date: day }];
     });
   }
 
   function toggleEquipment(item: Equipment) {
-    const key = `eq-${item.id}`;
+    const day = isMultiDay ? effectiveAddonDay : undefined;
+    const key = day ? `eq-${item.id}::${day}` : `eq-${item.id}`;
+    const name = item.name + (day ? ` — ${dayLabel(day)}` : '');
     setSelectedItems(prev => {
       const existing = prev.find(e => e.key === key);
       if (existing) return prev.filter(e => e.key !== key);
-      return [...prev, { key, name: item.name, rate: item.daily_rate, quantity: 1, equipment_id: item.id, is_package: false, is_complimentary: false, discount_pct: 0 }];
+      return [...prev, { key, name, rate: item.daily_rate, quantity: 1, equipment_id: item.id, is_package: false, is_complimentary: false, discount_pct: 0, day_date: day }];
     });
   }
 
@@ -498,6 +504,21 @@ function NewBookingForm() {
               )}
             </div>
 
+            {/* Day selector — applies to Equipment, Packages, Add-ons, and Manpower below,
+                so a multi-day booking can carry a different set of items per day. */}
+            {isMultiDay && (
+              <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-3 flex items-center gap-2">
+                <span className="text-xs text-white/40">Assigning items to:</span>
+                <select value={effectiveAddonDay} onChange={e => {
+                  setAddonDay(e.target.value);
+                  const existingElec = selectedItems.find(i => i.key === addonKey('ADD_ELEC', e.target.value));
+                  setAddonElecHours(existingElec ? existingElec.rate / ELEC_RATE : 10);
+                }} className="bg-[#0f0f0f] border border-[#2a2a2a] rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-[#E32726]">
+                  {bookingDays.map(d => <option key={d.date} value={d.date}>{dayLabel(d.date)}</option>)}
+                </select>
+              </div>
+            )}
+
             {/* Equipment — packages or individual */}
             <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4">
               <div className="flex items-center justify-between mb-3">
@@ -526,7 +547,7 @@ function NewBookingForm() {
 
                   <div className="space-y-2">
                     {EQUIPMENT_PACKAGES[equipmentTab].map((pkg) => {
-                      const sel = selectedItems.find(e => e.key === pkg.id);
+                      const sel = selectedItems.find(e => e.key === (isMultiDay ? `${pkg.id}::${effectiveAddonDay}` : pkg.id));
                       return (
                         <button key={pkg.id} type="button" onClick={() => togglePackage(equipmentTab, pkg)}
                           className={`w-full text-left p-3 rounded-lg border transition-all ${sel ? 'border-[#E32726] bg-[#E32726]/10' : 'border-[#2a2a2a] hover:border-[#3a3a3a]'}`}>
@@ -567,7 +588,7 @@ function NewBookingForm() {
                   </div>
                   <div className="space-y-1.5 max-h-72 overflow-y-auto pr-1">
                     {equipment.filter(e => e.category === individualCat).map(item => {
-                      const key = `eq-${item.id}`;
+                      const key = isMultiDay ? `eq-${item.id}::${effectiveAddonDay}` : `eq-${item.id}`;
                       const sel = selectedItems.find(e => e.key === key);
                       const bookedQty = item.booked_qty || 0;
                       const available = item.quantity - bookedQty;
@@ -599,18 +620,6 @@ function NewBookingForm() {
             <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4">
               <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
                 <h2 className="font-semibold text-white text-sm">Studio Add-ons</h2>
-                {isMultiDay && (
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] text-white/40">Applying to:</span>
-                    <select value={effectiveAddonDay} onChange={e => {
-                      setAddonDay(e.target.value);
-                      const existingElec = selectedItems.find(i => i.key === addonKey('ADD_ELEC', e.target.value));
-                      setAddonElecHours(existingElec ? existingElec.rate / ELEC_RATE : 10);
-                    }} className="bg-[#0f0f0f] border border-[#2a2a2a] rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-[#E32726]">
-                      {bookingDays.map(d => <option key={d.date} value={d.date}>{dayLabel(d.date)}</option>)}
-                    </select>
-                  </div>
-                )}
               </div>
               <div className="grid grid-cols-2 gap-2">
                 {ADDON_ITEMS.map(addon => {
@@ -730,7 +739,10 @@ function NewBookingForm() {
                   { key: 'MP_MAINTENANCE', label: 'Maintenance', rate: 1500, desc: '₱1,500/pax/day' },
                   { key: 'MP_PARKING', label: 'Parking Boy', rate: 800, desc: '₱800/pax/day' },
                 ].map(mp => {
-                  const sel = selectedItems.find(i => i.key === mp.key);
+                  const day = isMultiDay ? effectiveAddonDay : undefined;
+                  const key = day ? `${mp.key}::${day}` : mp.key;
+                  const name = mp.label + (day ? ` — ${dayLabel(day)}` : '');
+                  const sel = selectedItems.find(i => i.key === key);
                   return (
                     <div key={mp.key} className={`flex items-center justify-between p-2.5 rounded-lg border transition-all ${sel ? 'border-[#E32726]/40 bg-[#E32726]/5' : 'border-[#2a2a2a]'}`}>
                       <div>
@@ -742,17 +754,17 @@ function NewBookingForm() {
                           <>
                             <button type="button" onClick={() => {
                               const newQty = (sel.quantity || 1) - 1;
-                              if (newQty <= 0) setSelectedItems(prev => prev.filter(i => i.key !== mp.key));
-                              else setSelectedItems(prev => prev.map(i => i.key === mp.key ? { ...i, quantity: newQty } : i));
+                              if (newQty <= 0) setSelectedItems(prev => prev.filter(i => i.key !== key));
+                              else setSelectedItems(prev => prev.map(i => i.key === key ? { ...i, quantity: newQty } : i));
                             }} className="w-6 h-6 bg-[#2a2a2a] rounded text-white text-xs">−</button>
                             <span className="text-sm text-white w-5 text-center font-bold">{sel.quantity}</span>
-                            <button type="button" onClick={() => setSelectedItems(prev => prev.map(i => i.key === mp.key ? { ...i, quantity: (i.quantity || 1) + 1 } : i))}
+                            <button type="button" onClick={() => setSelectedItems(prev => prev.map(i => i.key === key ? { ...i, quantity: (i.quantity || 1) + 1 } : i))}
                               className="w-6 h-6 bg-[#2a2a2a] rounded text-white text-xs">+</button>
                             <span className="text-xs text-[#E32726] font-bold w-16 text-right">{formatPHP(mp.rate * (sel.quantity || 1))}</span>
                           </>
                         )}
                         {!sel && (
-                          <button type="button" onClick={() => setSelectedItems(prev => [...prev, { key: mp.key, name: mp.label, rate: mp.rate, quantity: 1, is_package: false, is_complimentary: false, discount_pct: 0 }])}
+                          <button type="button" onClick={() => setSelectedItems(prev => [...prev, { key, name, rate: mp.rate, quantity: 1, is_package: false, is_complimentary: false, discount_pct: 0, day_date: day }])}
                             className="text-xs text-[#E32726] border border-[#E32726]/40 px-2.5 py-1 rounded hover:bg-[#E32726]/10 transition-colors">
                             + Add
                           </button>
@@ -762,7 +774,10 @@ function NewBookingForm() {
                   );
                 })}
                 {/* Custom crew */}
-                <button type="button" onClick={() => setSelectedItems(prev => [...prev, { key: `mp-custom-${Date.now()}`, name: 'Custom Crew', rate: 1500, quantity: 1, is_package: false, is_complimentary: false, discount_pct: 0 }])}
+                <button type="button" onClick={() => {
+                  const day = isMultiDay ? effectiveAddonDay : undefined;
+                  setSelectedItems(prev => [...prev, { key: `mp-custom-${Date.now()}`, name: 'Custom Crew' + (day ? ` — ${dayLabel(day)}` : ''), rate: 1500, quantity: 1, is_package: false, is_complimentary: false, discount_pct: 0, day_date: day }]);
+                }}
                   className="w-full text-xs text-white/40 border border-dashed border-[#2a2a2a] rounded-lg py-2 hover:border-[#E32726]/40 hover:text-white/60 transition-colors">
                   + Add Custom Crew / Manpower
                 </button>

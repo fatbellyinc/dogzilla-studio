@@ -17,6 +17,11 @@ function StatusBadge({ status }: { status: string }) {
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 
+interface ResourceStatus {
+  studio: { booked: boolean; bookings: { id: number; client_name: string; status: string }[] };
+  holding: { booked: boolean; bookings: { id: number; client_name: string; status: string }[] };
+}
+
 export default function BookingsPage() {
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
@@ -34,6 +39,7 @@ export default function BookingsPage() {
   const [tbdBookings, setTbdBookings] = useState<Booking[]>([]);
   const [editingYear, setEditingYear] = useState(false);
   const [yearInput, setYearInput] = useState('');
+  const [resourceStatus, setResourceStatus] = useState<ResourceStatus | null>(null);
 
   useEffect(() => { fetch('/api/bookings?tbd=1').then(r => r.json()).then(setTbdBookings); }, []);
 
@@ -103,6 +109,8 @@ export default function BookingsPage() {
       const end = b.end_date || b.booking_date;
       return dateStr >= start && dateStr <= end;
     }));
+    setResourceStatus(null);
+    fetch(`/api/resource-availability?date=${dateStr}`).then(r => r.json()).then(setResourceStatus);
   }
 
   // Calendar grid
@@ -278,6 +286,35 @@ export default function BookingsPage() {
                 <h3 className="text-sm font-semibold text-white">{new Date(selected + 'T00:00:00').toLocaleDateString('en-PH', { weekday: 'short', month: 'short', day: 'numeric' })}</h3>
                 <Link href={`/bookings/new?date=${selected}`} className="text-xs text-[#E32726] hover:underline">+ Book</Link>
               </div>
+
+              {/* Resource status — shows Main Studio vs Additional Holding Areas separately,
+                  since one can be free even when the other is taken. */}
+              {resourceStatus && (
+                <div className="mb-3 grid grid-cols-2 gap-2">
+                  <div className={`rounded-lg p-2 border text-xs ${resourceStatus.studio.booked ? 'bg-[#E32726]/10 border-[#E32726]/30' : 'bg-green-500/10 border-green-500/30'}`}>
+                    <div className={`font-semibold ${resourceStatus.studio.booked ? 'text-[#E32726]' : 'text-green-400'}`}>
+                      🏢 Main Studio {resourceStatus.studio.booked ? '— Taken' : '— Free'}
+                    </div>
+                    {resourceStatus.studio.booked && (
+                      <div className="text-white/40 mt-0.5 truncate">{resourceStatus.studio.bookings.map(b => b.client_name).join(', ')}</div>
+                    )}
+                  </div>
+                  <div className={`rounded-lg p-2 border text-xs ${resourceStatus.holding.booked ? 'bg-[#E32726]/10 border-[#E32726]/30' : 'bg-green-500/10 border-green-500/30'}`}>
+                    <div className={`font-semibold ${resourceStatus.holding.booked ? 'text-[#E32726]' : 'text-green-400'}`}>
+                      🚪 Holding Areas {resourceStatus.holding.booked ? '— Taken' : '— Free'}
+                    </div>
+                    {resourceStatus.holding.booked && (
+                      <div className="text-white/40 mt-0.5 truncate">{resourceStatus.holding.bookings.map(b => b.client_name).join(', ')}</div>
+                    )}
+                  </div>
+                  {resourceStatus.studio.booked && !resourceStatus.holding.booked && (
+                    <div className="col-span-2 text-[10px] text-white/30">
+                      💡 Holding Areas are free — a second client can book them via &quot;Equipment Only&quot; without conflicting with the Main Studio booking.
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Visits on this day */}
               {visits.filter(v => v.visit_date === selected).map(v => (
                 <div key={v.id} className="mb-2 p-2.5 bg-teal-500/10 border border-teal-500/20 rounded-lg">

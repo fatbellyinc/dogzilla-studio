@@ -121,16 +121,21 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
   const newTotal = studioSubtotal + eqTotal;
 
   function addPackage(pkg: (typeof EQUIPMENT_PACKAGES)[PackageCat][number]) {
-    const existing = items.find(i => i.key === pkg.id);
-    if (existing) { setItems(prev => prev.filter(i => i.key !== pkg.id)); return; }
-    setItems(prev => [...prev, { key: pkg.id, name: `${pkg.label} Package — ${pkg.subtitle}`, rate: pkg.price, quantity: 1, is_complimentary: false, discount_pct: 0, item_type: 'package' }]);
+    const key = addonKey(pkg.id);
+    const existing = items.find(i => i.key === key);
+    if (existing) { setItems(prev => prev.filter(i => i.key !== key)); return; }
+    const day = isMultiDay ? effectiveAddonDay : undefined;
+    const name = `${pkg.label} Package — ${pkg.subtitle}` + (day ? ` (${dayShortLabel(day)})` : '');
+    setItems(prev => [...prev, { key, name, rate: pkg.price, quantity: 1, is_complimentary: false, discount_pct: 0, item_type: 'package', day_date: day }]);
   }
 
   function addEquipment(eq: Equipment) {
-    const key = `eq-${eq.id}`;
+    const key = addonKey(`eq-${eq.id}`);
     const existing = items.find(i => i.key === key);
     if (existing) { setItems(prev => prev.filter(i => i.key !== key)); return; }
-    setItems(prev => [...prev, { key, name: eq.name, rate: eq.daily_rate, quantity: 1, equipment_id: eq.id, is_complimentary: false, discount_pct: 0, item_type: 'individual' }]);
+    const day = isMultiDay ? effectiveAddonDay : undefined;
+    const name = eq.name + (day ? ` — ${dayShortLabel(day)}` : '');
+    setItems(prev => [...prev, { key, name, rate: eq.daily_rate, quantity: 1, equipment_id: eq.id, is_complimentary: false, discount_pct: 0, item_type: 'individual', day_date: day }]);
   }
 
   function addAddon(addon: typeof ADDON_ITEMS[number]) {
@@ -373,7 +378,21 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
 
       {/* Add items */}
       <div>
-        <div className="text-xs text-white/40 uppercase tracking-wider mb-2">Add Items</div>
+        <div className="flex items-center justify-between mb-2 flex-wrap gap-1.5">
+          <div className="text-xs text-white/40 uppercase tracking-wider">Add Items</div>
+          {isMultiDay && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-white/40">Applying to:</span>
+              <select value={effectiveAddonDay} onChange={e => {
+                setAddonDay(e.target.value);
+                const existing = items.find(i => i.key === addonKey('ADD_ELEC', e.target.value));
+                setAddonElecHours(existing ? Math.round(existing.rate / ELEC_RATE) : (autoHours ?? 14));
+              }} className="bg-[#0f0f0f] border border-[#2a2a2a] rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-[#E32726]">
+                {bookingDays.map(d => <option key={d.date} value={d.date}>{dayShortLabel(d.date)}</option>)}
+              </select>
+            </div>
+          )}
+        </div>
         <div className="flex gap-1 mb-3 flex-wrap">
           {(['packages', 'individual', 'addons', 'manpower', 'custom'] as const).map(t => (
             <button key={t} type="button" onClick={() => { setTab(t as typeof tab); setSearch(''); if (t === 'custom') setShowCustom(true); else setShowCustom(false); }}
@@ -395,7 +414,7 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
             </div>
             <div className="space-y-1.5 max-h-48 overflow-y-auto">
               {EQUIPMENT_PACKAGES[pkgCat].map((pkg) => {
-                const sel = items.find(i => i.key === pkg.id);
+                const sel = items.find(i => i.key === addonKey(pkg.id));
                 return (
                   <button key={pkg.id} type="button" onClick={() => addPackage(pkg)}
                     className={`w-full text-left p-2.5 rounded-lg border text-xs transition-all ${sel ? 'border-[#E32726] bg-[#E32726]/10' : 'border-[#2a2a2a] hover:border-[#3a3a3a]'}`}>
@@ -438,7 +457,7 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
                   : e.category === indCat
                 )
                 .map(eq => {
-                  const sel = items.find(i => i.key === `eq-${eq.id}`);
+                  const sel = items.find(i => i.key === addonKey(`eq-${eq.id}`));
                   return (
                     <button key={eq.id} type="button" onClick={() => addEquipment(eq)}
                       className={`w-full text-left px-2.5 py-2 rounded-lg border text-xs transition-all ${sel ? 'border-[#E32726] bg-[#E32726]/10' : 'border-[#2a2a2a] hover:border-[#3a3a3a]'}`}>
@@ -462,18 +481,6 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
 
         {tab === 'addons' && (
           <div className="space-y-1.5">
-            {isMultiDay && (
-              <div className="flex items-center gap-1.5 mb-1">
-                <span className="text-[10px] text-white/40">Applying to:</span>
-                <select value={effectiveAddonDay} onChange={e => {
-                  setAddonDay(e.target.value);
-                  const existing = items.find(i => i.key === addonKey('ADD_ELEC', e.target.value));
-                  setAddonElecHours(existing ? Math.round(existing.rate / ELEC_RATE) : (autoHours ?? 14));
-                }} className="bg-[#0f0f0f] border border-[#2a2a2a] rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-[#E32726]">
-                  {bookingDays.map(d => <option key={d.date} value={d.date}>{dayShortLabel(d.date)}</option>)}
-                </select>
-              </div>
-            )}
             {/* Electricity — special hours-based UI */}
             {(() => {
               const elecKey = addonKey('ADD_ELEC');
@@ -536,7 +543,10 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
               { key: 'MP_MAINTENANCE', label: 'Maintenance', rate: 1500, desc: '₱1,500/pax/day' },
               { key: 'MP_PARKING', label: 'Parking Boy', rate: 800, desc: '₱800/pax/day' },
             ].map(mp => {
-              const sel = items.find(i => i.key === mp.key);
+              const key = addonKey(mp.key);
+              const sel = items.find(i => i.key === key);
+              const day = isMultiDay ? effectiveAddonDay : undefined;
+              const name = mp.label + (day ? ` — ${dayShortLabel(day)}` : '');
               return (
                 <div key={mp.key} className={`flex items-center justify-between p-2.5 rounded-lg border transition-all ${sel ? 'border-[#E32726]/40 bg-[#E32726]/5' : 'border-[#2a2a2a]'}`}>
                   <div>
@@ -548,17 +558,17 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
                       <>
                         <button onClick={() => {
                           const newQty = (sel.quantity || 1) - 1;
-                          if (newQty <= 0) setItems(prev => prev.filter(i => i.key !== mp.key));
-                          else setItems(prev => prev.map(i => i.key === mp.key ? { ...i, quantity: newQty } : i));
+                          if (newQty <= 0) setItems(prev => prev.filter(i => i.key !== key));
+                          else setItems(prev => prev.map(i => i.key === key ? { ...i, quantity: newQty } : i));
                         }} className="w-5 h-5 bg-[#2a2a2a] rounded text-white text-xs">−</button>
                         <span className="text-xs text-white w-4 text-center font-bold">{sel.quantity}</span>
-                        <button onClick={() => setItems(prev => prev.map(i => i.key === mp.key ? { ...i, quantity: (i.quantity || 1) + 1 } : i))}
+                        <button onClick={() => setItems(prev => prev.map(i => i.key === key ? { ...i, quantity: (i.quantity || 1) + 1 } : i))}
                           className="w-5 h-5 bg-[#2a2a2a] rounded text-white text-xs">+</button>
                         <span className="text-xs text-[#E32726] font-bold w-14 text-right">{formatPHP(mp.rate * (sel.quantity || 1))}</span>
-                        <button onClick={() => setItems(prev => prev.filter(i => i.key !== mp.key))} className="text-white/20 hover:text-red-400 text-xs ml-1">✕</button>
+                        <button onClick={() => setItems(prev => prev.filter(i => i.key !== key))} className="text-white/20 hover:text-red-400 text-xs ml-1">✕</button>
                       </>
                     ) : (
-                      <button onClick={() => setItems(prev => [...prev, { key: mp.key, name: mp.label, rate: mp.rate, quantity: 1, is_complimentary: false, discount_pct: 0, item_type: 'manpower' }])}
+                      <button onClick={() => setItems(prev => [...prev, { key, name, rate: mp.rate, quantity: 1, is_complimentary: false, discount_pct: 0, item_type: 'manpower', day_date: day }])}
                         className="text-xs text-[#E32726] border border-[#E32726]/40 px-2 py-1 rounded hover:bg-[#E32726]/10 transition-colors">
                         + Add
                       </button>
