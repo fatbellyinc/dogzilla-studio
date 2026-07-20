@@ -294,6 +294,16 @@ function initSchema(db: Database.Database) {
       status TEXT DEFAULT 'new',
       created_at TEXT DEFAULT (datetime('now'))
     );
+
+    -- Purely a "closed the books" signal for a LIVE month in Financial History — once every
+    -- completed booking that month is paid up, mark it settled so it stops showing as an
+    -- active/attention-needing LIVE month. Doesn't change any figures.
+    CREATE TABLE IF NOT EXISTS settled_months (
+      year INTEGER NOT NULL,
+      month INTEGER NOT NULL,
+      settled_at TEXT DEFAULT (datetime('now')),
+      PRIMARY KEY (year, month)
+    );
   `);
 
   // Migration: add new columns if upgrading from old schema

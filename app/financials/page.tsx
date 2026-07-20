@@ -27,6 +27,8 @@ function MonthlySalesTab() {
   const [liveData, setLiveData] = useState<Record<number, LiveMonthData>>({});
   // Historical data (manual, editable — for pre-app records)
   const [histGrid, setHistGrid] = useState<Record<number, HistoricalMonthData>>({});
+  // Months marked "settled" (fully paid, closed the books) — just a badge, doesn't affect totals
+  const [settledMonths, setSettledMonths] = useState<Set<number>>(new Set());
 
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -77,6 +79,10 @@ function MonthlySalesTab() {
     });
   }, []);
 
+  const loadSettled = useCallback(() => {
+    fetch(`/api/settled-months?year=${year}`).then(r => r.json()).then((months: number[]) => setSettledMonths(new Set(months)));
+  }, [year]);
+
   useEffect(() => {
     // Load LIVE booking revenue month-by-month for this year
     fetch(`/api/monthly-revenue?year=${year}`)
@@ -85,7 +91,17 @@ function MonthlySalesTab() {
 
     loadHistorical();
     loadSummaries();
-  }, [year, loadHistorical, loadSummaries]);
+    loadSettled();
+  }, [year, loadHistorical, loadSummaries, loadSettled]);
+
+  async function toggleSettled(month: number, settled: boolean) {
+    if (settled) {
+      await fetch(`/api/settled-months?year=${year}&month=${month}`, { method: 'DELETE' });
+    } else {
+      await fetch('/api/settled-months', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ year, month }) });
+    }
+    loadSettled();
+  }
 
   async function saveHistorical() {
     setSaving(true);
@@ -134,21 +150,28 @@ function MonthlySalesTab() {
           const hist = histGrid[month] || { revenue: '', shoots: '' };
           const isFuture = year > currentYear || (year === currentYear && month > currentMonth);
           const hasLive = live && (live.revenue > 0 || live.shoot_count > 0);
+          const settled = settledMonths.has(month);
 
           return (
-            <div key={month} className={`rounded-xl p-3 border ${hasLive ? 'bg-green-500/5 border-green-500/20' : 'bg-[#1a1a1a] border-[#2a2a2a]'}`}>
+            <div key={month} className={`rounded-xl p-3 border ${settled ? 'bg-white/5 border-white/10' : hasLive ? 'bg-green-500/5 border-green-500/20' : 'bg-[#1a1a1a] border-[#2a2a2a]'}`}>
               <div className="flex items-center justify-between mb-2">
                 <div className="text-xs text-white/40 font-semibold">{m} {year}</div>
-                {hasLive && <span className="text-[9px] text-green-400 font-bold">LIVE</span>}
+                {hasLive && (settled
+                  ? <span className="text-[9px] text-white/50 font-bold">✓ SETTLED</span>
+                  : <span className="text-[9px] text-green-400 font-bold">LIVE</span>)}
               </div>
 
               {/* Live data (auto) */}
               {hasLive ? (
                 <div className="space-y-0.5 mb-2">
-                  <div className="text-sm font-bold text-green-400">{formatPHP(live.revenue)}</div>
+                  <div className={`text-sm font-bold ${settled ? 'text-white/60' : 'text-green-400'}`}>{formatPHP(live.revenue)}</div>
                   <div className="text-[10px] text-white/40">{live.shoot_count} shoot{live.shoot_count !== 1 ? 's' : ''}</div>
                   {live.vat > 0 && <div className="text-[10px] text-white/30">+{formatPHP(live.vat)} VAT</div>}
                   {live.cancelled_count > 0 && <div className="text-[10px] text-red-400/60">{live.cancelled_count} cancelled</div>}
+                  <button onClick={() => toggleSettled(month, settled)}
+                    className={`w-full mt-1.5 py-1 rounded text-[10px] font-semibold transition-colors ${settled ? 'bg-white/10 text-white/50 hover:text-white/70' : 'bg-green-500/10 text-green-400/80 hover:bg-green-500/20 hover:text-green-400'}`}>
+                    {settled ? '↺ Unsettle' : '✓ Mark Settled (paid up)'}
+                  </button>
                   {/* A leftover manual entry for this same month double-counts into the All
                       Years Summary total (it adds live + historical together per year) —
                       surface it here since the input above is hidden once LIVE data exists. */}
