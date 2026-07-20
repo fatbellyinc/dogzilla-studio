@@ -22,7 +22,9 @@ export default function BIRPage() {
       setData(yearData.map(m => ({
         month: m.month,
         bookings: m.booking_count,
-        gross_sales: m.revenue * 1.12, // VAT-inclusive total
+        // net + VAT rather than a blind ×1.12 — VAT-exempt bookings contribute 0 VAT,
+        // so this stays correct for months with a mix of VAT and VAT-exempt bookings
+        gross_sales: m.revenue + m.vat,
         vat_collected: m.vat,
         net_sales: m.revenue,
       })));

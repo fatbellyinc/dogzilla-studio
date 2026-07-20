@@ -6,7 +6,7 @@ import BackButton from '@/components/BackButton';
 
 interface ReceiptData {
   payment: { id: number; booking_id: number; amount: number; type: string; method: string; reference: string; paid_at: string; };
-  booking: { booking_date: string; total: number; client_name: string; client_company?: string; project_name: string; client_phone?: string; client_email?: string; };
+  booking: { booking_date: string; total: number; client_name: string; client_company?: string; project_name: string; client_phone?: string; client_email?: string; vat_exempt?: number; };
   or_sequence: number;
 }
 
@@ -114,7 +114,7 @@ export default function ReceiptPage({ params }: { params: Promise<{ id: string }
 
       {/* VAT info */}
       <div style={{ fontSize: '10px', color: '#aaa', textAlign: 'center', marginBottom: '16px' }}>
-        VAT-inclusive · 12% VAT per TRAIN Law (RA 10963)
+        {booking.vat_exempt ? 'VAT-exempt transaction' : 'VAT-inclusive · 12% VAT per TRAIN Law (RA 10963)'}
         <br />© Alberto Monteras II · Dogzilla Films · dogzillafilms.com
       </div>
 

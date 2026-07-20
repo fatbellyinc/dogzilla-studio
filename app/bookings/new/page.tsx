@@ -903,17 +903,21 @@ function NewBookingForm() {
                     </div>
                   )}
                   <div className="flex justify-between font-semibold text-white">
-                    <span>Total (VAT-excl.)</span>
+                    <span>{form.vat_exempt ? 'Total (No VAT)' : 'Total (VAT-excl.)'}</span>
                     <span className="text-[#E32726]">{formatPHP(total)}</span>
                   </div>
-                  <div className="flex justify-between text-xs text-white/40">
-                    <span>VAT 12%</span>
-                    <span>+{formatPHP(total * 0.12)}</span>
-                  </div>
-                  <div className="flex justify-between font-bold text-white text-sm">
-                    <span>Total (VAT-incl.)</span>
-                    <span>{formatPHP(total * 1.12)}</span>
-                  </div>
+                  {!form.vat_exempt && (
+                    <>
+                      <div className="flex justify-between text-xs text-white/40">
+                        <span>VAT 12%</span>
+                        <span>+{formatPHP(total * 0.12)}</span>
+                      </div>
+                      <div className="flex justify-between font-bold text-white text-sm">
+                        <span>Total (VAT-incl.)</span>
+                        <span>{formatPHP(total * 1.12)}</span>
+                      </div>
+                    </>
+                  )}
                   <div className="flex justify-between text-yellow-400 text-xs pt-1 border-t border-[#2a2a2a]">
                     <span>50% Deposit</span>
                     <span>{formatPHP(deposit)}</span>

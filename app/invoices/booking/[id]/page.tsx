@@ -164,7 +164,7 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
       totalSavings > 0 ? ['Total Discount', '', '', '', -totalSavings] : null,
       ['Subtotal (VAT-exclusive)', '', '', '', subtotalExVAT],
       vatExempt ? ['No VAT', '', '', '', 0] : ['VAT 12%', '', '', '', vatAmount],
-      ['TOTAL (VAT-inclusive)', '', '', '', totalIncVAT],
+      [vatExempt ? 'TOTAL (No VAT)' : 'TOTAL (VAT-inclusive)', '', '', '', totalIncVAT],
       ['', '', '', '', ''],
       totalPaid > 0 ? ['Total Paid', '', '', '', totalPaid] : null,
       totalPaid > 0 ? ['Balance Due', '', '', '', totalIncVAT - totalPaid] : null,
@@ -346,7 +346,7 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
               </tr>
             )}
             <tr style={{ borderTop: '2px solid #E32726' }}>
-              <td style={{ padding: '8px 10px', fontWeight: 700, fontSize: '15px' }}>TOTAL (VAT-inclusive)</td>
+              <td style={{ padding: '8px 10px', fontWeight: 700, fontSize: '15px' }}>{vatExempt ? 'TOTAL (No VAT)' : 'TOTAL (VAT-inclusive)'}</td>
               <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 900, fontSize: '15px', color: '#E32726' }}>{formatPHP(totalIncVAT)}</td>
             </tr>
           </tbody>

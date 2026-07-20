@@ -520,7 +520,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
 
   const { booking, equipment, payments, quotation, invoice, bookingDays } = data;
   const totalPaid = payments.reduce((s, p) => s + p.amount, 0);
-  const totalIncVAT = booking.total * (1 + VAT_RATE);
+  const totalIncVAT = booking.vat_exempt ? booking.total : booking.total * (1 + VAT_RATE);
   const balance = totalIncVAT - totalPaid;
   const studioRate = STUDIO_RATES[booking.studio_rate];
   const ic = 'bg-[#1a1a1a] border border-[#2a2a2a] rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:border-[#E32726]';
@@ -927,17 +927,21 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
 
               <div className="border-t border-[#2a2a2a] pt-2 space-y-1">
                 <div className="flex justify-between font-semibold text-white">
-                  <span>Total (VAT-excl.)</span>
+                  <span>{booking.vat_exempt ? 'Total (No VAT)' : 'Total (VAT-excl.)'}</span>
                   <span className="text-[#E32726]">{formatPHP(booking.total)}</span>
                 </div>
-                <div className="flex justify-between text-white/40 text-xs">
-                  <span>VAT 12%</span>
-                  <span>+{formatPHP(booking.total * VAT_RATE)}</span>
-                </div>
-                <div className="flex justify-between font-bold text-white">
-                  <span>Total (VAT-incl.)</span>
-                  <span>{formatPHP(totalIncVAT)}</span>
-                </div>
+                {!booking.vat_exempt && (
+                  <>
+                    <div className="flex justify-between text-white/40 text-xs">
+                      <span>VAT 12%</span>
+                      <span>+{formatPHP(booking.total * VAT_RATE)}</span>
+                    </div>
+                    <div className="flex justify-between font-bold text-white">
+                      <span>Total (VAT-incl.)</span>
+                      <span>{formatPHP(totalIncVAT)}</span>
+                    </div>
+                  </>
+                )}
               </div>
 
               <div className="border-t border-[#2a2a2a] pt-2">
@@ -1037,7 +1041,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
             </div>
             <div className="space-y-1.5 text-sm">
               <div className="flex justify-between text-white/60 text-xs">
-                <span>Invoice total (VAT-incl.)</span><span>{formatPHP(totalIncVAT)}</span>
+                <span>Invoice total{booking.vat_exempt ? ' (No VAT)' : ' (VAT-incl.)'}</span><span>{formatPHP(totalIncVAT)}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className={`text-xs flex items-center gap-1 ${booking.no_deposit ? 'text-green-400' : 'text-yellow-400'}`}>

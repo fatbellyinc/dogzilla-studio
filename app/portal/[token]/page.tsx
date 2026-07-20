@@ -41,7 +41,7 @@ export default function ClientPortalPage({ params }: { params: Promise<{ token: 
 
   const { booking, equipment, payments } = data;
   const totalPaid = payments.reduce((s, p) => s + p.amount, 0);
-  const totalIncVAT = booking.total * (1 + VAT_RATE);
+  const totalIncVAT = booking.vat_exempt ? booking.total : booking.total * (1 + VAT_RATE);
   const balance = totalIncVAT - totalPaid;
   const studioRate = STUDIO_RATES[booking.studio_rate];
 
@@ -100,9 +100,11 @@ export default function ClientPortalPage({ params }: { params: Promise<{ token: 
             </div>
           ))}
           <div className="border-t border-[#2a2a2a] pt-2 space-y-1">
-            <div className="flex justify-between text-white/50 text-xs"><span>Subtotal (VAT-excl.)</span><span>{formatPHP(booking.total)}</span></div>
-            <div className="flex justify-between text-white/50 text-xs"><span>VAT 12%</span><span>+{formatPHP(booking.total * VAT_RATE)}</span></div>
-            <div className="flex justify-between font-bold text-white"><span>Total (VAT-incl.)</span><span className="text-[#E32726]">{formatPHP(totalIncVAT)}</span></div>
+            <div className="flex justify-between text-white/50 text-xs"><span>{booking.vat_exempt ? 'Subtotal (No VAT)' : 'Subtotal (VAT-excl.)'}</span><span>{formatPHP(booking.total)}</span></div>
+            {!booking.vat_exempt && (
+              <div className="flex justify-between text-white/50 text-xs"><span>VAT 12%</span><span>+{formatPHP(booking.total * VAT_RATE)}</span></div>
+            )}
+            <div className="flex justify-between font-bold text-white"><span>{booking.vat_exempt ? 'Total (No VAT)' : 'Total (VAT-incl.)'}</span><span className="text-[#E32726]">{formatPHP(totalIncVAT)}</span></div>
           </div>
         </div>
         <p className="text-[10px] text-white/30 mt-3 italic">This is an initial estimate. Final amount may vary based on shoot day add-ons and overtime.</p>
