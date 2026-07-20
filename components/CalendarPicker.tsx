@@ -24,6 +24,8 @@ function fmt(date: string) {
 
 export default function CalendarPicker({ value, onChange, label, placeholder = 'Select date', bookedDates = [], blockoutDates = [], pencilDates = [], minDate, className = '' }: Props) {
   const [open, setOpen] = useState(false);
+  const [editingYear, setEditingYear] = useState(false);
+  const [yearInput, setYearInput] = useState('');
   const ref = useRef<HTMLDivElement>(null);
 
   const today = new Date();
@@ -53,6 +55,13 @@ export default function CalendarPicker({ value, onChange, label, placeholder = '
 
   function prev() { if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); } else setViewMonth(m => m - 1); }
   function next() { if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); } else setViewMonth(m => m + 1); }
+  function prevYear() { setViewYear(y => y - 1); }
+  function nextYear() { setViewYear(y => y + 1); }
+  function submitYear() {
+    const y = parseInt(yearInput, 10);
+    if (y >= 1900 && y <= 2200) setViewYear(y);
+    setEditingYear(false);
+  }
 
   return (
     <div className={`relative ${className}`} ref={ref}>
@@ -67,9 +76,26 @@ export default function CalendarPicker({ value, onChange, label, placeholder = '
         <div className="absolute top-full left-0 mt-1 z-50 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl shadow-2xl p-3 w-72">
           {/* Header */}
           <div className="flex items-center justify-between mb-3">
-            <button type="button" onClick={prev} className="w-7 h-7 flex items-center justify-center rounded text-white/50 hover:text-white hover:bg-[#2a2a2a] transition-colors">‹</button>
-            <span className="text-sm font-semibold text-white">{MONTHS[viewMonth]} {viewYear}</span>
-            <button type="button" onClick={next} className="w-7 h-7 flex items-center justify-center rounded text-white/50 hover:text-white hover:bg-[#2a2a2a] transition-colors">›</button>
+            <div className="flex items-center gap-0.5">
+              <button type="button" onClick={prevYear} title="Previous year" className="w-7 h-7 flex items-center justify-center rounded text-white/50 hover:text-white hover:bg-[#2a2a2a] transition-colors text-xs">«</button>
+              <button type="button" onClick={prev} title="Previous month" className="w-7 h-7 flex items-center justify-center rounded text-white/50 hover:text-white hover:bg-[#2a2a2a] transition-colors">‹</button>
+            </div>
+            {editingYear ? (
+              <input type="number" autoFocus value={yearInput}
+                onChange={e => setYearInput(e.target.value)}
+                onBlur={submitYear}
+                onKeyDown={e => { if (e.key === 'Enter') submitYear(); if (e.key === 'Escape') setEditingYear(false); }}
+                className="w-16 bg-[#0f0f0f] border border-[#E32726]/50 rounded px-1 py-0.5 text-sm text-center text-white focus:outline-none" />
+            ) : (
+              <button type="button" onClick={() => { setYearInput(String(viewYear)); setEditingYear(true); }}
+                title="Click to jump to a year" className="text-sm font-semibold text-white hover:text-[#E32726] transition-colors">
+                {MONTHS[viewMonth]} {viewYear}
+              </button>
+            )}
+            <div className="flex items-center gap-0.5">
+              <button type="button" onClick={next} title="Next month" className="w-7 h-7 flex items-center justify-center rounded text-white/50 hover:text-white hover:bg-[#2a2a2a] transition-colors">›</button>
+              <button type="button" onClick={nextYear} title="Next year" className="w-7 h-7 flex items-center justify-center rounded text-white/50 hover:text-white hover:bg-[#2a2a2a] transition-colors text-xs">»</button>
+            </div>
           </div>
 
           {/* Day headers */}

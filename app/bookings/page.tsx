@@ -32,6 +32,8 @@ export default function BookingsPage() {
   const [showBlockoutForm, setShowBlockoutForm] = useState(false);
   const [blockoutForm, setBlockoutForm] = useState({ date: '', end_date: '', reason: '' });
   const [tbdBookings, setTbdBookings] = useState<Booking[]>([]);
+  const [editingYear, setEditingYear] = useState(false);
+  const [yearInput, setYearInput] = useState('');
 
   useEffect(() => { fetch('/api/bookings?tbd=1').then(r => r.json()).then(setTbdBookings); }, []);
 
@@ -117,6 +119,13 @@ export default function BookingsPage() {
     if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); }
     else setViewMonth(m => m + 1);
   }
+  function prevYear() { setViewYear(y => y - 1); }
+  function nextYear() { setViewYear(y => y + 1); }
+  function submitYear() {
+    const y = parseInt(yearInput, 10);
+    if (y >= 1900 && y <= 2200) setViewYear(y);
+    setEditingYear(false);
+  }
 
   return (
     <div className="pt-14 md:pt-0 p-4 md:p-6 max-w-5xl">
@@ -129,9 +138,26 @@ export default function BookingsPage() {
         {/* Calendar */}
         <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4">
           <div className="flex items-center justify-between mb-4">
-            <button onClick={prevMonth} className="w-8 h-8 flex items-center justify-center rounded-lg text-white/60 hover:bg-[#2a2a2a] hover:text-white transition-colors">‹</button>
-            <span className="font-semibold text-white">{MONTHS[viewMonth]} {viewYear}</span>
-            <button onClick={nextMonth} className="w-8 h-8 flex items-center justify-center rounded-lg text-white/60 hover:bg-[#2a2a2a] hover:text-white transition-colors">›</button>
+            <div className="flex items-center gap-0.5">
+              <button onClick={prevYear} title="Previous year" className="w-8 h-8 flex items-center justify-center rounded-lg text-white/60 hover:bg-[#2a2a2a] hover:text-white transition-colors text-xs">«</button>
+              <button onClick={prevMonth} title="Previous month" className="w-8 h-8 flex items-center justify-center rounded-lg text-white/60 hover:bg-[#2a2a2a] hover:text-white transition-colors">‹</button>
+            </div>
+            {editingYear ? (
+              <input type="number" autoFocus value={yearInput}
+                onChange={e => setYearInput(e.target.value)}
+                onBlur={submitYear}
+                onKeyDown={e => { if (e.key === 'Enter') submitYear(); if (e.key === 'Escape') setEditingYear(false); }}
+                className="w-20 bg-[#0f0f0f] border border-[#E32726]/50 rounded px-1 py-0.5 text-sm text-center text-white focus:outline-none" />
+            ) : (
+              <button onClick={() => { setYearInput(String(viewYear)); setEditingYear(true); }} title="Click to jump to a year"
+                className="font-semibold text-white hover:text-[#E32726] transition-colors">
+                {MONTHS[viewMonth]} {viewYear}
+              </button>
+            )}
+            <div className="flex items-center gap-0.5">
+              <button onClick={nextMonth} title="Next month" className="w-8 h-8 flex items-center justify-center rounded-lg text-white/60 hover:bg-[#2a2a2a] hover:text-white transition-colors">›</button>
+              <button onClick={nextYear} title="Next year" className="w-8 h-8 flex items-center justify-center rounded-lg text-white/60 hover:bg-[#2a2a2a] hover:text-white transition-colors text-xs">»</button>
+            </div>
           </div>
           <div className="grid grid-cols-7 gap-1 mb-2">
             {DAYS.map(d => <div key={d} className="text-center text-xs text-white/30 py-1">{d}</div>)}
