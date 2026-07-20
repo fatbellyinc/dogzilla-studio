@@ -15,7 +15,10 @@ export async function GET(req: NextRequest) {
       JOIN clients c ON c.id = b.client_id
       WHERE strftime('%Y-%m', b.booking_date) = ?
         AND b.status = 'completed'
-        AND NOT (bc.type = 'personnel' AND bc.description = 'Studio Crew')
+        AND NOT (
+          bc.type = 'personnel' AND bc.description = 'Studio Crew'
+          AND EXISTS (SELECT 1 FROM booking_crew crew WHERE crew.booking_id = bc.booking_id)
+        )
         AND NOT (
           bc.type = 'electricity'
           AND EXISTS (

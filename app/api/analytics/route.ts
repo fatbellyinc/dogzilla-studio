@@ -22,7 +22,10 @@ export async function GET() {
     FROM booking_costs bc
     JOIN bookings b ON b.id = bc.booking_id
     WHERE b.booking_date >= date('now', '-12 months') AND b.status = 'completed'
-      AND NOT (bc.type = 'personnel' AND bc.description = 'Studio Crew')
+      AND NOT (
+        bc.type = 'personnel' AND bc.description = 'Studio Crew'
+        AND EXISTS (SELECT 1 FROM booking_crew crew WHERE crew.booking_id = bc.booking_id)
+      )
       AND bc.type != 'overtime'
       AND NOT (
         bc.type = 'electricity'
