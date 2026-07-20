@@ -433,15 +433,105 @@ function CapexTab() {
   );
 }
 
+// ─── POWER RECOVERY TAB ──────────────────────────────────────────────────────
+// Compares electricity cost logged per booking (Overhead panel > Power tab — an estimate of
+// what each shoot drew) against the real monthly electric bill (Utility Bills tab), so you can
+// see whether your flat studio-rate pricing is actually covering power draw or you're eating
+// the difference. Electricity isn't billed to clients as its own invoice line, so "recovered"
+// here means "the electricity cost attributable to this month's completed shoots."
+interface PowerMonth { month: number; recovered: number; shoots: number; billed: number; }
+
+function PowerRecoveryTab() {
+  const currentYear = new Date().getFullYear();
+  const [year, setYear] = useState(currentYear);
+  const [months, setMonths] = useState<PowerMonth[]>([]);
+  const [totals, setTotals] = useState({ recovered: 0, billed: 0, shoots: 0 });
+
+  useEffect(() => {
+    fetch(`/api/electricity-recovery?year=${year}`).then(r => r.json())
+      .then((d: { months: PowerMonth[]; totals: typeof totals }) => { setMonths(d.months); setTotals(d.totals); });
+  }, [year]);
+
+  const diff = totals.recovered - totals.billed;
+  const fullyOffset = totals.billed > 0 && diff >= 0;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <button onClick={() => setYear(y => y - 1)} className="w-8 h-8 bg-[#2a2a2a] rounded text-white/60 hover:text-white">‹</button>
+        <span className="text-white font-bold text-lg w-16 text-center">{year}</span>
+        <button onClick={() => setYear(y => y + 1)} className="w-8 h-8 bg-[#2a2a2a] rounded text-white/60 hover:text-white">›</button>
+      </div>
+
+      {/* Annual summary */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-3">
+          <div className="text-lg font-bold text-yellow-400">{formatPHP(totals.recovered)}</div>
+          <div className="text-[10px] text-white/40 uppercase tracking-wider">Electricity logged on shoots</div>
+        </div>
+        <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-3">
+          <div className="text-lg font-bold text-orange-400">{formatPHP(totals.billed)}</div>
+          <div className="text-[10px] text-white/40 uppercase tracking-wider">Actual electric bills</div>
+        </div>
+        <div className={`rounded-xl p-3 border col-span-2 md:col-span-1 ${totals.billed === 0 ? 'bg-[#1a1a1a] border-[#2a2a2a]' : fullyOffset ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
+          <div className={`text-lg font-bold ${totals.billed === 0 ? 'text-white' : fullyOffset ? 'text-green-400' : 'text-red-400'}`}>
+            {totals.billed === 0 ? '—' : `${diff >= 0 ? '+' : ''}${formatPHP(diff)}`}
+          </div>
+          <div className="text-[10px] text-white/40 uppercase tracking-wider">
+            {totals.billed === 0 ? 'Enter bills to compare' : fullyOffset ? 'Fully offset by pricing' : 'Not covered — you\'re eating the difference'}
+          </div>
+        </div>
+      </div>
+
+      {/* Monthly table */}
+      <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-[#2a2a2a]">
+                {['Month', 'Shoots', 'Logged on Shoots', 'Actual Bill', 'Offset'].map(h => (
+                  <th key={h} className="text-left text-xs text-white/40 px-4 py-2.5 font-medium">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {months.map(m => {
+                const mDiff = m.recovered - m.billed;
+                const covered = m.billed > 0 && mDiff >= 0;
+                return (
+                  <tr key={m.month} className="border-b border-[#2a2a2a]/50 hover:bg-[#222] transition-colors">
+                    <td className="px-4 py-2.5 font-medium text-white">{MONTHS_SHORT[m.month - 1]}</td>
+                    <td className="px-4 py-2.5 text-white/60">{m.shoots || '—'}</td>
+                    <td className="px-4 py-2.5 text-yellow-400">{m.recovered > 0 ? formatPHP(m.recovered) : '—'}</td>
+                    <td className="px-4 py-2.5 text-orange-400">{m.billed > 0 ? formatPHP(m.billed) : '—'}</td>
+                    <td className={`px-4 py-2.5 font-semibold ${m.billed === 0 ? 'text-white/20' : covered ? 'text-green-400' : 'text-red-400'}`}>
+                      {m.billed === 0 ? '—' : `${mDiff >= 0 ? '+' : ''}${formatPHP(mDiff)}`}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <p className="text-[10px] text-white/30">
+        &quot;Logged on Shoots&quot; is the estimated electricity cost recorded per booking (Overhead panel → ⚡ Power tab), summed for that month&apos;s completed shoots — not a separate line billed to clients, since power draw is baked into your flat studio rate. Compare it against the real bill entered in the Utility Bills tab to see if your pricing covers it.
+      </p>
+    </div>
+  );
+}
+
 // ─── MAIN PAGE ───────────────────────────────────────────────────────────────
 const TABS = [
   { id: 'sales', label: '📈 Monthly Sales', desc: 'Enter revenue records year by year, going back to 2004' },
   { id: 'utility', label: '⚡ Utility Bills', desc: 'Studio electricity, auxiliary electricity, water, internet' },
+  { id: 'power', label: '🔌 Power Recovery', desc: 'Electricity cost logged per shoot vs your actual electric bills — are you offsetting it?' },
   { id: 'capex', label: '🏗️ Capital Expenses', desc: 'Studio construction, equipment purchases, renovations' },
 ] as const;
 
 export default function FinancialsPage() {
-  const [tab, setTab] = useState<'sales' | 'utility' | 'capex'>('sales');
+  const [tab, setTab] = useState<'sales' | 'utility' | 'power' | 'capex'>('sales');
 
   return (
     <div className="pt-14 md:pt-0 p-4 md:p-6 max-w-5xl">
@@ -464,6 +554,7 @@ export default function FinancialsPage() {
 
       {tab === 'sales' && <MonthlySalesTab />}
       {tab === 'utility' && <UtilityBillsTab />}
+      {tab === 'power' && <PowerRecoveryTab />}
       {tab === 'capex' && <CapexTab />}
     </div>
   );
