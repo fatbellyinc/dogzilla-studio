@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 
-// Compares, per month, what was actually BILLED to clients for electricity (a line item on
-// booking_equipment whose name mentions "electric" — however it's typed in at invoicing time,
-// e.g. "Electricity (14hrs x P750/hr)") against the studio's real electric bills (Financial
-// History > Utility Bills, elec_studio + elec_aux accounts). Only bookings marked completed
-// count, matching how every other revenue figure in the app is realized.
+// Compares, per month, what was actually BILLED to clients for electricity — the "Power
+// Consumption" add-on line item (BookingEditor's dedicated ⚡ add-on, named "Power Consumption"
+// or "Power Consumption — <day>" for multi-day bookings), plus any older bookings that used the
+// legacy "Electricity" naming — against the studio's real electric bills (Financial History >
+// Utility Bills, elec_studio + elec_aux accounts). Only bookings marked completed count,
+// matching how every other revenue figure in the app is realized.
 export async function GET(req: NextRequest) {
   const db = getDb();
   const year = req.nextUrl.searchParams.get('year');
@@ -17,7 +18,8 @@ export async function GET(req: NextRequest) {
       COUNT(DISTINCT b.id) as shoots
     FROM booking_equipment be
     JOIN bookings b ON b.id = be.booking_id
-    WHERE LOWER(be.name) LIKE '%electric%' AND b.status = 'completed' AND strftime('%Y', b.booking_date) = ?
+    WHERE (LOWER(be.name) LIKE '%power consumption%' OR LOWER(be.name) LIKE '%electric%')
+      AND b.status = 'completed' AND strftime('%Y', b.booking_date) = ?
     GROUP BY month
   `).all(year) as { month: number; billed_to_clients: number; shoots: number }[];
 

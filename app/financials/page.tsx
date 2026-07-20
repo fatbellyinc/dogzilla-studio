@@ -515,7 +515,7 @@ function PowerRecoveryTab() {
       </div>
 
       <p className="text-[10px] text-white/30">
-        &quot;Charged to Clients&quot; sums any invoice line item whose name mentions &quot;electric&quot; on completed bookings that month — however you typed it in at invoicing time (e.g. &quot;Electricity (14hrs × ₱750/hr)&quot;). Compare it against the real Meralco bill entered in the Utility Bills tab to see if what you charge actually covers it.
+        &quot;Charged to Clients&quot; sums the &quot;Power Consumption&quot; add-on line item on completed bookings that month (plus older bookings that used the &quot;Electricity&quot; naming). Compare it against the real Meralco bill entered in the Utility Bills tab to see if what you charge actually covers it.
       </p>
     </div>
   );
