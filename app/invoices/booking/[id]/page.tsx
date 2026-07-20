@@ -1,6 +1,6 @@
 'use client';
 import React, { use, useEffect, useState, useCallback } from 'react';
-import { formatPHP, formatDate, STUDIO_WHATSAPP, fmt24, calcOT, OT_RATE } from '@/lib/utils';
+import { formatPHP, formatDate, STUDIO_WHATSAPP, fmt24, calcOT, OT_RATE, groupByDayDate } from '@/lib/utils';
 import { Booking, BookingEquipment, BookingDay, Payment, Invoice, STUDIO_RATES, VAT_RATE, PAYMENT_ACCOUNTS, NO_DATE_SENTINEL } from '@/lib/types';
 
 function fullDayLabel(date: string) {
@@ -66,6 +66,22 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
   let otHrs = 0;
   let otAmount = 0;
 
+  // Equipment/add-ons/personnel with a day_date belong to that specific day, so they're shown
+  // grouped right under that day's studio line instead of one flat list at the bottom —
+  // otherwise it's hard to tell which day rented what on a multi-day booking.
+  const equipmentByDay = groupByDayDate(equipment);
+  const equipmentForDay = (date: string) => equipmentByDay.find(g => g.dayDate === date)?.items ?? [];
+  const generalEquipment = equipmentByDay.find(g => g.dayDate === null)?.items ?? [];
+
+  function pushEquipmentLines(items: BookingEquipment[]) {
+    items.forEach(e => {
+      const comp = !!e.is_complimentary;
+      const discPct = e.discount_pct || 0;
+      const lineTotal = comp ? 0 : e.rate * e.quantity * (1 - discPct / 100);
+      lines.push({ desc: e.name, qty: e.quantity, unit: e.rate, total: lineTotal, indent: true, comp, disc: discPct > 0 ? discPct : undefined });
+    });
+  }
+
   if (isMultiDay) {
     bookingDays.forEach((d, i) => {
       const dayRate = STUDIO_RATES[d.studio_rate as keyof typeof STUDIO_RATES];
@@ -84,6 +100,7 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
           qty: 1, unit: dayOT.otAmount, total: dayOT.otAmount, indent: true,
         });
       }
+      pushEquipmentLines(equipmentForDay(d.date));
     });
   } else {
     lines.push({
@@ -101,12 +118,10 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
     }
   }
 
-  equipment.forEach(e => {
-    const comp = !!e.is_complimentary;
-    const discPct = e.discount_pct || 0;
-    const lineTotal = comp ? 0 : e.rate * e.quantity * (1 - discPct / 100);
-    lines.push({ desc: e.name, qty: e.quantity, unit: e.rate, total: lineTotal, indent: true, comp, disc: discPct > 0 ? discPct : undefined });
-  });
+  // Multi-day already inserted each day's items right under that day's studio line above —
+  // only day-less (whole-booking) items land here. Single-day bookings have no day grouping
+  // to speak of, so all equipment lands here as before.
+  pushEquipmentLines(isMultiDay ? generalEquipment : equipment);
 
   // Recompute totals from line items so the document stays accurate even when
   // booking data is edited — never trust stale stored totals for display

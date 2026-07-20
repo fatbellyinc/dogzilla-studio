@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { formatPHP } from '@/lib/utils';
+import { formatPHP, groupByDayDate } from '@/lib/utils';
 import { Equipment, BookingEquipment, BookingDay, STUDIO_RATES, CATEGORY_LABELS, EQUIPMENT_PACKAGES, ADDON_ITEMS } from '@/lib/types';
 
 type PackageCat = keyof typeof EQUIPMENT_PACKAGES;
@@ -253,8 +253,16 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
         </div>
         <div className="text-[10px] text-white/30 mb-1.5">Use ↑↓ to set the order items appear on invoices/quotations.</div>
         {items.length === 0 ? <p className="text-white/30 text-xs py-2">No equipment — studio only</p> : (
-          <div className="space-y-1.5">
-            {items.map((item, idx) => {
+          <div className="space-y-3">
+            {groupByDayDate(items).map(group => (
+              <div key={group.dayDate ?? '__general__'} className="space-y-1.5">
+                {isMultiDay && (
+                  <div className="text-[10px] text-[#E32726]/70 font-semibold uppercase tracking-wider">
+                    {group.dayDate ? dayShortLabel(group.dayDate) : 'All Days'}
+                  </div>
+                )}
+                {group.items.map(item => {
+              const idx = items.findIndex(i => i.key === item.key);
               const lineTotal = item.is_complimentary ? 0 : item.rate * item.quantity * (1 - item.discount_pct / 100);
               const elec = isElecItem(item);
               const itemElecHours = elecHoursFromItem(item);
@@ -367,7 +375,9 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
                   </div>
                 </div>
               );
-            })}
+                })}
+              </div>
+            ))}
           </div>
         )}
         <div className="flex justify-between text-sm font-semibold text-white border-t border-[#2a2a2a] pt-2 mt-2">

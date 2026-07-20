@@ -1,3 +1,22 @@
+// Groups line items (equipment, add-ons, personnel — anything carrying an optional day_date)
+// by the day they belong to, so multi-day bookings can display "what's on Day 1" separately
+// from "what's on Day 2" instead of one flat undifferentiated list. Dated groups come first in
+// chronological order; items with no day_date (applies to the whole booking) come last.
+export function groupByDayDate<T extends { day_date?: string | null }>(items: T[]): { dayDate: string | null; items: T[] }[] {
+  const map = new Map<string | null, T[]>();
+  for (const item of items) {
+    const key = item.day_date || null;
+    if (!map.has(key)) map.set(key, []);
+    map.get(key)!.push(item);
+  }
+  const dated = [...map.entries()]
+    .filter((e): e is [string, T[]] => e[0] !== null)
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([dayDate, groupItems]) => ({ dayDate, items: groupItems }));
+  const general = map.get(null);
+  return general ? [...dated, { dayDate: null, items: general }] : dated;
+}
+
 export function formatPHP(amount: number): string {
   return '₱' + amount.toLocaleString('en-PH', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 }

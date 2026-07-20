@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { formatPHP } from '@/lib/utils';
+import { formatPHP, groupByDayDate } from '@/lib/utils';
 import { Equipment, STUDIO_RATES, EQUIPMENT_PACKAGES, ADDON_ITEMS, CATEGORY_LABELS, SHOOT_TYPES } from '@/lib/types';
 import { Client } from '@/lib/types';
 import MultiDayPicker, { DayConfig } from '@/components/MultiDayPicker';
@@ -857,55 +857,64 @@ function NewBookingForm() {
                     </div>
                   </div>
                 ))}
-                {selectedItems.map(e => {
-                  const lineTotal = e.is_complimentary ? 0 : e.rate * e.quantity * (1 - (e.discount_pct || 0) / 100);
-                  return (
-                    <div key={e.key} className="rounded-lg bg-[#0f0f0f] p-2 space-y-1">
-                      <div className="flex justify-between">
-                        <span className="truncate max-w-[140px] text-xs text-white/70">{e.name}{e.quantity > 1 ? ` ×${e.quantity}` : ''}</span>
-                        <span className="shrink-0 ml-1 text-xs">
-                          {e.is_complimentary ? <span className="text-green-400 font-semibold">COMP</span> : formatPHP(lineTotal)}
-                        </span>
+                {groupByDayDate(selectedItems).map(group => (
+                  <div key={group.dayDate ?? '__general__'} className="space-y-1">
+                    {isMultiDay && (
+                      <div className="text-[10px] text-[#E32726]/70 font-semibold uppercase tracking-wider">
+                        {group.dayDate ? dayLabel(group.dayDate) : 'All Days'}
                       </div>
-                      {/* Custom price + discount controls */}
-                      <div className="flex items-center gap-1 flex-wrap">
-                        {/* Direct custom price input */}
-                        <div className="flex items-center gap-1 bg-[#1a1a1a] rounded px-1.5 py-0.5 border border-[#2a2a2a]">
-                          <span className="text-[10px] text-white/30">₱</span>
-                          <input
-                            type="number"
-                            value={e.rate}
-                            onChange={ev => setSelectedItems(prev => prev.map(i => i.key === e.key ? { ...i, rate: Number(ev.target.value) || 0, discount_pct: 0 } : i))}
-                            className="w-16 bg-transparent text-[11px] text-[#E32726] font-semibold focus:outline-none"
-                            title="Custom price"
-                          />
+                    )}
+                    {group.items.map(e => {
+                      const lineTotal = e.is_complimentary ? 0 : e.rate * e.quantity * (1 - (e.discount_pct || 0) / 100);
+                      return (
+                        <div key={e.key} className="rounded-lg bg-[#0f0f0f] p-2 space-y-1">
+                          <div className="flex justify-between">
+                            <span className="truncate max-w-[140px] text-xs text-white/70">{e.name}{e.quantity > 1 ? ` ×${e.quantity}` : ''}</span>
+                            <span className="shrink-0 ml-1 text-xs">
+                              {e.is_complimentary ? <span className="text-green-400 font-semibold">COMP</span> : formatPHP(lineTotal)}
+                            </span>
+                          </div>
+                          {/* Custom price + discount controls */}
+                          <div className="flex items-center gap-1 flex-wrap">
+                            {/* Direct custom price input */}
+                            <div className="flex items-center gap-1 bg-[#1a1a1a] rounded px-1.5 py-0.5 border border-[#2a2a2a]">
+                              <span className="text-[10px] text-white/30">₱</span>
+                              <input
+                                type="number"
+                                value={e.rate}
+                                onChange={ev => setSelectedItems(prev => prev.map(i => i.key === e.key ? { ...i, rate: Number(ev.target.value) || 0, discount_pct: 0 } : i))}
+                                className="w-16 bg-transparent text-[11px] text-[#E32726] font-semibold focus:outline-none"
+                                title="Custom price"
+                              />
+                            </div>
+                            <button type="button" onClick={() => toggleComplimentary(e.key)}
+                              className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${e.is_complimentary ? 'bg-green-500/20 text-green-400 border-green-500/30' : 'text-white/30 border-white/10 hover:border-green-500/30 hover:text-green-400'}`}>
+                              🎁
+                            </button>
+                            {[10, 20, 30, 40, 50].map(pct => (
+                              <button key={pct} type="button" onClick={() => setItemDiscount(e.key, e.discount_pct === pct ? 0 : pct)}
+                                className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${e.discount_pct === pct ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' : 'text-white/30 border-white/10 hover:border-yellow-500/30 hover:text-yellow-400'}`}>
+                                {pct}%
+                              </button>
+                            ))}
+                            {/* Custom % discount */}
+                            <div className="flex items-center gap-0.5 border border-white/10 rounded px-1 py-0.5">
+                              <input
+                                type="number" min={0} max={100}
+                                value={e.discount_pct || ''}
+                                onChange={ev => setItemDiscount(e.key, Math.min(100, Math.max(0, Number(ev.target.value) || 0)))}
+                                placeholder="%"
+                                className="w-8 bg-transparent text-[10px] text-yellow-400 text-center focus:outline-none placeholder:text-white/20"
+                                title="Custom discount %"
+                              />
+                              <span className="text-[10px] text-white/20">%</span>
+                            </div>
+                          </div>
                         </div>
-                        <button type="button" onClick={() => toggleComplimentary(e.key)}
-                          className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${e.is_complimentary ? 'bg-green-500/20 text-green-400 border-green-500/30' : 'text-white/30 border-white/10 hover:border-green-500/30 hover:text-green-400'}`}>
-                          🎁
-                        </button>
-                        {[10, 20, 30, 40, 50].map(pct => (
-                          <button key={pct} type="button" onClick={() => setItemDiscount(e.key, e.discount_pct === pct ? 0 : pct)}
-                            className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${e.discount_pct === pct ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' : 'text-white/30 border-white/10 hover:border-yellow-500/30 hover:text-yellow-400'}`}>
-                            {pct}%
-                          </button>
-                        ))}
-                        {/* Custom % discount */}
-                        <div className="flex items-center gap-0.5 border border-white/10 rounded px-1 py-0.5">
-                          <input
-                            type="number" min={0} max={100}
-                            value={e.discount_pct || ''}
-                            onChange={ev => setItemDiscount(e.key, Math.min(100, Math.max(0, Number(ev.target.value) || 0)))}
-                            placeholder="%"
-                            className="w-8 bg-transparent text-[10px] text-yellow-400 text-center focus:outline-none placeholder:text-white/20"
-                            title="Custom discount %"
-                          />
-                          <span className="text-[10px] text-white/20">%</span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+                      );
+                    })}
+                  </div>
+                ))}
                 <div className="border-t border-[#2a2a2a] pt-2 mt-1 space-y-1">
                   <div className="flex justify-between text-white/60 text-xs">
                     <span>Subtotal</span>

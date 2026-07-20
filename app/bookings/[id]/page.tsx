@@ -3,7 +3,7 @@ import { useEffect, useState, use, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
-import { formatPHP, formatDate, fmt24, calcOT, OT_RATE, SETUP_OT_RATE } from '@/lib/utils';
+import { formatPHP, formatDate, fmt24, calcOT, OT_RATE, SETUP_OT_RATE, groupByDayDate } from '@/lib/utils';
 import { Booking, BookingEquipment, Payment, Quotation, Invoice, BookingDay, STUDIO_RATES, VAT_RATE, SHOOT_TYPES, NO_DATE_SENTINEL } from '@/lib/types';
 
 function shortDayLabel(date: string) {
@@ -898,23 +898,32 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
               <div className="flex justify-between"><span className="text-white/40">Studio</span><span className="text-white">{formatPHP(booking.subtotal)}</span></div>
 
               {equipment.length > 0 && (
-                <div className="border-t border-[#2a2a2a] pt-2">
-                  <div className="text-white/40 text-xs mb-1">Equipment / Packages</div>
-                  {equipment.map(e => {
-                    const comp = !!e.is_complimentary;
-                    const disc = e.discount_pct || 0;
-                    const lineTotal = comp ? 0 : e.rate * e.quantity * (1 - disc / 100);
-                    return (
-                      <div key={e.id} className="flex justify-between items-center py-0.5">
-                        <span className="text-white/60 text-xs truncate max-w-[200px]">{e.name} x{e.quantity}</span>
-                        <div className="flex items-center gap-1.5 ml-2 shrink-0">
-                          {comp && <span className="text-[10px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded font-semibold">COMP</span>}
-                          {disc > 0 && !comp && <span className="text-[10px] bg-yellow-500/20 text-yellow-400 px-1.5 py-0.5 rounded">{disc}% off</span>}
-                          <span className="text-white text-xs">{comp ? '₱0' : formatPHP(lineTotal)}</span>
+                <div className="border-t border-[#2a2a2a] pt-2 space-y-2">
+                  <div className="text-white/40 text-xs">Equipment / Packages</div>
+                  {groupByDayDate(equipment).map(group => (
+                    <div key={group.dayDate ?? '__general__'}>
+                      {bookingDays && bookingDays.length > 1 && (
+                        <div className="text-[10px] text-[#E32726]/70 font-semibold uppercase tracking-wider mb-0.5">
+                          {group.dayDate ? shortDayLabel(group.dayDate) : 'All Days'}
                         </div>
-                      </div>
-                    );
-                  })}
+                      )}
+                      {group.items.map(e => {
+                        const comp = !!e.is_complimentary;
+                        const disc = e.discount_pct || 0;
+                        const lineTotal = comp ? 0 : e.rate * e.quantity * (1 - disc / 100);
+                        return (
+                          <div key={e.id} className="flex justify-between items-center py-0.5">
+                            <span className="text-white/60 text-xs truncate max-w-[200px]">{e.name} x{e.quantity}</span>
+                            <div className="flex items-center gap-1.5 ml-2 shrink-0">
+                              {comp && <span className="text-[10px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded font-semibold">COMP</span>}
+                              {disc > 0 && !comp && <span className="text-[10px] bg-yellow-500/20 text-yellow-400 px-1.5 py-0.5 rounded">{disc}% off</span>}
+                              <span className="text-white text-xs">{comp ? '₱0' : formatPHP(lineTotal)}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ))}
                 </div>
               )}
 
