@@ -3,7 +3,7 @@ import { useEffect, useState, use, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
-import { formatPHP, formatDate, fmt24, calcOT, OT_RATE, SETUP_OT_RATE, groupByDayDate } from '@/lib/utils';
+import { formatPHP, formatDate, fmt24, calcOT, OT_RATE, SETUP_OT_RATE, groupByDayDate, groupByCategory, categoryLabel } from '@/lib/utils';
 import { Booking, BookingEquipment, Payment, Quotation, Invoice, BookingDay, STUDIO_RATES, VAT_RATE, SHOOT_TYPES, NO_DATE_SENTINEL } from '@/lib/types';
 
 function shortDayLabel(date: string) {
@@ -419,6 +419,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
   const [otherBookedDates, setOtherBookedDates] = useState<string[]>([]);
   const [blockoutDates, setBlockoutDates] = useState<string[]>([]);
   const [showRebook, setShowRebook] = useState(false);
+  const [splittingDuplicates, setSplittingDuplicates] = useState(false);
   const [rebookDate, setRebookDate] = useState('');
   const [rebooking, setRebooking] = useState(false);
   const [rebookError, setRebookError] = useState('');
@@ -524,6 +525,33 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
   const balance = totalIncVAT - totalPaid;
   const studioRate = STUDIO_RATES[booking.studio_rate];
   const ic = 'bg-[#1a1a1a] border border-[#2a2a2a] rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:border-[#E32726]';
+
+  // Detects equipment items added before per-day assignment existed (or hit the old "+ Custom"
+  // bug): no day_date set, but repeated in exact multiples of the day count — e.g. the same
+  // item added once per day, back when there was no way to tag which day it belonged to.
+  const realDayCount = (bookingDays || []).filter(d => d.date !== NO_DATE_SENTINEL).length;
+  const splittableDuplicateCount = (() => {
+    if (realDayCount < 2) return 0;
+    const unassigned = equipment.filter(e => !e.day_date);
+    const groups = new Map<string, number>();
+    for (const e of unassigned) {
+      const key = `${e.name}::${e.rate}::${e.item_type}`;
+      groups.set(key, (groups.get(key) || 0) + 1);
+    }
+    let count = 0;
+    for (const n of groups.values()) if (n >= 2 && n % realDayCount === 0) count += n;
+    return count;
+  })();
+
+  async function splitDuplicateItems() {
+    setSplittingDuplicates(true);
+    const res = await fetch(`/api/bookings/${id}/split-duplicate-items`, { method: 'POST' });
+    const result = await res.json();
+    setSplittingDuplicates(false);
+    await load();
+    if (result.splitCount > 0) toast.success(`Split ${result.splitCount} item(s) across days ✓`);
+    else toast.error('Nothing splittable found');
+  }
 
   async function updateStatus(status: string) {
     setSaving(true);
@@ -899,7 +927,15 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
 
               {equipment.length > 0 && (
                 <div className="border-t border-[#2a2a2a] pt-2 space-y-2">
-                  <div className="text-white/40 text-xs">Equipment / Packages</div>
+                  <div className="flex items-center justify-between">
+                    <div className="text-white/40 text-xs">Equipment / Packages</div>
+                    {splittableDuplicateCount > 0 && (
+                      <button onClick={splitDuplicateItems} disabled={splittingDuplicates}
+                        className="text-[10px] text-yellow-400 hover:text-yellow-300 border border-yellow-500/30 px-2 py-0.5 rounded disabled:opacity-50">
+                        {splittingDuplicates ? 'Splitting…' : `🔧 Split ${splittableDuplicateCount} unassigned item${splittableDuplicateCount !== 1 ? 's' : ''} across days`}
+                      </button>
+                    )}
+                  </div>
                   {groupByDayDate(equipment).map(group => (
                     <div key={group.dayDate ?? '__general__'}>
                       {bookingDays && bookingDays.length > 1 && (
@@ -907,21 +943,28 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                           {group.dayDate ? shortDayLabel(group.dayDate) : 'All Days'}
                         </div>
                       )}
-                      {group.items.map(e => {
-                        const comp = !!e.is_complimentary;
-                        const disc = e.discount_pct || 0;
-                        const lineTotal = comp ? 0 : e.rate * e.quantity * (1 - disc / 100);
-                        return (
-                          <div key={e.id} className="flex justify-between items-center py-0.5">
-                            <span className="text-white/60 text-xs truncate max-w-[200px]">{e.name} x{e.quantity}</span>
-                            <div className="flex items-center gap-1.5 ml-2 shrink-0">
-                              {comp && <span className="text-[10px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded font-semibold">COMP</span>}
-                              {disc > 0 && !comp && <span className="text-[10px] bg-yellow-500/20 text-yellow-400 px-1.5 py-0.5 rounded">{disc}% off</span>}
-                              <span className="text-white text-xs">{comp ? '₱0' : formatPHP(lineTotal)}</span>
-                            </div>
-                          </div>
-                        );
-                      })}
+                      {groupByCategory(group.items).map(catGroup => (
+                        <div key={catGroup.category}>
+                          {groupByCategory(group.items).length > 1 && (
+                            <div className="text-[9px] text-white/30 font-medium uppercase tracking-wider mt-1">{categoryLabel(catGroup.category)}</div>
+                          )}
+                          {catGroup.items.map(e => {
+                            const comp = !!e.is_complimentary;
+                            const disc = e.discount_pct || 0;
+                            const lineTotal = comp ? 0 : e.rate * e.quantity * (1 - disc / 100);
+                            return (
+                              <div key={e.id} className="flex justify-between items-center py-0.5">
+                                <span className="text-white/60 text-xs truncate max-w-[200px]">{e.name} x{e.quantity}</span>
+                                <div className="flex items-center gap-1.5 ml-2 shrink-0">
+                                  {comp && <span className="text-[10px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded font-semibold">COMP</span>}
+                                  {disc > 0 && !comp && <span className="text-[10px] bg-yellow-500/20 text-yellow-400 px-1.5 py-0.5 rounded">{disc}% off</span>}
+                                  <span className="text-white text-xs">{comp ? '₱0' : formatPHP(lineTotal)}</span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ))}
                     </div>
                   ))}
                 </div>
@@ -991,6 +1034,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
               bookingDays={bookingDays}
               onSaved={() => { setEditingItems(false); load(); }}
               onCancel={() => setEditingItems(false)}
+              onChangeRateType={() => { setEditingItems(false); startEditDates(); }}
             />
           )}
 
