@@ -21,7 +21,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const oldDays = db.prepare('SELECT * FROM booking_days WHERE booking_id = ? ORDER BY date').all(id) as
     { date: string; day_type: string; studio_rate: string; hours: number; subtotal: number; call_time: string | null; wrap_time: string | null; is_pencil: number | null }[];
   const equipment = db.prepare('SELECT * FROM booking_equipment WHERE booking_id = ? ORDER BY id').all(id) as
-    { equipment_id: number | null; quantity: number; rate: number; name: string; item_type: string; is_complimentary: number; discount_pct: number; day_date: string | null }[];
+    { equipment_id: number | null; quantity: number; rate: number; name: string; item_type: string; is_complimentary: number; discount_pct: number; day_date: string | null; category: string | null }[];
 
   // First REAL day, not literally oldDays[0] — a "no date yet" placeholder's sentinel value
   // sorts alphabetically first and would otherwise corrupt the offset calculation.
@@ -87,10 +87,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   for (const d of newDays) insDay.run(newBookingId, d.date, d.day_type, d.studio_rate, d.hours || 1, d.subtotal || 0, d.call_time || null, d.wrap_time || null, d.is_pencil ? 1 : 0);
 
   if (equipment.length) {
-    const insEq = db.prepare(`INSERT INTO booking_equipment (booking_id, equipment_id, quantity, rate, name, item_type, is_complimentary, discount_pct, day_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    const insEq = db.prepare(`INSERT INTO booking_equipment (booking_id, equipment_id, quantity, rate, name, item_type, is_complimentary, discount_pct, day_date, category) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
     for (const item of equipment) {
       insEq.run(newBookingId, item.equipment_id, item.quantity, item.rate, item.name, item.item_type,
-        item.is_complimentary, item.discount_pct, item.day_date ? shift(item.day_date) : null);
+        item.is_complimentary, item.discount_pct, item.day_date ? shift(item.day_date) : null, item.category || null);
     }
   }
 

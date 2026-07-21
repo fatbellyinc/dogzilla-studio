@@ -1,7 +1,7 @@
 'use client';
 import { use, useEffect, useState, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { formatPHP, formatDate, fmt24, calcOT, OT_RATE, groupByDayDate } from '@/lib/utils';
+import { formatPHP, formatDate, fmt24, calcOT, OT_RATE, groupByDayDate, groupByCategory, categoryLabel } from '@/lib/utils';
 import { Booking, BookingEquipment, Quotation, BookingDay, Payment, STUDIO_RATES, VAT_RATE, PAYMENT_ACCOUNTS, NO_DATE_SENTINEL } from '@/lib/types';
 
 function fullDayLabel(date: string) {
@@ -47,7 +47,7 @@ function DocView({ bookingId }: { bookingId: string }) {
   const vatExempt = !!booking.vat_exempt;
   const isMultiDay = bookingDays && bookingDays.length > 1;
 
-  type Line = { code: string; desc: string; qty: number; unit: number; total: number; bold?: boolean; indent?: boolean; comp?: boolean; disc?: number };
+  type Line = { code: string; desc: string; qty: number; unit: number; total: number; bold?: boolean; indent?: boolean; comp?: boolean; disc?: number; isCategoryLabel?: boolean };
   const lines: Line[] = [];
 
   // Overtime is computed per day from each day's own call/wrap times — a booking-level
@@ -64,19 +64,25 @@ function DocView({ bookingId }: { bookingId: string }) {
   const generalEquipment = equipmentByDay.find(g => g.dayDate === null)?.items ?? [];
 
   function pushEquipmentLines(items: BookingEquipment[]) {
-    items.forEach(e => {
-      const comp = !!e.is_complimentary;
-      const disc = e.discount_pct || 0;
-      const lineTotal = comp ? 0 : e.rate * e.quantity * (1 - disc / 100);
-      lines.push({
-        code: '',
-        desc: e.name,
-        qty: e.quantity,
-        unit: e.rate,
-        total: lineTotal,
-        indent: true,
-        comp,
-        disc: disc > 0 ? disc : undefined,
+    const catGroups = groupByCategory(items);
+    catGroups.forEach(catGroup => {
+      if (catGroups.length > 1) {
+        lines.push({ code: '', desc: categoryLabel(catGroup.category), qty: 0, unit: 0, total: 0, isCategoryLabel: true });
+      }
+      catGroup.items.forEach(e => {
+        const comp = !!e.is_complimentary;
+        const disc = e.discount_pct || 0;
+        const lineTotal = comp ? 0 : e.rate * e.quantity * (1 - disc / 100);
+        lines.push({
+          code: '',
+          desc: e.name,
+          qty: e.quantity,
+          unit: e.rate,
+          total: lineTotal,
+          indent: true,
+          comp,
+          disc: disc > 0 ? disc : undefined,
+        });
       });
     });
   }
@@ -194,7 +200,7 @@ function DocView({ bookingId }: { bookingId: string }) {
       [`Shoot Date: ${formatDate(booking.booking_date)}`, '', '', '', ''],
       ['', '', '', '', ''],
       ['Description', 'Qty', 'Unit Price', 'Disc.', 'Amount'],
-      ...lines.map(l => [l.desc, l.qty, l.comp ? 0 : l.unit, l.comp ? '100%' : l.disc ? `${l.disc}%` : '', l.comp ? 0 : l.total]),
+      ...lines.map(l => l.isCategoryLabel ? [`— ${l.desc} —`, '', '', '', ''] : [l.desc, l.qty, l.comp ? 0 : l.unit, l.comp ? '100%' : l.disc ? `${l.disc}%` : '', l.comp ? 0 : l.total]),
       ['', '', '', '', ''],
       ['Regular Price', '', '', '', regularPrice],
       totalSavings > 0 ? ['Total Discount', '', '', '', -totalSavings] : null,
@@ -311,6 +317,13 @@ function DocView({ bookingId }: { bookingId: string }) {
         </thead>
         <tbody>
           {lines.map((line, i) => (
+            line.isCategoryLabel ? (
+              <tr key={i} style={{ background: '#f3f3f3' }}>
+                <td colSpan={5} style={{ padding: '3px 10px 3px 22px', fontSize: '10px', fontWeight: 700, color: '#999', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  {line.desc}
+                </td>
+              </tr>
+            ) : (
             <tr key={i} style={{
               borderBottom: '1px solid #e5e5e5',
               background: line.bold ? '#f8f8f8' : i % 2 === 0 ? '#fff' : '#fafafa',
@@ -332,6 +345,7 @@ function DocView({ bookingId }: { bookingId: string }) {
                 {line.comp ? <span style={{ color: '#166534' }}>₱0</span> : formatPHP(line.total)}
               </td>
             </tr>
+            )
           ))}
         </tbody>
       </table>

@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { formatPHP, groupByDayDate } from '@/lib/utils';
+import { formatPHP, groupByDayDate, groupByCategory, categoryLabel } from '@/lib/utils';
 import { Equipment, BookingEquipment, BookingDay, STUDIO_RATES, CATEGORY_LABELS, EQUIPMENT_PACKAGES, ADDON_ITEMS } from '@/lib/types';
 
 type PackageCat = keyof typeof EQUIPMENT_PACKAGES;
@@ -16,6 +16,8 @@ interface EditItem {
   item_type: string;
   /** If set, this add-on (e.g. Electricity) applies to a specific shoot day rather than the whole booking. */
   day_date?: string | null;
+  /** Equipment catalog category, or a pseudo-category (package/addon/manpower/custom). */
+  category?: string | null;
 }
 
 const ELEC_RATE = 850; // ₱850/hr
@@ -48,9 +50,12 @@ interface Props {
   bookingDays?: BookingDay[];
   onSaved: () => void;
   onCancel: () => void;
+  /** Jumps to the Date editor, where the actual studio_rate type (Full Day/Hourly/Event/
+   * Equipment Only) lives per day — this panel only edits the price and equipment. */
+  onChangeRateType?: () => void;
 }
 
-export default function BookingEditor({ bookingId, currentEquipment, currentSubtotal, studioRate, callTime, wrapTime, bookingDays = [], onSaved, onCancel }: Props) {
+export default function BookingEditor({ bookingId, currentEquipment, currentSubtotal, studioRate, callTime, wrapTime, bookingDays = [], onSaved, onCancel, onChangeRateType }: Props) {
   const [items, setItems] = useState<EditItem[]>(() => {
     const mapped: EditItem[] = currentEquipment.map(e => {
       const item: EditItem = {
@@ -63,6 +68,7 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
         discount_pct: e.discount_pct || 0,
         item_type: e.item_type || 'individual',
         day_date: e.day_date || undefined,
+        category: e.category || undefined,
       };
       // Normalize old electricity name patterns → "Power Consumption"
       if (item.name.toLowerCase().includes('electricity') || item.name.startsWith('Power Consumption')) {
@@ -126,7 +132,7 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
     if (existing) { setItems(prev => prev.filter(i => i.key !== key)); return; }
     const day = isMultiDay ? effectiveAddonDay : undefined;
     const name = `${pkg.label} Package — ${pkg.subtitle}` + (day ? ` (${dayShortLabel(day)})` : '');
-    setItems(prev => [...prev, { key, name, rate: pkg.price, quantity: 1, is_complimentary: false, discount_pct: 0, item_type: 'package', day_date: day }]);
+    setItems(prev => [...prev, { key, name, rate: pkg.price, quantity: 1, is_complimentary: false, discount_pct: 0, item_type: 'package', day_date: day, category: 'package' }]);
   }
 
   function addEquipment(eq: Equipment) {
@@ -135,7 +141,7 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
     if (existing) { setItems(prev => prev.filter(i => i.key !== key)); return; }
     const day = isMultiDay ? effectiveAddonDay : undefined;
     const name = eq.name + (day ? ` — ${dayShortLabel(day)}` : '');
-    setItems(prev => [...prev, { key, name, rate: eq.daily_rate, quantity: 1, equipment_id: eq.id, is_complimentary: false, discount_pct: 0, item_type: 'individual', day_date: day }]);
+    setItems(prev => [...prev, { key, name, rate: eq.daily_rate, quantity: 1, equipment_id: eq.id, is_complimentary: false, discount_pct: 0, item_type: 'individual', day_date: day, category: eq.category }]);
   }
 
   function addAddon(addon: typeof ADDON_ITEMS[number]) {
@@ -148,7 +154,7 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
     if (existing) { setItems(prev => prev.filter(i => i.key !== key)); return; }
     const day = isMultiDay ? effectiveAddonDay : undefined;
     const name = addon.label + (day ? ` — ${dayShortLabel(day)}` : '');
-    setItems(prev => [...prev, { key, name, rate: addon.price, quantity: 1, is_complimentary: false, discount_pct: 0, item_type: 'addon', day_date: day }]);
+    setItems(prev => [...prev, { key, name, rate: addon.price, quantity: 1, is_complimentary: false, discount_pct: 0, item_type: 'addon', day_date: day, category: 'addon' }]);
   }
 
   function updateElecHours(hrs: number) {
@@ -161,7 +167,7 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
     setItems(prev => {
       const exists = prev.find(i => i.key === key);
       if (exists) return prev.map(i => i.key === key ? { ...i, rate: total, name } : i);
-      return [...prev, { key, name, rate: total, quantity: 1, is_complimentary: false, discount_pct: 0, item_type: 'addon', day_date: day }];
+      return [...prev, { key, name, rate: total, quantity: 1, is_complimentary: false, discount_pct: 0, item_type: 'addon', day_date: day, category: 'addon' }];
     });
   }
 
@@ -184,7 +190,7 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
     if (!customItem.name || !customItem.rate) return;
     const day = isMultiDay ? effectiveAddonDay : undefined;
     const name = customItem.name + (day ? ` — ${dayShortLabel(day)}` : '');
-    setItems(prev => [...prev, { key: `custom-${Date.now()}`, name, rate: Number(customItem.rate), quantity: Number(customItem.quantity) || 1, is_complimentary: false, discount_pct: 0, item_type: 'custom', day_date: day }]);
+    setItems(prev => [...prev, { key: `custom-${Date.now()}`, name, rate: Number(customItem.rate), quantity: Number(customItem.quantity) || 1, is_complimentary: false, discount_pct: 0, item_type: 'custom', day_date: day, category: 'custom' }]);
     setCustomItem({ name: '', rate: '', quantity: '1' });
     setShowCustom(false);
   }
@@ -215,6 +221,7 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
       is_complimentary: i.is_complimentary,
       discount_pct: i.discount_pct,
       day_date: i.day_date || null,
+      category: i.category || null,
     }));
     await fetch(`/api/bookings/${bookingId}/equipment`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ equipment_items, studio_subtotal: studioSubtotal }) });
     setSaving(false);
@@ -253,6 +260,14 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
             <button onClick={() => setStudioSubtotal(currentSubtotal)} className="text-[10px] text-white/30 hover:text-white border border-white/10 px-1.5 py-0.5 rounded" title="Reset to original">↺</button>
           )}
         </div>
+        {onChangeRateType && (
+          <div className="mb-1.5">
+            <button type="button" onClick={onChangeRateType}
+              className="text-[10px] text-[#E32726]/80 hover:text-[#E32726] border border-[#E32726]/20 hover:border-[#E32726]/40 px-2 py-1 rounded transition-colors">
+              🔁 Switch between Full Day / Hourly / Event / Equipment Only →
+            </button>
+          </div>
+        )}
         <div className="text-[10px] text-white/30 mb-1.5">Use ↑↓ to set the order items appear on invoices/quotations.</div>
         {items.length === 0 ? <p className="text-white/30 text-xs py-2">No equipment — studio only</p> : (
           <div className="space-y-3">
@@ -263,7 +278,12 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
                     {group.dayDate ? dayShortLabel(group.dayDate) : 'All Days'}
                   </div>
                 )}
-                {group.items.map(item => {
+                {groupByCategory(group.items).map(catGroup => (
+                  <div key={catGroup.category} className="space-y-1.5">
+                    {catGroup.items.length > 0 && groupByCategory(group.items).length > 1 && (
+                      <div className="text-[9px] text-white/30 font-medium uppercase tracking-wider pl-1">{categoryLabel(catGroup.category)}</div>
+                    )}
+                    {catGroup.items.map(item => {
               const idx = items.findIndex(i => i.key === item.key);
               const lineTotal = item.is_complimentary ? 0 : item.rate * item.quantity * (1 - item.discount_pct / 100);
               const elec = isElecItem(item);
@@ -377,7 +397,9 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
                   </div>
                 </div>
               );
-                })}
+                    })}
+                  </div>
+                ))}
               </div>
             ))}
           </div>
@@ -580,7 +602,7 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
                         <button onClick={() => setItems(prev => prev.filter(i => i.key !== key))} className="text-white/20 hover:text-red-400 text-xs ml-1">✕</button>
                       </>
                     ) : (
-                      <button onClick={() => setItems(prev => [...prev, { key, name, rate: mp.rate, quantity: 1, is_complimentary: false, discount_pct: 0, item_type: 'manpower', day_date: day }])}
+                      <button onClick={() => setItems(prev => [...prev, { key, name, rate: mp.rate, quantity: 1, is_complimentary: false, discount_pct: 0, item_type: 'manpower', day_date: day, category: 'manpower' }])}
                         className="text-xs text-[#E32726] border border-[#E32726]/40 px-2 py-1 rounded hover:bg-[#E32726]/10 transition-colors">
                         + Add
                       </button>

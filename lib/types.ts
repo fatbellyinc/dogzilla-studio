@@ -5,6 +5,7 @@ export const SHOOT_TYPES = [
   'Commercial / TVC',
   'Event',
   'Workshop',
+  'Rehearsal',
   'Livestream',
   'Equipment Rental',
   'Others',
@@ -102,6 +103,10 @@ export interface BookingEquipment {
   discount_pct?: number;
   /** If set, this line item (e.g. an add-on like Electricity) applies to a specific shoot day rather than the whole booking. */
   day_date?: string | null;
+  /** Equipment catalog category (camera, lighting, monitor, etc.) for individual items, or a
+   * pseudo-category (package/addon/manpower/custom) for everything else — lets items be
+   * sub-grouped by category within each day's line-item list. */
+  category?: string | null;
 }
 
 export interface Invoice {

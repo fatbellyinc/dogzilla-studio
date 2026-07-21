@@ -17,6 +17,39 @@ export function groupByDayDate<T extends { day_date?: string | null }>(items: T[
   return general ? [...dated, { dayDate: null, items: general }] : dated;
 }
 
+// Category order + labels for grouping line items within a day — real equipment catalog
+// categories first (camera, lighting, etc.), then the pseudo-categories for things that were
+// never in the catalog (packages, add-ons, personnel, custom one-off items).
+const CATEGORY_ORDER = ['camera', 'lens', 'lighting', 'lighting_old', 'grip', 'tripod', 'audio', 'monitor', 'rigging', 'misc', 'crew', 'package', 'addon', 'manpower', 'custom', 'other'];
+const CATEGORY_LABELS_ALL: Record<string, string> = {
+  camera: 'Camera Bodies', lens: 'Lenses', lighting: 'Lights — LED', lighting_old: 'Lights — Old School',
+  grip: 'Grip', tripod: 'Tripods', audio: 'Audio', monitor: 'Monitors & Wireless', rigging: 'Camera/Rigging Accessories',
+  misc: 'Miscellaneous', crew: 'Crew',
+  package: 'Packages', addon: 'Add-ons', manpower: 'Personnel', custom: 'Custom Items', other: 'Other',
+};
+export function categoryLabel(key: string): string {
+  return CATEGORY_LABELS_ALL[key] || key;
+}
+
+// Sub-groups line items by category (equipment catalog category for individual items, or a
+// pseudo-category — package/addon/manpower/custom — for everything else) within whatever
+// broader grouping (e.g. a single day) they already belong to.
+export function groupByCategory<T extends { category?: string | null; item_type?: string }>(items: T[]): { category: string; items: T[] }[] {
+  const map = new Map<string, T[]>();
+  for (const item of items) {
+    const key = item.category || item.item_type || 'other';
+    if (!map.has(key)) map.set(key, []);
+    map.get(key)!.push(item);
+  }
+  return [...map.entries()]
+    .sort((a, b) => {
+      const ai = CATEGORY_ORDER.indexOf(a[0]);
+      const bi = CATEGORY_ORDER.indexOf(b[0]);
+      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+    })
+    .map(([category, groupItems]) => ({ category, items: groupItems }));
+}
+
 export function formatPHP(amount: number): string {
   return '₱' + amount.toLocaleString('en-PH', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 }

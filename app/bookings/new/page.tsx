@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { formatPHP, groupByDayDate } from '@/lib/utils';
+import { formatPHP, groupByDayDate, groupByCategory, categoryLabel } from '@/lib/utils';
 import { Equipment, STUDIO_RATES, EQUIPMENT_PACKAGES, ADDON_ITEMS, CATEGORY_LABELS, SHOOT_TYPES } from '@/lib/types';
 import { Client } from '@/lib/types';
 import MultiDayPicker, { DayConfig } from '@/components/MultiDayPicker';
@@ -20,6 +20,8 @@ interface SelectedItem {
   discount_pct?: number;
   /** If set, this add-on (e.g. Electricity) applies to a specific shoot day rather than the whole booking. */
   day_date?: string;
+  /** Equipment catalog category, or a pseudo-category (package/addon/manpower/custom). */
+  category?: string;
 }
 
 function RecurringPanel({ recurrence, recurrenceEnd, startDate, onChange }: {
@@ -219,7 +221,7 @@ function NewBookingForm() {
         const sameCat = EQUIPMENT_PACKAGES[cat].some((p: { id: string }) => e.key === p.id || (day && e.key === `${p.id}::${day}`));
         return !sameCat;
       });
-      return [...filtered, { key, name, rate: pkg.price, quantity: 1, is_package: true, day_date: day }];
+      return [...filtered, { key, name, rate: pkg.price, quantity: 1, is_package: true, day_date: day, category: 'package' }];
     });
   }
 
@@ -230,7 +232,7 @@ function NewBookingForm() {
     setSelectedItems(prev => {
       const existing = prev.find(e => e.key === key);
       if (existing) return prev.filter(e => e.key !== key);
-      return [...prev, { key, name, rate: item.daily_rate, quantity: 1, equipment_id: item.id, is_package: false, is_complimentary: false, discount_pct: 0, day_date: day }];
+      return [...prev, { key, name, rate: item.daily_rate, quantity: 1, equipment_id: item.id, is_package: false, is_complimentary: false, discount_pct: 0, day_date: day, category: item.category }];
     });
   }
 
@@ -265,7 +267,7 @@ function NewBookingForm() {
       const isElec = addon.id === 'ADD_ELEC';
       const rate = isElec ? ELEC_RATE * addonElecHours : addon.price;
       const name = (isElec ? `Power Consumption` : addon.label) + (day ? ` — ${dayLabel(day)}` : '');
-      return [...prev, { key, name, rate, quantity: 1, is_package: false, day_date: day }];
+      return [...prev, { key, name, rate, quantity: 1, is_package: false, day_date: day, category: 'addon' }];
     });
   }
 
@@ -283,7 +285,7 @@ function NewBookingForm() {
         return prev.map(e => e.key === key ? { ...e, quantity: 1, rate: total, name } : e);
       }
       // Auto-add
-      return [...prev, { key, name, rate: total, quantity: 1, is_package: false, day_date: day }];
+      return [...prev, { key, name, rate: total, quantity: 1, is_package: false, day_date: day, category: 'addon' }];
     });
   }
 
@@ -315,6 +317,7 @@ function NewBookingForm() {
         is_complimentary: item.is_complimentary || false,
         discount_pct: item.discount_pct || 0,
         day_date: item.day_date || null,
+        category: item.category || null,
       }));
       const res = await fetch('/api/bookings', {
         method: 'POST',
@@ -764,7 +767,7 @@ function NewBookingForm() {
                           </>
                         )}
                         {!sel && (
-                          <button type="button" onClick={() => setSelectedItems(prev => [...prev, { key, name, rate: mp.rate, quantity: 1, is_package: false, is_complimentary: false, discount_pct: 0, day_date: day }])}
+                          <button type="button" onClick={() => setSelectedItems(prev => [...prev, { key, name, rate: mp.rate, quantity: 1, is_package: false, is_complimentary: false, discount_pct: 0, day_date: day, category: 'manpower' }])}
                             className="text-xs text-[#E32726] border border-[#E32726]/40 px-2.5 py-1 rounded hover:bg-[#E32726]/10 transition-colors">
                             + Add
                           </button>
@@ -776,7 +779,7 @@ function NewBookingForm() {
                 {/* Custom crew */}
                 <button type="button" onClick={() => {
                   const day = isMultiDay ? effectiveAddonDay : undefined;
-                  setSelectedItems(prev => [...prev, { key: `mp-custom-${Date.now()}`, name: 'Custom Crew' + (day ? ` — ${dayLabel(day)}` : ''), rate: 1500, quantity: 1, is_package: false, is_complimentary: false, discount_pct: 0, day_date: day }]);
+                  setSelectedItems(prev => [...prev, { key: `mp-custom-${Date.now()}`, name: 'Custom Crew' + (day ? ` — ${dayLabel(day)}` : ''), rate: 1500, quantity: 1, is_package: false, is_complimentary: false, discount_pct: 0, day_date: day, category: 'manpower' }]);
                 }}
                   className="w-full text-xs text-white/40 border border-dashed border-[#2a2a2a] rounded-lg py-2 hover:border-[#E32726]/40 hover:text-white/60 transition-colors">
                   + Add Custom Crew / Manpower
@@ -864,7 +867,12 @@ function NewBookingForm() {
                         {group.dayDate ? dayLabel(group.dayDate) : 'All Days'}
                       </div>
                     )}
-                    {group.items.map(e => {
+                    {groupByCategory(group.items).map(catGroup => (
+                      <div key={catGroup.category} className="space-y-1">
+                        {groupByCategory(group.items).length > 1 && (
+                          <div className="text-[9px] text-white/30 font-medium uppercase tracking-wider pl-1">{categoryLabel(catGroup.category)}</div>
+                        )}
+                        {catGroup.items.map(e => {
                       const lineTotal = e.is_complimentary ? 0 : e.rate * e.quantity * (1 - (e.discount_pct || 0) / 100);
                       return (
                         <div key={e.key} className="rounded-lg bg-[#0f0f0f] p-2 space-y-1">
@@ -912,7 +920,9 @@ function NewBookingForm() {
                           </div>
                         </div>
                       );
-                    })}
+                        })}
+                      </div>
+                    ))}
                   </div>
                 ))}
                 <div className="border-t border-[#2a2a2a] pt-2 mt-1 space-y-1">
