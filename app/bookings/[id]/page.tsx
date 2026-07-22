@@ -569,6 +569,12 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
     load();
   }
 
+  async function deletePayment(paymentId: number, amount: number) {
+    if (!confirm(`Delete this ${formatPHP(amount)} payment record? This cannot be undone.`)) return;
+    await fetch(`/api/payments/${paymentId}`, { method: 'DELETE' });
+    load();
+  }
+
   async function generateQuote() {
     setGeneratingQuote(true);
     const valid = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
@@ -1123,6 +1129,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                       <div className="flex items-center gap-2">
                         <span>{formatPHP(p.amount)}</span>
                         <Link href={`/print/receipt/${p.id}`} target="_blank" className="text-[10px] text-white/30 hover:text-white border border-white/10 px-1.5 py-0.5 rounded hover:border-white/30 transition-colors">{p.type === 'deposit' ? 'AR' : 'OR'}</Link>
+                        <button onClick={() => deletePayment(p.id, p.amount)} title="Delete this payment record" className="text-[10px] text-white/20 hover:text-[#E32726] border border-white/10 hover:border-[#E32726]/40 px-1.5 py-0.5 rounded transition-colors">✕</button>
                       </div>
                     </div>
                   ))}

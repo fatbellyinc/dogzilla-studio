@@ -56,11 +56,15 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   if (body.deposit_amount !== undefined) { db.prepare('UPDATE bookings SET deposit_amount = ? WHERE id = ?').run(Number(body.deposit_amount) || 0, id); logActivity(Number(id), ACTIONS.ITEMS_EDITED, `Deposit amount set to ₱${(Number(body.deposit_amount) || 0).toLocaleString()}`); }
   if (body.wrap_date !== undefined) db.prepare('UPDATE bookings SET wrap_date = ? WHERE id = ?').run(body.wrap_date || null, id);
   if (fully_paid !== undefined) {
+    const wasFullyPaid = (db.prepare('SELECT fully_paid FROM bookings WHERE id = ?').get(id) as { fully_paid: number } | undefined)?.fully_paid;
     db.prepare('UPDATE bookings SET fully_paid = ? WHERE id = ?').run(fully_paid ? 1 : 0, id);
     // Auto-log a payment for whatever's left unpaid so Reconciliation (which only trusts the
     // payments table) doesn't flag this as underpaid — this button is meant to mean "the money
-    // is in," so make that true in the one place that actually tracks money received.
-    if (fully_paid) {
+    // is in," so make that true in the one place that actually tracks money received. Only do
+    // this on the false→true transition — otherwise re-saving an already-paid booking (e.g. the
+    // toggle firing again, or the total shifting after the fact) stacks a second "full" payment
+    // on top of the first instead of leaving the ledger alone.
+    if (fully_paid && !wasFullyPaid) {
       const b = db.prepare('SELECT total, vat_exempt FROM bookings WHERE id = ?').get(id) as { total: number; vat_exempt: number } | undefined;
       if (b) {
         const invoiceTotal = b.vat_exempt ? b.total : Math.round(b.total * 1.12 * 100) / 100;
