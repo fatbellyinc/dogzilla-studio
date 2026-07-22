@@ -1210,6 +1210,15 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                   ✓ Mark Completed
                 </button>
               )}
+              {/* Undo accidental "Mark Completed" — reverts to confirmed, matching the status it
+                  was in right before. Completed bookings feed revenue/reconciliation, so this
+                  needs to be reachable without digging through the activity log. */}
+              {booking.status === 'completed' && (
+                <button onClick={() => { if (confirm('Undo "Completed" and revert this booking back to Confirmed?')) updateStatus('confirmed'); }} disabled={saving}
+                  className="w-full bg-[#2a2a2a] text-white/50 border border-[#2a2a2a] text-sm py-2 rounded-lg hover:text-blue-400 hover:border-blue-500/30 transition-colors">
+                  ↺ Undo — Mark as Confirmed
+                </button>
+              )}
               {/* Paid toggle — visible for completed bookings */}
               {booking.status === 'completed' && (
                 <button onClick={async () => {

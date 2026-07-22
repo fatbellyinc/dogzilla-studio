@@ -1,10 +1,10 @@
 // Electricity cost calculator
 // All ACs are INVERTER type — efficiency factor 0.65 kW per HP (vs 1.0 for non-inverter)
-// Main Studio: ₱50/kWh  |  Holding Areas + Admin Office: ₱15/kWh
+// Main Studio: ₱50/kWh  |  Holding Areas + Admin Office: ₱17/kWh
 
 export const INVERTER_FACTOR = 0.65; // Inverter ACs consume ~65% of rated HP in kW
 export const ELECTRICITY_RATE_STUDIO = 50;  // ₱/kWh — Main Studio
-export const ELECTRICITY_RATE_OTHER  = 15;  // ₱/kWh — Holding areas & admin office
+export const ELECTRICITY_RATE_OTHER  = 17;  // ₱/kWh — Holding areas & admin office
 export const ELECTRICITY_RATE = ELECTRICITY_RATE_STUDIO; // default for equipment
 
 // kW = HP × 0.65 (inverter efficiency)
