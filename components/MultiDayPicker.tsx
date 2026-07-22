@@ -127,6 +127,13 @@ export default function MultiDayPicker({ days, onChange, bookedDates = [], block
     onChange(newDays);
   }
 
+  // Direct price override — bypasses updateDay's automatic calcSubtotal recompute, since the
+  // whole point here is to let the studio charge something other than the rate/hours formula.
+  function setCustomSubtotal(index: number, value: number) {
+    const newDays = days.map((d, i) => i === index ? { ...d, subtotal: Math.max(0, value) } : d);
+    onChange(newDays);
+  }
+
   // Assign a real date to a no-date-yet placeholder — re-sorts since it moves out of the
   // always-last TBD slot into chronological order with the rest.
   function setDayDate(index: number, date: string) {
@@ -228,7 +235,13 @@ export default function MultiDayPicker({ days, onChange, bookedDates = [], block
                   {isMulti && i === 0 && days.length > 1 && <span className="text-[10px] text-white/30">first</span>}
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold text-[#E32726]">{formatPHP(day.subtotal)}</span>
+                  <div className="flex items-center gap-1 bg-[#0f0f0f] rounded px-1.5 py-0.5 border border-[#2a2a2a]">
+                    <span className="text-white/30 text-xs">₱</span>
+                    <input type="number" min={0} value={day.subtotal}
+                      onChange={e => setCustomSubtotal(i, Number(e.target.value) || 0)}
+                      className="w-20 bg-transparent text-sm text-[#E32726] font-bold focus:outline-none text-right"
+                      title="Custom price — overrides the rate/hours formula" />
+                  </div>
                   {isMulti && (
                     <button type="button" onClick={() => removeDay(day.date)} className="text-white/20 hover:text-red-400 text-xs">✕</button>
                   )}

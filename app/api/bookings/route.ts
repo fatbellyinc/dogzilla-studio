@@ -42,12 +42,21 @@ export async function GET(req: NextRequest) {
   // is_pencil) vs confirmed, since a multi-day booking can have some days locked in and others
   // still held.
   const dayRows = bookings.length
-    ? db.prepare(`SELECT booking_id, date, is_pencil FROM booking_days WHERE booking_id IN (${bookings.map(() => '?').join(',')}) AND studio_rate != 'equipment_only' AND day_type != 'cancelled' AND date != ?`)
-        .all(...bookings.map(b => b.id), NO_DATE_SENTINEL) as { booking_id: number; date: string; is_pencil: number }[]
+    ? db.prepare(`SELECT booking_id, date, is_pencil, studio_rate FROM booking_days WHERE booking_id IN (${bookings.map(() => '?').join(',')}) AND day_type != 'cancelled' AND date != ?`)
+        .all(...bookings.map(b => b.id), NO_DATE_SENTINEL) as { booking_id: number; date: string; is_pencil: number; studio_rate: string }[]
     : [];
   const daysByBooking = new Map<number, string[]>();
   const pencilDaysByBooking = new Map<number, string[]>();
+  // Equipment-only days don't occupy the Main Studio (excluded from occupied_dates so a second
+  // client can still book the studio that date), but they're still a real confirmed rental —
+  // tracked separately so the calendar can mark them distinctly instead of showing nothing.
+  const equipmentDaysByBooking = new Map<number, string[]>();
   for (const row of dayRows) {
+    if (row.studio_rate === 'equipment_only') {
+      if (!equipmentDaysByBooking.has(row.booking_id)) equipmentDaysByBooking.set(row.booking_id, []);
+      equipmentDaysByBooking.get(row.booking_id)!.push(row.date);
+      continue;
+    }
     if (!daysByBooking.has(row.booking_id)) daysByBooking.set(row.booking_id, []);
     daysByBooking.get(row.booking_id)!.push(row.date);
     if (row.is_pencil) {
@@ -57,11 +66,17 @@ export async function GET(req: NextRequest) {
   }
 
   const result = bookings.map(b => {
-    const occupied = b.studio_rate === 'equipment_only' ? [] : (daysByBooking.get(b.id) ?? [b.booking_date]);
+    // Prefer the real per-day breakdown whenever booking_days rows exist — booking.studio_rate
+    // is just a coarse "representative" label (e.g. it can end up 'equipment_only' even for a
+    // booking that also has real studio days) and must never override the actual per-day data.
+    // Only fall back to that coarse label for legacy bookings with no booking_days rows at all.
+    const hasDayRows = daysByBooking.has(b.id) || equipmentDaysByBooking.has(b.id);
+    const occupied = hasDayRows ? (daysByBooking.get(b.id) ?? []) : (b.studio_rate === 'equipment_only' ? [] : [b.booking_date]);
     // Whole-booking pencil means every occupied date is tentative; otherwise only the
     // specific days flagged is_pencil are.
     const pencilDates = b.is_pencil ? occupied : (pencilDaysByBooking.get(b.id) ?? []);
-    return { ...b, occupied_dates: occupied, pencil_dates: pencilDates };
+    const equipmentDates = hasDayRows ? (equipmentDaysByBooking.get(b.id) ?? []) : (b.studio_rate === 'equipment_only' ? [b.booking_date] : []);
+    return { ...b, occupied_dates: occupied, pencil_dates: pencilDates, equipment_dates: equipmentDates };
   });
 
   return NextResponse.json(result);

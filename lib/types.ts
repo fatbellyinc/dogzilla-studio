@@ -74,6 +74,8 @@ export interface Booking {
   occupied_dates?: string[];
   /** Subset of occupied_dates still tentative (per-day is_pencil, or every date if the whole booking is pencil). Set by GET /api/bookings. */
   pencil_dates?: string[];
+  /** Dates booked as Equipment Only — doesn't occupy the Main Studio (excluded from occupied_dates), but still a real confirmed rental worth marking distinctly on the calendar. Set by GET /api/bookings. */
+  equipment_dates?: string[];
 }
 
 export interface BookingDay {

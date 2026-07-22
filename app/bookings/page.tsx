@@ -87,6 +87,12 @@ export default function BookingsPage() {
   );
   const bookedDates = new Set([...confirmedDates, ...pencilDates]);
   const blockoutSet = new Set(blockouts.map(b => b.date));
+  // Equipment-only bookings don't occupy the Main Studio, so they never set a confirmed/pencil
+  // dot — but they're still a real confirmed rental, marked distinctly instead of showing
+  // nothing at all. Skip dates that already have a studio-occupying booking that day.
+  const equipmentOnlyDates = new Set(
+    activeBookings.flatMap(b => b.equipment_dates ?? []).filter(d => !bookedDates.has(d))
+  );
 
   async function addBlockout() {
     if (!blockoutForm.date) return;
@@ -185,6 +191,7 @@ export default function BookingsPage() {
                   {day}
                   {confirmedDates.has(dateStr) && !isSelected && <div className="absolute bottom-1 w-1.5 h-1.5 rounded-full bg-[#E32726]" />}
                   {pencilDates.has(dateStr) && !confirmedDates.has(dateStr) && !isSelected && <div className="absolute bottom-1 w-1.5 h-1.5 rounded-full bg-yellow-400" />}
+                  {equipmentOnlyDates.has(dateStr) && !isSelected && <div className="absolute bottom-1 w-1.5 h-1.5 rounded-full bg-blue-400" title="Equipment Only" />}
                   {hasBooking && isSelected && <div className="absolute bottom-1 w-1.5 h-1.5 rounded-full bg-white" />}
                   {blockoutSet.has(dateStr) && !isSelected && <div className="absolute bottom-1 w-1.5 h-1.5 rounded-full bg-orange-500" />}
                   {historicalDates.has(dateStr) && !isSelected && !confirmedDates.has(dateStr) && !pencilDates.has(dateStr) && <div className="absolute top-0.5 right-0.5 w-1 h-1 rounded-full bg-white/25" />}
@@ -196,6 +203,7 @@ export default function BookingsPage() {
           <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-white/30">
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#E32726] inline-block" /> Confirmed</span>
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-yellow-400 inline-block" /> ✏️ Pencil</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-400 inline-block" /> Equipment Only</span>
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#E32726]/40 inline-block" /> Today</span>
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-orange-500 inline-block" /> Blocked</span>
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-white/25 inline-block" /> Historical shoot</span>
