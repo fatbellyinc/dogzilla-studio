@@ -79,14 +79,35 @@ export async function GET() {
   // Upcoming bookings count
   const upcoming = (db.prepare(`SELECT COUNT(*) as c FROM bookings WHERE booking_date >= date('now') AND status NOT IN ('cancelled','completed')`).get() as { c: number }).c;
 
-  // Equipment most rented
-  const topEquipment = db.prepare(`
-    SELECT be.name, COUNT(*) as times, SUM(be.rate * be.quantity) as revenue
+  // Equipment most rented — full ranking per category (catalog category wins over the
+  // denormalized booking_equipment.category, which only exists for custom/non-catalog items)
+  const equipmentRentalsRaw = db.prepare(`
+    SELECT COALESCE(e.category, be.category, 'other') as category, be.name,
+      COUNT(*) as times, SUM(be.rate * be.quantity) as revenue
     FROM booking_equipment be
     JOIN bookings b ON b.id = be.booking_id
+    LEFT JOIN equipment e ON e.id = be.equipment_id
     WHERE b.status != 'cancelled' AND be.is_complimentary = 0
-    GROUP BY be.name ORDER BY times DESC LIMIT 8
-  `).all();
+    GROUP BY COALESCE(e.category, be.category, 'other'), be.name
+    ORDER BY times DESC
+  `).all() as { category: string; name: string; times: number; revenue: number }[];
+
+  const CATEGORY_ORDER = ['camera', 'lens', 'lighting', 'lighting_old', 'grip', 'tripod', 'audio', 'monitor', 'rigging', 'misc', 'crew', 'package', 'addon', 'manpower', 'custom', 'other'];
+  const catMap = new Map<string, { name: string; times: number; revenue: number }[]>();
+  for (const row of equipmentRentalsRaw) {
+    if (!catMap.has(row.category)) catMap.set(row.category, []);
+    catMap.get(row.category)!.push({ name: row.name, times: row.times, revenue: row.revenue });
+  }
+  const equipmentByCategory = [...catMap.entries()]
+    .sort((a, b) => {
+      const ai = CATEGORY_ORDER.indexOf(a[0]);
+      const bi = CATEGORY_ORDER.indexOf(b[0]);
+      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+    })
+    .map(([category, items]) => ({ category, items }));
+
+  // Flat top-8, kept for anything still consuming the old shape
+  const topEquipment = equipmentRentalsRaw.slice(0, 8);
 
   // Historical sales summary (all-time, from pre-app records)
   const historicalSummary = db.prepare(`
@@ -104,7 +125,7 @@ export async function GET() {
 
   return NextResponse.json({
     monthlyRevenue, monthlyCosts, rateBreakdown, topClients, totals,
-    totalCosts, paymentMethods, upcoming, topEquipment,
+    totalCosts, paymentMethods, upcoming, topEquipment, equipmentByCategory,
     historicalSummary, utilityTotals, capexTotal,
   });
 }

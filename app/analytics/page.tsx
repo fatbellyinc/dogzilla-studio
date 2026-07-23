@@ -12,6 +12,7 @@ interface AnalyticsData {
   paymentMethods: { method: string; count: number; total: number }[];
   upcoming: number;
   topEquipment: { name: string; times: number; revenue: number }[];
+  equipmentByCategory: { category: string; items: { name: string; times: number; revenue: number }[] }[];
   historicalSummary: { year: number; revenue: number; shoots: number }[];
   utilityTotals: { account: string; total: number }[];
   capexTotal: number;
@@ -19,6 +20,12 @@ interface AnalyticsData {
 
 const RATE_LABELS: Record<string, string> = { setup: 'Set-Up Day', fullday: 'Full Day', hourly: 'Hourly', event: 'Event' };
 const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const EQUIPMENT_CATEGORY_LABELS: Record<string, string> = {
+  camera: 'Camera Bodies', lens: 'Lenses', lighting: 'Lights — LED', lighting_old: 'Lights — Old School',
+  grip: 'Grip', tripod: 'Tripods', audio: 'Audio', monitor: 'Monitors & Wireless', rigging: 'Camera/Rigging Accessories',
+  misc: 'Miscellaneous', crew: 'Crew',
+  package: 'Packages', addon: 'Add-ons', manpower: 'Personnel', custom: 'Custom Items', other: 'Other',
+};
 
 function BarChart({ data, valueKey, labelKey, color = '#E32726' }: {
   data: Record<string, unknown>[]; valueKey: string; labelKey: string; color?: string;
@@ -48,6 +55,12 @@ function BarChart({ data, valueKey, labelKey, color = '#E32726' }: {
 export default function AnalyticsPage() {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [exportMonth, setExportMonth] = useState('');
+  const [collapsedCats, setCollapsedCats] = useState<Set<string>>(new Set());
+  const toggleCat = (cat: string) => setCollapsedCats(prev => {
+    const next = new Set(prev);
+    if (next.has(cat)) next.delete(cat); else next.add(cat);
+    return next;
+  });
 
   useEffect(() => { fetch('/api/analytics').then(r => r.json()).then(setData); }, []);
 
@@ -58,7 +71,7 @@ export default function AnalyticsPage() {
 
   if (!data) return <div className="flex items-center justify-center h-64 text-white/30 pt-14 md:pt-0">Loading analytics...</div>;
 
-  const { totals, totalCosts, monthlyRevenue, monthlyCosts, rateBreakdown, topClients, topEquipment, paymentMethods, upcoming, historicalSummary, utilityTotals, capexTotal } = data;
+  const { totals, totalCosts, monthlyRevenue, monthlyCosts, rateBreakdown, topClients, topEquipment, equipmentByCategory, paymentMethods, upcoming, historicalSummary, utilityTotals, capexTotal } = data;
   const UTILITY_LABELS: Record<string, string> = { elec_studio: 'Studio Electricity', elec_aux: 'Auxiliary Electricity', water: 'Water', internet: 'Internet', other: 'Other' };
   const totalHistoricalRevenue = historicalSummary.reduce((s, y) => s + y.revenue, 0);
   const grossRev = totals.gross_revenue || 0;
@@ -191,12 +204,12 @@ export default function AnalyticsPage() {
           )}
         </div>
 
-        {/* Top equipment */}
+        {/* Top equipment — overall top 5, full breakdown by category is below */}
         <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4">
           <h2 className="text-sm font-semibold text-white mb-3">Most Rented Equipment</h2>
           {topEquipment.length === 0 ? <p className="text-white/30 text-sm py-4 text-center">No data yet</p> : (
             <div className="space-y-2">
-              {topEquipment.map((e, i) => (
+              {topEquipment.slice(0, 5).map((e, i) => (
                 <div key={i} className="flex items-center justify-between">
                   <div>
                     <div className="text-xs text-white leading-tight truncate max-w-[160px]">{e.name}</div>
@@ -205,6 +218,7 @@ export default function AnalyticsPage() {
                   <span className="text-xs text-white/50">{formatPHP(e.revenue)}</span>
                 </div>
               ))}
+              <p className="text-[10px] text-white/20 pt-1">Full ranking by category ↓</p>
             </div>
           )}
         </div>
@@ -226,6 +240,51 @@ export default function AnalyticsPage() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Equipment rentals — full ranking, grouped by category */}
+      <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4 mb-4 min-w-0">
+        <h2 className="text-sm font-semibold text-white mb-3">Equipment Rentals by Category</h2>
+        {equipmentByCategory.length === 0 ? <p className="text-white/30 text-sm py-4 text-center">No data yet</p> : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {equipmentByCategory.map(cat => {
+              const collapsed = collapsedCats.has(cat.category);
+              const catTotalRentals = cat.items.reduce((s, i) => s + i.times, 0);
+              const catTotalRevenue = cat.items.reduce((s, i) => s + i.revenue, 0);
+              return (
+                <div key={cat.category} className="bg-[#0f0f0f] border border-[#2a2a2a] rounded-lg">
+                  <button onClick={() => toggleCat(cat.category)} className="w-full flex items-center justify-between px-3 py-2.5">
+                    <div className="flex items-center gap-2">
+                      <span className={`text-white/40 text-xs transition-transform ${collapsed ? '' : 'rotate-90'}`}>▶</span>
+                      <span className="text-xs font-semibold text-white">{EQUIPMENT_CATEGORY_LABELS[cat.category] || cat.category}</span>
+                      <span className="text-[10px] text-white/30">({cat.items.length} item{cat.items.length !== 1 ? 's' : ''})</span>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xs text-white/50">{catTotalRentals}× total</div>
+                      <div className="text-[10px] text-white/30">{formatPHP(catTotalRevenue)}</div>
+                    </div>
+                  </button>
+                  {!collapsed && (
+                    <div className="px-3 pb-3 space-y-1.5">
+                      {cat.items.map((e, i) => (
+                        <div key={e.name} className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-white/20 text-[10px] font-bold w-4 shrink-0">#{i + 1}</span>
+                            <span className="text-xs text-white truncate">{e.name}</span>
+                          </div>
+                          <div className="flex items-center gap-3 shrink-0">
+                            <span className="text-[10px] text-white/30">{e.times}×</span>
+                            <span className="text-xs text-white/50 w-20 text-right">{formatPHP(e.revenue)}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Historical + Utilities + Capex */}
