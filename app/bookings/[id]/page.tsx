@@ -1169,7 +1169,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
             </div>
           )}
 
-          <OverheadPanel bookingId={Number(id)} totalRevenue={booking.total} hours={booking.studio_rate === 'hourly' ? booking.hours : 10} callTime={callTime} wrapTime={wrapTime} />
+          <OverheadPanel bookingId={Number(id)} totalRevenue={booking.total} hours={booking.studio_rate === 'hourly' ? booking.hours : 10} callTime={callTime} wrapTime={wrapTime} days={(bookingDays || []).filter(d => d.date !== NO_DATE_SENTINEL).map(d => d.date)} />
 
           <ActivityLog bookingId={Number(id)} key={`al-${id}`} />
         </div>

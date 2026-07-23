@@ -362,6 +362,7 @@ function initSchema(db: Database.Database) {
     `ALTER TABLE bookings ADD COLUMN date_tbd INTEGER DEFAULT 0`,
     `ALTER TABLE booking_days ADD COLUMN is_pencil INTEGER DEFAULT 0`,
     `ALTER TABLE booking_equipment ADD COLUMN category TEXT`,
+    `ALTER TABLE booking_costs ADD COLUMN day_date TEXT`,
   ];
   for (const sql of migrations) {
     try { db.exec(sql); } catch { /* column already exists */ }

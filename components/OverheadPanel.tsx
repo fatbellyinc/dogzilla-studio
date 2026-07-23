@@ -10,6 +10,11 @@ interface Props {
   hours?: number;
   callTime?: string | null;
   wrapTime?: string | null;
+  /** Real shoot dates for this booking (excludes the "no date yet" sentinel). When there's more
+   * than one, a day selector lets costs be attributed to the day they were actually incurred —
+   * otherwise a multi-day booking crossing a month boundary dumps everything into the first
+   * day's month in P&L History. */
+  days?: string[];
 }
 
 interface WattageItem { name: string; quantity: number; unit_wattage: number; total_wattage: number; category: string; }
@@ -26,10 +31,15 @@ function parseHours(callTime?: string | null, wrapTime?: string | null): number 
 
 const AC_AREA_KEYS = Object.keys(AC_PRESETS) as ACArea[];
 
-export default function OverheadPanel({ bookingId, totalRevenue, hours = 10, callTime, wrapTime }: Props) {
+export default function OverheadPanel({ bookingId, totalRevenue, hours = 10, callTime, wrapTime, days = [] }: Props) {
   const [costs, setCosts] = useState<BookingCost[]>([]);
   const [wattage, setWattage] = useState<WattageData>({ items: [], totalW: 0 });
   const [tab, setTab] = useState<'personnel' | 'electricity' | 'custom'>('personnel');
+
+  // '' = "All days" (legacy, day_date null) — only meaningful to show when the booking spans
+  // more than one date.
+  const [selectedDay, setSelectedDay] = useState<string>('');
+  const fmtDay = (d: string) => new Date(d + 'T00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
   // Inline edit state
   const [editingCostId, setEditingCostId] = useState<number | null>(null);
@@ -87,34 +97,37 @@ export default function OverheadPanel({ bookingId, totalRevenue, hours = 10, cal
   const elecTotal = elecLines.reduce((s, l) => s + l.cost, 0);
 
   async function saveElectricityCosts(hrs: number, areas: Set<ACArea>, inclEquip: boolean) {
-    await fetch(`/api/booking-costs?booking_id=${bookingId}&type=electricity`, { method: 'DELETE' });
+    const dayParam = selectedDay ? `&day_date=${selectedDay}` : '';
+    await fetch(`/api/booking-costs?booking_id=${bookingId}&type=electricity${dayParam}`, { method: 'DELETE' });
     const lines = computeElecCosts(hrs, areas, inclEquip);
     for (const line of lines) {
       await fetch('/api/booking-costs', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ booking_id: bookingId, type: 'electricity', description: line.description, quantity: 1, unit_cost: line.cost }),
+        body: JSON.stringify({ booking_id: bookingId, type: 'electricity', description: line.description, quantity: 1, unit_cost: line.cost, day_date: selectedDay || null }),
       });
     }
     load();
   }
 
-  // Auto-replace electricity costs when hours change (only after first mount, only if costs exist)
+  // Auto-replace electricity costs when hours change (only after first mount, only if costs
+  // already exist for the currently-selected day)
   useEffect(() => {
     if (!mountedRef.current) { mountedRef.current = true; return; }
-    if (costsRef.current.some(c => c.type === 'electricity')) {
+    if (costsRef.current.some(c => c.type === 'electricity' && (c.day_date || '') === selectedDay)) {
       saveElectricityCosts(elecHrs, activeAreas, includeEquipment);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [elecHrs]);
 
   async function addPersonnelCosts() {
-    await fetch(`/api/booking-costs?booking_id=${bookingId}&type=personnel`, { method: 'DELETE' });
+    const dayParam = selectedDay ? `&day_date=${selectedDay}` : '';
+    await fetch(`/api/booking-costs?booking_id=${bookingId}&type=personnel${dayParam}`, { method: 'DELETE' });
     const entries = (Object.entries(personnel) as [PersonnelType, number][]).filter(([, qty]) => qty > 0);
     for (const [type, qty] of entries) {
       const rate = PERSONNEL_RATES[type];
       await fetch('/api/booking-costs', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ booking_id: bookingId, type: 'personnel', description: rate.label, quantity: qty, unit_cost: rate.rate }),
+        body: JSON.stringify({ booking_id: bookingId, type: 'personnel', description: rate.label, quantity: qty, unit_cost: rate.rate, day_date: selectedDay || null }),
       });
     }
     load();
@@ -124,7 +137,7 @@ export default function OverheadPanel({ bookingId, totalRevenue, hours = 10, cal
     if (!custom.description || !custom.unit_cost) return;
     await fetch('/api/booking-costs', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ booking_id: bookingId, type: 'other', description: custom.description, quantity: Number(custom.quantity) || 1, unit_cost: Number(custom.unit_cost) }),
+      body: JSON.stringify({ booking_id: bookingId, type: 'other', description: custom.description, quantity: Number(custom.quantity) || 1, unit_cost: Number(custom.unit_cost), day_date: selectedDay || null }),
     });
     setCustom({ description: '', quantity: '1', unit_cost: '' });
     load();
@@ -154,7 +167,9 @@ export default function OverheadPanel({ bookingId, totalRevenue, hours = 10, cal
   const profit = totalRevenue - totalCosts;
   const margin = totalRevenue > 0 ? ((profit / totalRevenue) * 100).toFixed(1) : '0';
   const personnelPreview = (Object.entries(personnel) as [PersonnelType, number][]).reduce((s, [k, q]) => s + PERSONNEL_RATES[k].rate * q, 0);
-  const hasElecCosts = costs.some(c => c.type === 'electricity');
+  const hasElecCosts = costs.some(c => c.type === 'electricity' && (c.day_date || '') === selectedDay);
+  const hasPersonnelCosts = costs.some(c => c.type === 'personnel' && (c.day_date || '') === selectedDay);
+  const realDays = [...new Set(days)].sort();
 
   return (
     <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4">
@@ -206,7 +221,12 @@ export default function OverheadPanel({ bookingId, totalRevenue, hours = 10, cal
                 <div className="flex items-center justify-between">
                   <div className="flex-1 min-w-0">
                     <div className="text-xs text-white truncate">{c.description}</div>
-                    <div className="text-[10px] text-white/30">{c.type}{c.quantity > 1 ? ` · qty ${c.quantity}` : ''}</div>
+                    <div className="text-[10px] text-white/30">
+                      {c.type}{c.quantity > 1 ? ` · qty ${c.quantity}` : ''}
+                      {realDays.length > 1 && (
+                        <span className={c.day_date ? 'text-blue-400/70' : 'text-white/20'}> · {c.day_date ? fmtDay(c.day_date) : 'All days'}</span>
+                      )}
+                    </div>
                   </div>
                   <div className="flex items-center gap-2 ml-2 shrink-0">
                     <span className="text-xs text-yellow-400">{formatPHP(c.total_cost)}</span>
@@ -221,6 +241,17 @@ export default function OverheadPanel({ bookingId, totalRevenue, hours = 10, cal
             <span>Total Costs</span>
             <span className="text-yellow-400 font-semibold">{formatPHP(totalCosts)}</span>
           </div>
+        </div>
+      )}
+
+      {/* Day selector — only matters for multi-day bookings, so costs land in the right month */}
+      {realDays.length > 1 && (
+        <div className="mb-3">
+          <div className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Assigning costs to</div>
+          <select value={selectedDay} onChange={e => setSelectedDay(e.target.value)} className={ic + ' w-full'}>
+            <option value="">All days (whole booking)</option>
+            {realDays.map(d => <option key={d} value={d}>{fmtDay(d)}</option>)}
+          </select>
         </div>
       )}
 
@@ -255,7 +286,7 @@ export default function OverheadPanel({ bookingId, totalRevenue, hours = 10, cal
             <span className="text-yellow-400">{formatPHP(personnelPreview)}</span>
           </div>
           <button onClick={addPersonnelCosts} className="w-full bg-[#E32726] text-white text-xs py-1.5 rounded font-medium">
-            {costs.some(c => c.type === 'personnel') ? '↺ Replace Staff Costs' : 'Add Staff Costs'}
+            {hasPersonnelCosts ? '↺ Replace Staff Costs' : 'Add Staff Costs'}
           </button>
         </div>
       )}

@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
       const varCosts = (db.prepare(`
         SELECT COALESCE(SUM(bc.total_cost),0) as total FROM booking_costs bc
         JOIN bookings b ON b.id=bc.booking_id
-        WHERE strftime('%Y-%m', b.booking_date) = ? AND b.status = 'completed'
+        WHERE strftime('%Y-%m', COALESCE(bc.day_date, b.booking_date)) = ? AND b.status = 'completed'
           AND NOT (
             bc.type = 'personnel' AND bc.description = 'Studio Crew'
             AND EXISTS (SELECT 1 FROM booking_crew crew WHERE crew.booking_id = bc.booking_id)

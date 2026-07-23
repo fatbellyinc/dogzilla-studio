@@ -128,6 +128,9 @@ export interface BookingCost {
   quantity: number;
   unit_cost: number;
   total_cost: number;
+  /** If set, this cost applies to a specific shoot day rather than the whole booking —
+   * used to attribute costs to the correct month when a booking spans a month boundary. */
+  day_date?: string | null;
 }
 
 export interface BlockoutDate {
