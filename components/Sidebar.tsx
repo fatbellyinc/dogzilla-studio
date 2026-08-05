@@ -18,6 +18,12 @@ const NAV_GROUPS = [
     ],
   },
   {
+    label: 'Production',
+    items: [
+      { href: '/projects', label: 'Projects', icon: '🎬' },
+    ],
+  },
+  {
     label: 'Clients & Equipment',
     items: [
       { href: '/clients', label: 'Clients', icon: '👥' },

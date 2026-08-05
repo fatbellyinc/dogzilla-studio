@@ -133,6 +133,58 @@ export interface BookingCost {
   day_date?: string | null;
 }
 
+export const PROJECT_CATEGORIES = [
+  'pre_production', 'production_personnel', 'raw_stock', 'equipment', 'set_props_location',
+  'talents', 'celebrity_entourage', 'food_transpo', 'sanitation', 'post_production', 'others',
+] as const;
+export type ProjectCategory = typeof PROJECT_CATEGORIES[number];
+
+export const PROJECT_CATEGORY_LABELS: Record<ProjectCategory, string> = {
+  pre_production: 'Pre-Production',
+  production_personnel: 'Production Personnel',
+  raw_stock: 'Raw Stock & Laboratory Charges',
+  equipment: 'Equipment Rental',
+  set_props_location: 'Set, Props, Wardrobe & Location',
+  talents: 'Talents',
+  celebrity_entourage: 'Celebrity Entourage Fees',
+  food_transpo: 'Food & Transportation',
+  sanitation: 'Sanitation & Pre-Testing',
+  post_production: 'Post Production',
+  others: 'Others',
+};
+
+export const PROJECT_STATUSES = ['draft', 'quoted', 'won', 'lost', 'in_production', 'completed'] as const;
+export type ProjectStatus = typeof PROJECT_STATUSES[number];
+
+export interface Project {
+  id: number;
+  quote_number: string | null;
+  name: string;
+  client_name: string | null;
+  client_company: string | null;
+  client_title: string | null;
+  description: string | null;
+  status: ProjectStatus;
+  markup_pct_dp: number;
+  markup_pct_no_dp: number;
+  vat_exempt: number;
+  cost_exclusions: string | null;
+  payment_terms: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface ProjectCost {
+  id: number;
+  project_id: number;
+  category: ProjectCategory;
+  description: string;
+  note: string | null;
+  internal_cost: number;
+  client_cost: number;
+  sort_order: number;
+}
+
 export interface BlockoutDate {
   id: number;
   date: string;

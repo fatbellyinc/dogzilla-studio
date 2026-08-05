@@ -150,6 +150,39 @@ function initSchema(db: Database.Database) {
       total_cost REAL NOT NULL
     );
 
+    -- Full video-production project budgets (director/crew/post jobs Dogzilla produces,
+    -- as opposed to studio-rental bookings). Tracks internal cost separately from what's
+    -- billed to the client so a markup/VAT-inclusive Cost Estimate/Quotation can be
+    -- generated without ever exposing internal numbers.
+    CREATE TABLE IF NOT EXISTS projects (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      quote_number TEXT,
+      name TEXT NOT NULL,
+      client_name TEXT,
+      client_company TEXT,
+      client_title TEXT,
+      description TEXT,
+      status TEXT NOT NULL DEFAULT 'draft',
+      markup_pct_dp REAL NOT NULL DEFAULT 10,
+      markup_pct_no_dp REAL NOT NULL DEFAULT 15,
+      vat_exempt INTEGER DEFAULT 0,
+      cost_exclusions TEXT,
+      payment_terms TEXT,
+      notes TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS project_costs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      category TEXT NOT NULL,
+      description TEXT NOT NULL,
+      note TEXT,
+      internal_cost REAL NOT NULL DEFAULT 0,
+      client_cost REAL NOT NULL DEFAULT 0,
+      sort_order INTEGER DEFAULT 0
+    );
+
     CREATE TABLE IF NOT EXISTS blockout_dates (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       date TEXT NOT NULL,

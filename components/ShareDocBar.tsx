@@ -4,7 +4,7 @@ import { toPng } from 'html-to-image';
 
 interface Props {
   bookingId: number;
-  docType: 'invoice' | 'quotation' | 'ack' | 'receipt';
+  docType: 'invoice' | 'quotation' | 'ack' | 'receipt' | 'project';
   clientName: string;
   clientPhone?: string | null;
   clientEmail?: string | null;
@@ -13,7 +13,7 @@ interface Props {
   captureSelector?: string;
 }
 
-const DOC_LABELS = { invoice: 'Invoice', quotation: 'Quotation', ack: 'Acknowledgement Receipt', receipt: 'Payment Receipt' };
+const DOC_LABELS = { invoice: 'Invoice', quotation: 'Quotation', ack: 'Acknowledgement Receipt', receipt: 'Payment Receipt', project: 'Cost Estimate' };
 
 export default function ShareDocBar({ bookingId, docType, clientName, clientPhone, clientEmail, docNumber, captureSelector = '.doc-page' }: Props) {
   const [status, setStatus] = useState('');
