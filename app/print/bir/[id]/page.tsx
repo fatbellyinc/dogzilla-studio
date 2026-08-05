@@ -177,7 +177,9 @@ export default function BIRInvoicePage({ params }: { params: Promise<{ id: strin
   const inp: React.CSSProperties = { background: 'transparent', border: 'none', outline: 'none', width: '100%', fontSize: '11px', fontFamily: 'Arial' };
 
   return (
-    <div style={{ background: 'white', color: '#111', fontFamily: 'Arial, sans-serif', maxWidth: '794px', margin: '0 auto', padding: '20px', fontSize: '11px' }}>
+    <div style={docType === 'ack'
+      ? { color: '#111', fontFamily: 'Arial, sans-serif' }
+      : { background: 'white', color: '#111', fontFamily: 'Arial, sans-serif', maxWidth: '794px', margin: '0 auto', padding: '20px', fontSize: '11px' }}>
 
       <BackButton fallbackHref={`/bookings/${id}`} />
 
@@ -219,81 +221,87 @@ export default function BIRInvoicePage({ params }: { params: Promise<{ id: strin
       {/* BIR INVOICE — matches physical book exactly    */}
       {/* ══════════════════════════════════════════════ */}
       {docType === 'ack' ? (
-        /* ─── ACKNOWLEDGEMENT RECEIPT (no VAT breakdown) ─── */
-        <div className="doc-page" style={{ border: '2px solid #333', padding: '20px 24px', maxWidth: '480px', margin: '0 auto', background: 'white' }}>
-          {/* Header */}
-          <div style={{ textAlign: 'center', borderBottom: '2px solid #E32726', paddingBottom: '12px', marginBottom: '16px' }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.png" alt="Dogzilla" style={{ width: '70px', height: '70px', objectFit: 'contain', margin: '0 auto 6px' }} />
-            <div style={{ fontSize: '16px', fontWeight: 900, textTransform: 'uppercase' }}>DOGZILLA FILM PRODUCTION</div>
-            <div style={{ fontSize: '10px', color: '#555' }}>102 7th St. Barangay 89 Grace Park 1400 City of Caloocan NCR, Third District Philippines</div>
-            <div style={{ fontSize: '11px', fontWeight: 700, marginTop: '2px' }}>ALBERTO C. MONTERAS II - Prop.</div>
-            <div style={{ fontSize: '10px' }}>VAT Reg. TIN: 238-839-234-00001</div>
-          </div>
-          <div style={{ fontSize: '16px', fontWeight: 900, textTransform: 'uppercase', marginBottom: '12px' }}>ACKNOWLEDGEMENT RECEIPT</div>
-          <div style={{ fontSize: '11px', textAlign: 'right', marginBottom: '12px' }}>
-            Date: <input value={invoiceDate} onChange={e => setInvoiceDate(e.target.value)} style={{ border: 'none', borderBottom: '1px solid #666', outline: 'none', width: '120px', fontSize: '11px' }} />
-          </div>
-          <div style={{ fontSize: '11px', marginBottom: '8px' }}>
-            Received from: <input style={{ border: 'none', borderBottom: '1px solid #666', outline: 'none', width: '220px', fontSize: '11px', fontWeight: 700 }} defaultValue={booking.client_name} />
-          </div>
-          <div style={{ fontSize: '11px', marginBottom: '12px' }}>
-            Address: <input style={{ border: 'none', borderBottom: '1px solid #666', outline: 'none', width: '280px', fontSize: '11px' }} defaultValue={data.booking.client_address || ''} />
-          </div>
-          {/* Line items */}
-          <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '12px' }}>
-            <thead>
-              <tr style={{ background: '#f0f0f0' }}>
-                <th style={{ border: '1px solid #ccc', padding: '4px 8px', fontSize: '11px', textAlign: 'left' }}>Description</th>
-                <th style={{ border: '1px solid #ccc', padding: '4px 8px', fontSize: '11px', textAlign: 'right', width: '100px' }}>Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              {lines.map((line, i) => (
-                <tr key={i}>
-                  <td style={{ border: '1px solid #ccc', padding: '6px 8px', fontSize: '11px' }}>
-                    <input value={line.desc} onChange={e => updateLine(i, 'desc', e.target.value)} style={{ border: 'none', outline: 'none', width: '100%', fontSize: '11px' }} />
-                  </td>
-                  <td style={{ border: '1px solid #ccc', padding: '6px 8px', fontSize: '11px', textAlign: 'right', fontWeight: 600 }}>
-                    {php((parseFloat(line.qty) || 1) * (parseFloat(line.unitCost) || 0))}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {/* Total */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '2px solid #333', paddingTop: '8px', marginBottom: '16px' }}>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '9px', color: '#888' }}>{vatExempt ? 'No VAT' : 'VAT-inclusive'}</div>
-              <div style={{ fontSize: '14px', fontWeight: 900 }}>TOTAL: <span style={{ color: '#E32726' }}>₱{ackTotal.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span></div>
-            </div>
-          </div>
-          {/* Payment method */}
-          <div style={{ marginBottom: '16px', fontSize: '11px' }}>
-            Payment: <select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)} style={{ border: '1px solid #ccc', borderRadius: '3px', padding: '2px 6px', fontSize: '11px' }}>
-              <option value="">—</option>
-              <option value="Cash">Cash</option>
-              <option value="GCash">GCash</option>
-              <option value="Bank Transfer">Bank Transfer</option>
-              <option value="Check">Check</option>
-            </select>
-            {paymentMethod === 'Check' && <>&nbsp;Check No: <input value={checkNo} onChange={e => setCheckNo(e.target.value)} style={{ border: 'none', borderBottom: '1px solid #666', outline: 'none', width: '100px', fontSize: '11px' }} /></>}
-          </div>
-          {/* Signature */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px', marginTop: '24px' }}>
-            <div>
-              <div style={{ borderTop: '1px solid #333', paddingTop: '4px', fontSize: '10px', color: '#888' }}>Received by — Client</div>
-            </div>
-            <div>
+        /* ─── ACKNOWLEDGEMENT RECEIPT (no VAT breakdown) — standard A4/Letter page,
+           matching the Invoice/Quotation page shell so print and Copy/Share Image
+           behave the same way everywhere. ─── */
+        <div className="doc-shell" style={{ background: '#d1d5db', minHeight: '100vh', padding: '32px 16px', display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
+          <div className="doc-page" style={{ background: 'white', width: '100%', maxWidth: '794px', boxShadow: '0 4px 24px rgba(0,0,0,0.18)', padding: '48px', fontSize: '13px', fontFamily: 'Arial, sans-serif', color: '#111' }}>
+            {/* Header */}
+            <div className="doc-header" style={{ textAlign: 'center', borderBottom: '3px solid #E32726', paddingBottom: '20px', marginBottom: '24px' }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/signature.jpg" alt="Signature" style={{ height: '32px', objectFit: 'contain', display: 'block' }} />
-              <div style={{ borderTop: '1px solid #333', paddingTop: '4px', fontSize: '10px', color: '#888' }}>Issued by — Dogzilla</div>
+              <img src="/logo.png" alt="Dogzilla" style={{ width: '90px', height: '90px', objectFit: 'contain', margin: '0 auto 8px' }} />
+              <div style={{ fontSize: '20px', fontWeight: 900, textTransform: 'uppercase' }}>DOGZILLA FILM PRODUCTION</div>
+              <div style={{ fontSize: '12px', color: '#555' }}>102 7th St. Barangay 89 Grace Park 1400 City of Caloocan NCR, Third District Philippines</div>
+              <div style={{ fontSize: '13px', fontWeight: 700, marginTop: '4px' }}>ALBERTO C. MONTERAS II - Prop.</div>
+              <div style={{ fontSize: '12px' }}>VAT Reg. TIN: 238-839-234-00001</div>
             </div>
-          </div>
-          {/* Copyright + footer */}
-          <div style={{ marginTop: '16px', borderTop: '1px solid #e5e5e5', paddingTop: '8px', fontSize: '9px', color: '#aaa', textAlign: 'center' }}>
-            <div>This is NOT a BIR Official Receipt. For acknowledgement purposes only.</div>
-            <div style={{ marginTop: '3px' }}>© Alberto Monteras II · Dogzilla Films · dogzillafilms.com · +63 939 933 8732</div>
+            <div style={{ fontSize: '20px', fontWeight: 900, textTransform: 'uppercase', marginBottom: '16px' }}>ACKNOWLEDGEMENT RECEIPT</div>
+            <div style={{ fontSize: '13px', textAlign: 'right', marginBottom: '16px' }}>
+              Date: <input value={invoiceDate} onChange={e => setInvoiceDate(e.target.value)} style={{ border: 'none', borderBottom: '1px solid #666', outline: 'none', width: '140px', fontSize: '13px' }} />
+            </div>
+            <div style={{ fontSize: '13px', marginBottom: '10px' }}>
+              Received from: <input style={{ border: 'none', borderBottom: '1px solid #666', outline: 'none', width: '320px', fontSize: '13px', fontWeight: 700 }} defaultValue={booking.client_name} />
+            </div>
+            <div style={{ fontSize: '13px', marginBottom: '16px' }}>
+              Address: <input style={{ border: 'none', borderBottom: '1px solid #666', outline: 'none', width: '420px', fontSize: '13px' }} defaultValue={data.booking.client_address || ''} />
+            </div>
+            {/* Line items */}
+            <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '16px' }}>
+              <thead>
+                <tr style={{ background: '#f0f0f0' }}>
+                  <th style={{ border: '1px solid #ccc', padding: '6px 10px', fontSize: '13px', textAlign: 'left' }}>Description</th>
+                  <th style={{ border: '1px solid #ccc', padding: '6px 10px', fontSize: '13px', textAlign: 'right', width: '140px' }}>Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lines.map((line, i) => (
+                  <tr key={i}>
+                    <td style={{ border: '1px solid #ccc', padding: '8px 10px', fontSize: '13px' }}>
+                      <input value={line.desc} onChange={e => updateLine(i, 'desc', e.target.value)} style={{ border: 'none', outline: 'none', width: '100%', fontSize: '13px' }} />
+                    </td>
+                    <td style={{ border: '1px solid #ccc', padding: '8px 10px', fontSize: '13px', textAlign: 'right', fontWeight: 600 }}>
+                      {php((parseFloat(line.qty) || 1) * (parseFloat(line.unitCost) || 0))}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {/* Total */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '2px solid #333', paddingTop: '10px', marginBottom: '20px' }}>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: '10px', color: '#888' }}>{vatExempt ? 'No VAT' : 'VAT-inclusive'}</div>
+                <div style={{ fontSize: '18px', fontWeight: 900 }}>TOTAL: <span style={{ color: '#E32726' }}>₱{ackTotal.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span></div>
+              </div>
+            </div>
+            {/* Payment method */}
+            <div style={{ marginBottom: '20px', fontSize: '13px' }}>
+              Payment: <select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)} style={{ border: '1px solid #ccc', borderRadius: '3px', padding: '3px 8px', fontSize: '13px' }}>
+                <option value="">—</option>
+                <option value="Cash">Cash</option>
+                <option value="GCash">GCash</option>
+                <option value="Bank Transfer">Bank Transfer</option>
+                <option value="Check">Check</option>
+              </select>
+              {paymentMethod === 'Check' && <>&nbsp;Check No: <input value={checkNo} onChange={e => setCheckNo(e.target.value)} style={{ border: 'none', borderBottom: '1px solid #666', outline: 'none', width: '120px', fontSize: '13px' }} /></>}
+            </div>
+            {/* Signature + footer — kept together at bottom, matches Invoice/Quotation */}
+            <div className="doc-footer">
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '40px', marginTop: '32px' }}>
+                <div>
+                  <div style={{ borderTop: '1px solid #333', paddingTop: '6px', fontSize: '11px', color: '#888' }}>Received by — Client</div>
+                </div>
+                <div>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/signature.jpg" alt="Signature" style={{ height: '40px', objectFit: 'contain', display: 'block' }} />
+                  <div style={{ borderTop: '1px solid #333', paddingTop: '6px', fontSize: '11px', color: '#888' }}>Issued by — Dogzilla</div>
+                </div>
+              </div>
+              {/* Copyright + footer */}
+              <div style={{ marginTop: '24px', borderTop: '1px solid #e5e5e5', paddingTop: '10px', fontSize: '10px', color: '#aaa', textAlign: 'center' }}>
+                <div>This is NOT a BIR Official Receipt. For acknowledgement purposes only.</div>
+                <div style={{ marginTop: '3px' }}>© Alberto Monteras II · Dogzilla Films · dogzillafilms.com · +63 939 933 8732</div>
+              </div>
+            </div>
           </div>
         </div>
       ) : (
