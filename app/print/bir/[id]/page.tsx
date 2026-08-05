@@ -1,7 +1,7 @@
 'use client';
 import { use, useEffect, useState } from 'react';
 import { formatDate } from '@/lib/utils';
-import { Booking, BookingEquipment, STUDIO_RATES } from '@/lib/types';
+import { Booking, BookingEquipment, STUDIO_RATES, VAT_RATE } from '@/lib/types';
 import ShareDocBar from '@/components/ShareDocBar';
 import BackButton from '@/components/BackButton';
 
@@ -128,6 +128,17 @@ export default function BIRInvoicePage({ params }: { params: Promise<{ id: strin
           initial.push({ qty: String(e.quantity), unit: 'day', desc, unitCost: String(effectiveRate) });
         }
       }
+      // Overtime and the booking-level discount both feed into booking.total (see
+      // recomputeBookingTotals in lib/booking-calc.ts) but were missing here, so this
+      // document's total silently drifted from the Invoice/Quotation/booking page total.
+      // Adding them as real lines keeps the printable total in sync with everywhere else.
+      if (d.booking.overtime_amount > 0) {
+        initial.push({ qty: '1', unit: '', desc: 'Overtime', unitCost: String(d.booking.overtime_amount) });
+      }
+      if (d.booking.discount_amount > 0) {
+        const discLabel = d.booking.discount_type === 'percent' ? `Discount (${d.booking.discount_value}% off)` : 'Discount';
+        initial.push({ qty: '1', unit: '', desc: discLabel, unitCost: String(-d.booking.discount_amount) });
+      }
       setLines(initial.length > 0 ? initial : [{ qty: '', unit: '', desc: '', unitCost: '' }]);
       // Invoice number from OR number
       if (d.invoice?.or_number) setInvoiceNo(d.invoice.or_number.replace(/\D/g, '').padStart(4, '0'));
@@ -152,6 +163,9 @@ export default function BIRInvoicePage({ params }: { params: Promise<{ id: strin
   }, 0);
 
   const calc = birCalc(grossTotal, vatExempt, scPwd, withholding);
+  // Acknowledgement Receipt has no VAT breakdown table, but the headline total still needs to
+  // be VAT-inclusive to match the Invoice/Quotation/booking page — grossTotal here is net of VAT.
+  const ackTotal = vatExempt ? grossTotal : grossTotal * (1 + VAT_RATE);
 
   function addLine() { setLines(l => [...l, { qty: '', unit: '', desc: '', unitCost: '' }]); }
   function updateLine(i: number, field: string, val: string) { setLines(l => l.map((line, idx) => idx === i ? { ...line, [field]: val } : line)); }
@@ -216,10 +230,7 @@ export default function BIRInvoicePage({ params }: { params: Promise<{ id: strin
             <div style={{ fontSize: '11px', fontWeight: 700, marginTop: '2px' }}>ALBERTO C. MONTERAS II - Prop.</div>
             <div style={{ fontSize: '10px' }}>VAT Reg. TIN: 238-839-234-00001</div>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', alignItems: 'center' }}>
-            <div style={{ fontSize: '16px', fontWeight: 900, textTransform: 'uppercase' }}>ACKNOWLEDGEMENT RECEIPT</div>
-            <div style={{ fontSize: '20px', fontWeight: 900, color: '#E32726' }}>No. {invoiceNo || '____'}</div>
-          </div>
+          <div style={{ fontSize: '16px', fontWeight: 900, textTransform: 'uppercase', marginBottom: '12px' }}>ACKNOWLEDGEMENT RECEIPT</div>
           <div style={{ fontSize: '11px', textAlign: 'right', marginBottom: '12px' }}>
             Date: <input value={invoiceDate} onChange={e => setInvoiceDate(e.target.value)} style={{ border: 'none', borderBottom: '1px solid #666', outline: 'none', width: '120px', fontSize: '11px' }} />
           </div>
@@ -253,7 +264,8 @@ export default function BIRInvoicePage({ params }: { params: Promise<{ id: strin
           {/* Total */}
           <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '2px solid #333', paddingTop: '8px', marginBottom: '16px' }}>
             <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '14px', fontWeight: 900 }}>TOTAL: <span style={{ color: '#E32726' }}>₱{grossTotal.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span></div>
+              <div style={{ fontSize: '9px', color: '#888' }}>{vatExempt ? 'No VAT' : 'VAT-inclusive'}</div>
+              <div style={{ fontSize: '14px', fontWeight: 900 }}>TOTAL: <span style={{ color: '#E32726' }}>₱{ackTotal.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span></div>
             </div>
           </div>
           {/* Payment method */}
@@ -273,6 +285,8 @@ export default function BIRInvoicePage({ params }: { params: Promise<{ id: strin
               <div style={{ borderTop: '1px solid #333', paddingTop: '4px', fontSize: '10px', color: '#888' }}>Received by — Client</div>
             </div>
             <div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/signature.jpg" alt="Signature" style={{ height: '32px', objectFit: 'contain', display: 'block' }} />
               <div style={{ borderTop: '1px solid #333', paddingTop: '4px', fontSize: '10px', color: '#888' }}>Issued by — Dogzilla</div>
             </div>
           </div>
@@ -486,7 +500,9 @@ export default function BIRInvoicePage({ params }: { params: Promise<{ id: strin
             <div>Date of Accreditation: 02/22/2024 · Expiry: 02/21/2029</div>
           </div>
           <div style={{ textAlign: 'right' }}>
-            <div style={{ marginBottom: '24px' }}>BY:</div>
+            <div style={{ marginBottom: '2px' }}>BY:</div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/signature.jpg" alt="Signature" style={{ height: '28px', objectFit: 'contain', marginLeft: 'auto' }} />
             <div style={{ borderTop: '1px solid #333', paddingTop: '2px' }}>Cashier/Authorized Representative</div>
           </div>
         </div>

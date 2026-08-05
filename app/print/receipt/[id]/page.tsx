@@ -1,6 +1,7 @@
 'use client';
 import { use, useEffect, useState } from 'react';
 import { formatPHP, formatDate, STUDIO_WHATSAPP } from '@/lib/utils';
+import { VAT_RATE } from '@/lib/types';
 import ShareDocBar from '@/components/ShareDocBar';
 import BackButton from '@/components/BackButton';
 
@@ -34,6 +35,10 @@ export default function ReceiptPage({ params }: { params: Promise<{ id: string }
   );
 
   const { payment, booking } = data;
+  // booking.total is the stored VAT-exclusive figure — every other document (Invoice, Quotation,
+  // booking page) headlines the VAT-inclusive total, so this needs the same treatment or it
+  // reads as a different, smaller number for the same booking.
+  const totalIncVAT = booking.vat_exempt ? booking.total : booking.total * (1 + VAT_RATE);
   // Deposits get an Acknowledgement Receipt (AR); full/balance payments get an Official Receipt (OR)
   const isDeposit = payment.type === 'deposit';
   const receiptPrefix = isDeposit ? 'AR' : 'OR';
@@ -101,8 +106,8 @@ export default function ReceiptPage({ params }: { params: Promise<{ id: string }
           </div>
         )}
         <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '2px solid #E32726' }}>
-          <span style={{ fontWeight: 700, fontSize: '15px' }}>Total Invoice</span>
-          <span style={{ fontWeight: 700 }}>{formatPHP(booking.total)}</span>
+          <span style={{ fontWeight: 700, fontSize: '15px' }}>Total Invoice {booking.vat_exempt ? '(No VAT)' : '(VAT-incl.)'}</span>
+          <span style={{ fontWeight: 700 }}>{formatPHP(totalIncVAT)}</span>
         </div>
       </div>
 
@@ -121,7 +126,10 @@ export default function ReceiptPage({ params }: { params: Promise<{ id: string }
       {/* Signature */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', borderTop: '1px solid #e5e5e5', paddingTop: '16px' }}>
         <div>
-          <div style={{ borderBottom: '1px solid #333', marginBottom: '4px', height: '30px' }} />
+          <div style={{ borderBottom: '1px solid #333', marginBottom: '4px', height: '30px', display: 'flex', alignItems: 'flex-end' }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/signature.jpg" alt="Signature" style={{ height: '28px', objectFit: 'contain' }} />
+          </div>
           <div style={{ fontSize: '10px', color: '#888' }}>Issued by — Dogzilla Studio</div>
         </div>
         <div>
