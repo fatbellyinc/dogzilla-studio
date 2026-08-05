@@ -393,6 +393,8 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
   const [data, setData] = useState<BookingDetail | null>(null);
   const [paymentForm, setPaymentForm] = useState({ amount: '', type: 'deposit', method: '', reference: '' });
   const [showPayment, setShowPayment] = useState(false);
+  const [editingPaymentId, setEditingPaymentId] = useState<number | null>(null);
+  const [editPaymentForm, setEditPaymentForm] = useState({ amount: '', type: 'deposit', method: '', reference: '' });
   const [showDiscount, setShowDiscount] = useState(false);
   const [showOT, setShowOT] = useState(false);
   const [otHours, setOtHours] = useState('1');
@@ -572,6 +574,20 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
   async function deletePayment(paymentId: number, amount: number) {
     if (!confirm(`Delete this ${formatPHP(amount)} payment record? This cannot be undone.`)) return;
     await fetch(`/api/payments/${paymentId}`, { method: 'DELETE' });
+    load();
+  }
+
+  function startEditPayment(p: Payment) {
+    setEditingPaymentId(p.id);
+    setEditPaymentForm({ amount: String(p.amount), type: p.type, method: p.method || '', reference: p.reference || '' });
+  }
+
+  async function saveEditPayment(paymentId: number) {
+    await fetch(`/api/payments/${paymentId}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...editPaymentForm, amount: Number(editPaymentForm.amount) }),
+    });
+    setEditingPaymentId(null);
     load();
   }
 
@@ -1124,14 +1140,39 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
               {payments.length > 0 && (
                 <div className="border-t border-[#2a2a2a] pt-2 space-y-1">
                   {payments.map(p => (
-                    <div key={p.id} className="flex justify-between text-green-400/80 text-xs items-center">
-                      <span>{p.type}{p.method ? ` - ${p.method}` : ''}{p.reference ? ` (${p.reference})` : ''}</span>
-                      <div className="flex items-center gap-2">
-                        <span>{formatPHP(p.amount)}</span>
-                        <Link href={`/print/receipt/${p.id}`} target="_blank" className="text-[10px] text-white/30 hover:text-white border border-white/10 px-1.5 py-0.5 rounded hover:border-white/30 transition-colors">{p.type === 'deposit' ? 'AR' : 'OR'}</Link>
-                        <button onClick={() => deletePayment(p.id, p.amount)} title="Delete this payment record" className="text-[10px] text-white/20 hover:text-[#E32726] border border-white/10 hover:border-[#E32726]/40 px-1.5 py-0.5 rounded transition-colors">✕</button>
+                    editingPaymentId === p.id ? (
+                      <div key={p.id} className="bg-[#0f0f0f] rounded-lg p-2 space-y-1.5">
+                        <div className="flex gap-1.5">
+                          <input value={editPaymentForm.amount} onChange={e => setEditPaymentForm(f => ({ ...f, amount: e.target.value }))}
+                            type="number" placeholder="Amount" className={ic + ' flex-1 text-xs py-1'} />
+                          <select value={editPaymentForm.type} onChange={e => setEditPaymentForm(f => ({ ...f, type: e.target.value }))} className={ic + ' text-xs py-1'}>
+                            <option value="deposit">Deposit</option>
+                            <option value="full">Full</option>
+                            <option value="balance">Balance</option>
+                          </select>
+                        </div>
+                        <div className="flex gap-1.5">
+                          <input value={editPaymentForm.method} onChange={e => setEditPaymentForm(f => ({ ...f, method: e.target.value }))}
+                            placeholder="Method" className={ic + ' flex-1 text-xs py-1'} />
+                          <input value={editPaymentForm.reference} onChange={e => setEditPaymentForm(f => ({ ...f, reference: e.target.value }))}
+                            placeholder="Reference #" className={ic + ' flex-1 text-xs py-1'} />
+                        </div>
+                        <div className="flex gap-1.5 justify-end">
+                          <button onClick={() => setEditingPaymentId(null)} className="text-[10px] text-white/50 border border-[#2a2a2a] px-2 py-1 rounded">Cancel</button>
+                          <button onClick={() => saveEditPayment(p.id)} className="text-[10px] bg-[#E32726] text-white px-2 py-1 rounded font-medium">Save</button>
+                        </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div key={p.id} className="flex justify-between text-green-400/80 text-xs items-center">
+                        <span>{p.type}{p.method ? ` - ${p.method}` : ''}{p.reference ? ` (${p.reference})` : ''}</span>
+                        <div className="flex items-center gap-2">
+                          <span>{formatPHP(p.amount)}</span>
+                          <Link href={`/print/receipt/${p.id}`} target="_blank" className="text-[10px] text-white/30 hover:text-white border border-white/10 px-1.5 py-0.5 rounded hover:border-white/30 transition-colors">{p.type === 'deposit' ? 'AR' : 'OR'}</Link>
+                          <button onClick={() => startEditPayment(p)} title="Edit this payment record" className="text-[10px] text-white/20 hover:text-white border border-white/10 hover:border-white/30 px-1.5 py-0.5 rounded transition-colors">✏</button>
+                          <button onClick={() => deletePayment(p.id, p.amount)} title="Delete this payment record" className="text-[10px] text-white/20 hover:text-[#E32726] border border-white/10 hover:border-[#E32726]/40 px-1.5 py-0.5 rounded transition-colors">✕</button>
+                        </div>
+                      </div>
+                    )
                   ))}
                   <div className="flex justify-between font-semibold mt-1 text-white border-t border-[#2a2a2a] pt-1">
                     <span>Balance</span>
