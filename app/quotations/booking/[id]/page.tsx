@@ -50,6 +50,12 @@ function DocView({ bookingId }: { bookingId: string }) {
   type Line = { code: string; desc: string; qty: number; unit: number; total: number; bold?: boolean; indent?: boolean; comp?: boolean; disc?: number; isCategoryLabel?: boolean; inclusions?: readonly string[]; category?: string | null };
   const lines: Line[] = [];
 
+  // Event-package inclusions (audio/lighting/crew/generator equipment, etc.) are informational,
+  // not billable — they don't belong in the priced line-item table as ₱0 rows. Collected here
+  // instead and rendered as a grouped bullet list right under the priced package rows.
+  const EVT_CATEGORY_ORDER = ['evt_venue', 'evt_audio', 'evt_lighting', 'evt_dj', 'evt_led', 'evt_crew', 'evt_logistics', 'evt_generator'];
+  const inclusionGroups = new Map<string, { qty: number; name: string }[]>();
+
   // Overtime is computed per day from each day's own call/wrap times — a booking-level
   // call_time/wrap_time no longer applies once a booking has more than one day, since each
   // day can run different hours.
@@ -64,7 +70,17 @@ function DocView({ bookingId }: { bookingId: string }) {
   const generalEquipment = equipmentByDay.find(g => g.dayDate === null)?.items ?? [];
 
   function pushEquipmentLines(items: BookingEquipment[]) {
-    const catGroups = groupByCategory(items);
+    // Event-package inclusions never show as table rows — pull them out into the bullet-list
+    // groups below and leave only genuinely billable/priced items for the pricing table.
+    const billable = items.filter(e => !e.category?.startsWith('evt_'));
+    for (const e of items) {
+      if (!e.category?.startsWith('evt_')) continue;
+      const cat = e.category!;
+      if (!inclusionGroups.has(cat)) inclusionGroups.set(cat, []);
+      inclusionGroups.get(cat)!.push({ qty: e.quantity, name: e.name });
+    }
+
+    const catGroups = groupByCategory(billable);
     catGroups.forEach(catGroup => {
       if (catGroups.length > 1) {
         lines.push({ code: '', desc: categoryLabel(catGroup.category), qty: 0, unit: 0, total: 0, isCategoryLabel: true });
@@ -116,8 +132,10 @@ function DocView({ bookingId }: { bookingId: string }) {
       }
       pushEquipmentLines(equipmentForDay(d.date));
     });
-  } else {
-    // Single day
+  } else if (booking.subtotal > 0) {
+    // Single day — skipped entirely when subtotal is 0, which is how an event-package
+    // booking is set up (the venue charge comes from the package's own Venue line, not
+    // from a separate studio-rate line), so it doesn't show a confusing ₱0 studio row.
     lines.push({
       code: booking.studio_rate.toUpperCase(),
       desc: `Studio — ${studioRate.label}${booking.studio_rate === 'hourly' ? ` (${booking.hours} hrs × ${formatPHP(studioRate.price)}/hr)` : ''}`,
@@ -334,7 +352,7 @@ function DocView({ bookingId }: { bookingId: string }) {
                 <div style={{ fontWeight: line.bold ? 700 : 400 }}>{line.desc}</div>
                 {line.comp && (
                   <span style={{ fontSize: '10px', background: '#dcfce7', color: '#166534', padding: '1px 5px', borderRadius: '3px', fontWeight: 700 }}>
-                    {line.category === 'package_item' ? 'INCLUDED IN PACKAGE' : 'COMPLIMENTARY'}
+                    {line.category?.startsWith('evt_') || line.category === 'package_item' ? 'INCLUDED IN PACKAGE' : 'COMPLIMENTARY'}
                   </span>
                 )}
                 {line.inclusions && line.inclusions.length > 0 && (
@@ -359,6 +377,31 @@ function DocView({ bookingId }: { bookingId: string }) {
         </tbody>
       </table>
       </div>{/* end doc-table-scroll */}
+
+      {/* Included Equipment & Services — event-package inclusions, shown as a clean bullet
+          list under the priced Venue/Technical/Generator rows rather than as ₱0 table rows.
+          The package price already represents the value of everything listed here. */}
+      {inclusionGroups.size > 0 && (
+        <div style={{ marginBottom: '16px', padding: '12px 14px', background: '#fafafa', border: '1px solid #eee', borderRadius: '6px' }}>
+          <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: '#888', marginBottom: '8px' }}>
+            Included Equipment &amp; Services
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 24px' }}>
+            {EVT_CATEGORY_ORDER.filter(cat => inclusionGroups.has(cat)).map(cat => (
+              <div key={cat} style={{ breakInside: 'avoid', marginBottom: '8px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: '#333', marginBottom: '2px' }}>{categoryLabel(cat)}</div>
+                <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
+                  {inclusionGroups.get(cat)!.map((it, i) => (
+                    <li key={i} style={{ fontSize: '11px', color: '#555', padding: '1px 0' }}>
+                      {it.qty > 1 ? `${it.qty} × ` : ''}{it.name}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Totals */}
       <div className="doc-totals">

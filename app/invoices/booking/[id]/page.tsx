@@ -60,6 +60,11 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
   type Line = { desc: string; qty: number; unit: number; total: number; bold?: boolean; indent?: boolean; comp?: boolean; disc?: number; isCategoryLabel?: boolean; category?: string | null };
   const lines: Line[] = [];
 
+  // Event-package inclusions are informational, not billable — collected here instead of
+  // added as ₱0 table rows, then rendered as a grouped bullet list under the priced rows.
+  const EVT_CATEGORY_ORDER = ['evt_venue', 'evt_audio', 'evt_lighting', 'evt_dj', 'evt_led', 'evt_crew', 'evt_logistics', 'evt_generator'];
+  const inclusionGroups = new Map<string, { qty: number; name: string }[]>();
+
   // Overtime is computed per day from each day's own call/wrap times — a booking-level
   // call_time/wrap_time no longer applies once a booking has more than one day, since each
   // day can run different hours. Multi-day OT is shown as its own line right under that day.
@@ -74,7 +79,15 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
   const generalEquipment = equipmentByDay.find(g => g.dayDate === null)?.items ?? [];
 
   function pushEquipmentLines(items: BookingEquipment[]) {
-    const catGroups = groupByCategory(items);
+    const billable = items.filter(e => !e.category?.startsWith('evt_'));
+    for (const e of items) {
+      if (!e.category?.startsWith('evt_')) continue;
+      const cat = e.category!;
+      if (!inclusionGroups.has(cat)) inclusionGroups.set(cat, []);
+      inclusionGroups.get(cat)!.push({ qty: e.quantity, name: e.name });
+    }
+
+    const catGroups = groupByCategory(billable);
     catGroups.forEach(catGroup => {
       if (catGroups.length > 1) {
         lines.push({ desc: categoryLabel(catGroup.category), qty: 0, unit: 0, total: 0, isCategoryLabel: true });
@@ -109,10 +122,15 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
       pushEquipmentLines(equipmentForDay(d.date));
     });
   } else {
-    lines.push({
-      desc: `Studio — ${studioRate.label}${booking.studio_rate === 'hourly' ? ` (${booking.hours} hrs × ${formatPHP(studioRate.price)}/hr)` : ''}`,
-      qty: 1, unit: booking.subtotal, total: booking.subtotal, bold: true,
-    });
+    // Skipped when subtotal is 0 — an event-package booking's venue charge comes from the
+    // package's own Venue line, not a separate studio-rate line, so this would just be a
+    // confusing ₱0 row.
+    if (booking.subtotal > 0) {
+      lines.push({
+        desc: `Studio — ${studioRate.label}${booking.studio_rate === 'hourly' ? ` (${booking.hours} hrs × ${formatPHP(studioRate.price)}/hr)` : ''}`,
+        qty: 1, unit: booking.subtotal, total: booking.subtotal, bold: true,
+      });
+    }
     const otCalc = calcOT(booking.studio_rate, booking.call_time, booking.wrap_time);
     otHrs = booking.overtime_hours || otCalc.otHrs;
     otAmount = booking.overtime_amount || otCalc.otAmount;
@@ -326,7 +344,7 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
             <tr key={i} style={{ borderBottom: '1px solid #e5e5e5', background: line.bold ? '#f8f8f8' : i % 2 === 0 ? '#fff' : '#fafafa' }}>
               <td style={{ padding: '8px 10px', paddingLeft: line.indent ? '22px' : '10px' }}>
                 <div style={{ fontWeight: line.bold ? 700 : 400 }}>{line.desc}</div>
-                {line.comp && <span style={{ fontSize: '10px', background: '#dcfce7', color: '#166534', padding: '1px 5px', borderRadius: '3px', fontWeight: 700 }}>{line.category === 'package_item' ? 'INCLUDED IN PACKAGE' : 'COMPLIMENTARY'}</span>}
+                {line.comp && <span style={{ fontSize: '10px', background: '#dcfce7', color: '#166534', padding: '1px 5px', borderRadius: '3px', fontWeight: 700 }}>{line.category?.startsWith('evt_') || line.category === 'package_item' ? 'INCLUDED IN PACKAGE' : 'COMPLIMENTARY'}</span>}
               </td>
               <td style={{ padding: '8px 10px', textAlign: 'center' }}>{line.qty}</td>
               <td style={{ padding: '8px 10px', textAlign: 'right' }}>{line.comp ? '—' : formatPHP(line.unit)}</td>
@@ -342,6 +360,31 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
         </tbody>
       </table>
       </div>{/* end doc-table-scroll */}
+
+      {/* Included Equipment & Services — event-package inclusions as a bullet list under the
+          priced Venue/Technical/Generator rows, not ₱0 table rows. The package price already
+          represents the value of everything listed here. */}
+      {inclusionGroups.size > 0 && (
+        <div style={{ marginBottom: '16px', padding: '12px 14px', background: '#fafafa', border: '1px solid #eee', borderRadius: '6px' }}>
+          <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: '#888', marginBottom: '8px' }}>
+            Included Equipment &amp; Services
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 24px' }}>
+            {EVT_CATEGORY_ORDER.filter(cat => inclusionGroups.has(cat)).map(cat => (
+              <div key={cat} style={{ breakInside: 'avoid', marginBottom: '8px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: '#333', marginBottom: '2px' }}>{categoryLabel(cat)}</div>
+                <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
+                  {inclusionGroups.get(cat)!.map((it, i) => (
+                    <li key={i} style={{ fontSize: '11px', color: '#555', padding: '1px 0' }}>
+                      {it.qty > 1 ? `${it.qty} × ` : ''}{it.name}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Totals */}
       <div className="doc-totals">

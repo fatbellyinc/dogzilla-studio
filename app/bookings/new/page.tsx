@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { formatPHP, groupByDayDate, groupByCategory, categoryLabel } from '@/lib/utils';
-import { Equipment, STUDIO_RATES, EQUIPMENT_PACKAGES, EVENT_PACKAGES, EQUIPMENT_MODULES, EVENT_VENUE, EVENT_GENERATOR_PRICE, ADDON_ITEMS, CATEGORY_LABELS, SHOOT_TYPES } from '@/lib/types';
+import { Equipment, STUDIO_RATES, EQUIPMENT_PACKAGES, EVENT_PACKAGES, EQUIPMENT_MODULES, EVENT_VENUE, EVENT_GENERATOR_PRICE, ADDON_ITEMS, CATEGORY_LABELS, SHOOT_TYPES, eventPackageItemizedRows } from '@/lib/types';
 import { Client } from '@/lib/types';
 import MultiDayPicker, { DayConfig } from '@/components/MultiDayPicker';
 
@@ -144,6 +144,27 @@ function NewBookingForm() {
   const [bookedDates, setBookedDates] = useState<string[]>([]);
   const [blockoutDates, setBlockoutDates] = useState<string[]>([]);
   const [selectedItems, setSelectedItems] = useState<SelectedItem[]>([]);
+
+  // Self-healing guard: whenever an event package is active for a day, that day's studio
+  // subtotal must stay ₱0 — the package's own Venue line already covers the charge. Keyed
+  // off selectedItems AND bookingDays (not just one) because picking a date can happen either
+  // before or after selecting the package, and either order must end up double-charge-free.
+  useEffect(() => {
+    const activeDayTags = new Set(
+      selectedItems.filter(e => e.key.startsWith('evt-') && e.key.endsWith('::venue')).map(e => e.day_date || 'none')
+    );
+    if (activeDayTags.size === 0) return;
+    setBookingDays(prev => {
+      const multi = prev.length > 1;
+      let changed = false;
+      const next = prev.map(d => {
+        const tag = multi ? d.date : 'none';
+        if (activeDayTags.has(tag) && d.subtotal !== 0) { changed = true; return { ...d, subtotal: 0 }; }
+        return d;
+      });
+      return changed ? next : prev;
+    });
+  }, [selectedItems, bookingDays]);
   const [addonElecHours, setAddonElecHours] = useState(10);
   // Which day new add-ons (electricity, holding areas, etc.) get tagged with, when there's more than one day
   const [addonDay, setAddonDay] = useState('');
@@ -253,20 +274,42 @@ function NewBookingForm() {
       if (pkg.hasGenerator) {
         rows.push({ key: `${groupPrefix}::generator`, name: `Generator & Power Package (14 hours)${dayTag}`, rate: EVENT_GENERATOR_PRICE, quantity: 1, is_package: true, day_date: day, category: 'package' });
       }
-      // Itemize every bundled piece of equipment — venue amenities plus every module the
-      // package includes — as ₱0 "Included in Package" rows so quotations/invoices show
-      // full itemization without exposing any internal cost or markup.
+      // Itemize every bundled piece of equipment — venue amenities, every audio/lighting/DJ/
+      // LED module the package includes, its crew, shared logistics, and the generator's own
+      // components — as ₱0 rows tagged "Included in Package" under their own document
+      // heading (evt_audio, evt_lighting, ...), so quotations/invoices show full itemization
+      // without adding a single peso on top of the three billable Venue/Technical/Generator
+      // lines above.
       let idx = 0;
-      const itemRow = (label: string): SelectedItem => ({
-        key: `${groupPrefix}::item::${idx++}`, name: label, rate: 0, quantity: 1,
-        is_package: false, is_complimentary: true, day_date: day, category: 'package_item',
+      const itemRow = (qty: number, label: string, category: string): SelectedItem => ({
+        key: `${groupPrefix}::item::${idx++}`, name: label, rate: 0, quantity: qty,
+        is_package: false, is_complimentary: true, day_date: day, category,
       });
-      for (const inc of EVENT_VENUE.inclusions) rows.push(itemRow(inc));
-      for (const modKey of pkg.modules) for (const item of EQUIPMENT_MODULES[modKey].items) rows.push(itemRow(item));
-      if (pkg.hasGenerator) for (const item of EQUIPMENT_MODULES.generator.items) rows.push(itemRow(item));
+      for (const inc of EVENT_VENUE.inclusions) rows.push(itemRow(1, inc, 'evt_venue'));
+      const crew: { qty: number; name: string }[] = [];
+      const pushModule = (modKey: keyof typeof EQUIPMENT_MODULES | null) => {
+        if (!modKey) return;
+        const mod = EQUIPMENT_MODULES[modKey];
+        for (const it of mod.equipment) rows.push(itemRow(it.qty, it.name, mod.docCategory));
+        crew.push(...mod.crew);
+      };
+      pushModule(pkg.audioModule);
+      pushModule(pkg.lightingModule);
+      pushModule(pkg.djModule);
+      pushModule(pkg.ledModule);
+      if (pkg.technicalPrice > 0) {
+        for (const it of EQUIPMENT_MODULES.shared_logistics.equipment) rows.push(itemRow(it.qty, it.name, 'evt_logistics'));
+      }
+      for (const it of crew) rows.push(itemRow(it.qty, it.name, 'evt_crew'));
+      if (pkg.hasGenerator) {
+        for (const it of EQUIPMENT_MODULES.generator.equipment) rows.push(itemRow(it.qty, it.name, 'evt_generator'));
+      }
 
       return [...withoutEventGroup, ...rows];
     });
+    // The self-healing effect above keeps this day's studio subtotal at ₱0 whenever an
+    // event package is active for it, regardless of whether the package or the date was
+    // picked first.
   }
 
   function toggleEquipment(item: Equipment) {
@@ -602,7 +645,7 @@ function NewBookingForm() {
                         const day = isMultiDay ? effectiveAddonDay : undefined;
                         const groupPrefix = `evt-${pkg.id}::${day || 'none'}`;
                         const sel = selectedItems.some(e => e.key.startsWith(groupPrefix));
-                        const moduleInclusions = pkg.modules.flatMap(m => EQUIPMENT_MODULES[m].items);
+                        const itemizedRows = eventPackageItemizedRows(pkg);
                         return (
                           <button key={pkg.id} type="button" onClick={() => toggleEventPackage(pkg)}
                             className={`w-full text-left p-3 rounded-lg border transition-all ${sel ? 'border-[#E32726] bg-[#E32726]/10' : 'border-[#2a2a2a] hover:border-[#3a3a3a]'}`}>
@@ -617,14 +660,8 @@ function NewBookingForm() {
                               </div>
                             </div>
                             <div className="mt-2 grid grid-cols-2 gap-x-2">
-                              {EVENT_VENUE.inclusions.map((inc, i) => (
-                                <div key={`v${i}`} className="text-xs text-white/40 flex items-start gap-1"><span className="text-[#E32726]/60 mt-0.5">·</span>{inc}</div>
-                              ))}
-                              {moduleInclusions.map((inc, i) => (
-                                <div key={`m${i}`} className="text-xs text-white/40 flex items-start gap-1"><span className="text-[#E32726]/60 mt-0.5">·</span>{inc}</div>
-                              ))}
-                              {pkg.hasGenerator && EQUIPMENT_MODULES.generator.items.map((inc, i) => (
-                                <div key={`g${i}`} className="text-xs text-white/40 flex items-start gap-1"><span className="text-[#E32726]/60 mt-0.5">·</span>{inc}</div>
+                              {itemizedRows.map((row, i) => (
+                                <div key={i} className="text-xs text-white/40 flex items-start gap-1"><span className="text-[#E32726]/60 mt-0.5">·</span>{row.name}</div>
                               ))}
                             </div>
                           </button>
@@ -967,7 +1004,7 @@ function NewBookingForm() {
                             <span className="truncate max-w-[140px] text-xs text-white/70">{e.name}{e.quantity > 1 ? ` ×${e.quantity}` : ''}</span>
                             <span className="shrink-0 ml-1 text-xs">
                               {e.is_complimentary
-                                ? <span className="text-green-400 font-semibold">{e.category === 'package_item' ? 'Included' : 'COMP'}</span>
+                                ? <span className="text-green-400 font-semibold">{e.category?.startsWith('evt_') || e.category === 'package_item' ? 'Included' : 'COMP'}</span>
                                 : formatPHP(lineTotal)}
                             </span>
                           </div>

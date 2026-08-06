@@ -78,7 +78,10 @@ export default function PullSheetPage({ params }: { params: Promise<{ id: string
               </tr>
             </thead>
             <tbody>
-              {equipment.filter(e => !e.is_complimentary).map((e, i) => (
+              {/* Event-package items are informational/₱0 on the invoice, but the crew still
+                  needs to physically pull every piece of it — only genuinely waived/comp
+                  items (not part of an event package) are skipped here. */}
+              {equipment.filter(e => !e.is_complimentary || e.category?.startsWith('evt_')).map((e, i) => (
                 <tr key={i} style={{ borderBottom: '1px solid #e5e5e5', background: i % 2 === 0 ? 'white' : '#fafafa' }}>
                   <td style={{ padding: '8px 10px', textAlign: 'center' }}>
                     <div style={{ width: '16px', height: '16px', border: '2px solid #ccc', borderRadius: '3px', display: 'inline-block' }} />

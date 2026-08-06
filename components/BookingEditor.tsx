@@ -144,10 +144,12 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
     const groupPrefix = `evt-${pkg.id}::${dayTag2}`;
     const dayTag = day ? ` (${dayShortLabel(day)})` : '';
 
+    let turnedOn = false;
     setItems(prev => {
       const alreadySelected = prev.some(i => i.key.startsWith(groupPrefix));
       const withoutEventGroup = prev.filter(i => !i.key.startsWith('evt-') || !i.key.includes(`::${dayTag2}::`));
       if (alreadySelected) return withoutEventGroup;
+      turnedOn = true;
 
       const rows: EditItem[] = [
         { key: `${groupPrefix}::venue`, name: `${EVENT_VENUE.name} — 14 Hours${dayTag}`, rate: EVENT_VENUE.price, quantity: 1, is_complimentary: false, discount_pct: 0, item_type: 'package', day_date: day, category: 'package' },
@@ -159,16 +161,35 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
         rows.push({ key: `${groupPrefix}::generator`, name: `Generator & Power Package (14 hours)${dayTag}`, rate: EVENT_GENERATOR_PRICE, quantity: 1, is_complimentary: false, discount_pct: 0, item_type: 'package', day_date: day, category: 'package' });
       }
       let idx = 0;
-      const itemRow = (label: string): EditItem => ({
-        key: `${groupPrefix}::item::${idx++}`, name: label, rate: 0, quantity: 1,
-        is_complimentary: true, discount_pct: 0, item_type: 'package', day_date: day, category: 'package_item',
+      const itemRow = (qty: number, label: string, category: string): EditItem => ({
+        key: `${groupPrefix}::item::${idx++}`, name: label, rate: 0, quantity: qty,
+        is_complimentary: true, discount_pct: 0, item_type: 'package', day_date: day, category,
       });
-      for (const inc of EVENT_VENUE.inclusions) rows.push(itemRow(inc));
-      for (const modKey of pkg.modules) for (const item of EQUIPMENT_MODULES[modKey].items) rows.push(itemRow(item));
-      if (pkg.hasGenerator) for (const item of EQUIPMENT_MODULES.generator.items) rows.push(itemRow(item));
+      for (const inc of EVENT_VENUE.inclusions) rows.push(itemRow(1, inc, 'evt_venue'));
+      const crew: { qty: number; name: string }[] = [];
+      const pushModule = (modKey: keyof typeof EQUIPMENT_MODULES | null) => {
+        if (!modKey) return;
+        const mod = EQUIPMENT_MODULES[modKey];
+        for (const it of mod.equipment) rows.push(itemRow(it.qty, it.name, mod.docCategory));
+        crew.push(...mod.crew);
+      };
+      pushModule(pkg.audioModule);
+      pushModule(pkg.lightingModule);
+      pushModule(pkg.djModule);
+      pushModule(pkg.ledModule);
+      if (pkg.technicalPrice > 0) {
+        for (const it of EQUIPMENT_MODULES.shared_logistics.equipment) rows.push(itemRow(it.qty, it.name, 'evt_logistics'));
+      }
+      for (const it of crew) rows.push(itemRow(it.qty, it.name, 'evt_crew'));
+      if (pkg.hasGenerator) {
+        for (const it of EQUIPMENT_MODULES.generator.equipment) rows.push(itemRow(it.qty, it.name, 'evt_generator'));
+      }
 
       return [...withoutEventGroup, ...rows];
     });
+    // Same double-charge guard as toggleEventPackage in New Booking — the package's own
+    // Venue line already covers the studio charge.
+    if (turnedOn) setStudioSubtotal(0);
   }
 
   function addEquipment(eq: Equipment) {
@@ -412,7 +433,7 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
                     </div>
                     <div className="text-xs text-white/60 w-16 text-right shrink-0">
                       {item.is_complimentary
-                        ? <span className="text-green-400">{item.category === 'package_item' ? 'Included' : 'COMP'}</span>
+                        ? <span className="text-green-400">{item.category?.startsWith('evt_') || item.category === 'package_item' ? 'Included' : 'COMP'}</span>
                         : formatPHP(lineTotal)}
                     </div>
                     <button onClick={() => removeItem(item.key)} className="text-white/20 hover:text-red-400 text-xs">✕</button>

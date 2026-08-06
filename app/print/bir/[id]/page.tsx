@@ -117,7 +117,10 @@ export default function BIRInvoicePage({ params }: { params: Promise<{ id: strin
       if (rate && d.booking.subtotal > 0) {
         initial.push({ qty: '1', unit: 'day', desc: `Studio Rental — ${rate.label}`, unitCost: String(d.booking.subtotal) });
       }
-      // Equipment lines — apply discount_pct
+      // Equipment lines — apply discount_pct. Billable items skip is_complimentary rows
+      // (those are genuinely waived extras), but an event package's itemized equipment is
+      // also flagged is_complimentary despite being real, needed gear — it's just informational
+      // at ₱0 — so those still need to show up here, not be silently dropped.
       for (const e of eq) {
         if (!e.is_complimentary) {
           const disc = e.discount_pct || 0;
@@ -126,6 +129,8 @@ export default function BIRInvoicePage({ params }: { params: Promise<{ id: strin
             : e.rate;
           const desc = disc > 0 ? `${e.name} (${disc}% off)` : e.name;
           initial.push({ qty: String(e.quantity), unit: 'day', desc, unitCost: String(effectiveRate) });
+        } else if (e.category?.startsWith('evt_')) {
+          initial.push({ qty: String(e.quantity), unit: '', desc: `${e.name} — Included in Package`, unitCost: '0' });
         }
       }
       // Overtime and the booking-level discount both feed into booking.total (see

@@ -297,66 +297,132 @@ export const PACKAGE_INCLUSIONS_BY_NAME: Record<string, readonly string[]> = Obj
 // full itemization for free, with no per-document special-casing needed.
 
 export const EQUIPMENT_MODULES = {
-  standard_audio: { name: 'Standard Audio', items: [
-    '4× Turbo-sound TBV123-AN Compact Line Array', '4× Turbo-sound TBV118 Subwoofer',
-    'Yamaha DM3 Digital Mixer', 'CDJ 350', 'DJM 350',
-    '2× AMS Wireless Microphones', 'AMS Wireless Paddle', 'AMS Wireless Receiver',
-    'Microphone Stand', 'Distro Box', 'Cable and Connectors', '5× Rubber Humps',
-    'Audio Technician / Crew',
-  ] },
-  standard_lighting: { name: 'Standard Lighting', items: [
-    '4× VLTG 290 Moving Lights', '4× Auto Light', '8× LED Par RGBW',
-    'Mini Quartz Lighting Controller', '2× Giant Light Stands',
-    'Distro Box', 'Cable and Connector', '5× Rubber Humps', 'Light Technician / Crew',
-  ] },
-  launch_audio: { name: 'Product Launch Audio', items: [
-    '2× JBL PRX-One', 'Yamaha DM3 Digital Mixer', 'CDJ 350', 'DJM 350',
-    '10× AMS Wireless Microphones', 'AMS Wireless Paddle', 'AMS Wireless Receiver',
-    'Microphone Stand', 'Distro Box', 'Cable and Connectors', '5× Rubber Humps',
-    'Audio Technician / Crew',
-  ] },
-  launch_lighting: { name: 'Product Launch Lighting', items: [
-    '4× Mac Aura', '4× Diva Light', 'Quartz Lighting Controller',
-    'Distro Box', 'Cable and Connector', '5× Rubber Humps', 'Light Technician / Crew',
-  ] },
-  led_wall: { name: 'LED Wall', items: [
-    'Tentech P3 9x12 LED Wall', 'LED Wall Riser', 'Video Processor',
-    'HDMI Cable', 'Laptop', 'Cable and Connector', 'Video Technician / Crew',
-  ] },
-  dj_equipment: { name: 'DJ Equipment', items: [
-    '2× Turbo-sound Wedge Monitor', 'CDJ 3000', 'DJM A9',
-    'AMS Wireless Microphone', 'AMS Wireless Paddle', 'AMS Wireless Receiver',
-    'Cable and Connectors', 'Audio Technician / Crew',
-  ] },
-  shared_logistics: { name: 'Shared Logistics', items: [
-    'Trucking and Mobilization', 'Crew Transportation', 'Black Cloth', 'Duct / Caution / Warning Tapes',
-  ] },
-  generator: { name: 'Generator & Power', items: [
-    '100 kVA Generator', 'Power Box', 'Power Distribution',
-    '2 Generator Personnel', 'Generator Truck', 'Fuel (14 hours)',
-  ] },
+  standard_audio: { name: 'Standard Audio', docCategory: 'evt_audio' as const,
+    equipment: [
+      { qty: 4, name: 'Turbo-sound TBV123-AN Compact Line Array' }, { qty: 4, name: 'Turbo-sound TBV118 Subwoofer' },
+      { qty: 1, name: 'Yamaha DM3 Digital Mixer' }, { qty: 1, name: 'CDJ 350' }, { qty: 1, name: 'DJM 350' },
+      { qty: 2, name: 'AMS Wireless Microphone' }, { qty: 1, name: 'AMS Wireless Paddle' }, { qty: 1, name: 'AMS Wireless Receiver' },
+      { qty: 1, name: 'Microphone Stands' }, { qty: 1, name: 'Distro Box' }, { qty: 1, name: 'Cables and Connectors' }, { qty: 5, name: 'Rubber Humps' },
+    ],
+    crew: [{ qty: 1, name: 'Audio Technician / Crew' }],
+  },
+  // Event Essentials' lighting is intentionally NOT the full moving-head rig below — it's a
+  // lighter, generic configuration confirmed per-booking, which is what distinguishes it
+  // from Live Showcase's "Standard Lighting Rig with Moving Heads".
+  basic_lighting: { name: 'Basic Stage Lighting', docCategory: 'evt_lighting' as const,
+    equipment: [
+      { qty: 1, name: 'Basic Stage Lighting' },
+      { qty: 1, name: 'Reduced lighting configuration, confirmed at booking' },
+    ],
+    crew: [{ qty: 1, name: 'Light Technician / Crew' }],
+  },
+  standard_lighting: { name: 'Standard Lighting', docCategory: 'evt_lighting' as const,
+    equipment: [
+      { qty: 4, name: 'VLTG 290 Moving Lights' }, { qty: 4, name: 'Auto Light' }, { qty: 8, name: 'LED Par RGBW' },
+      { qty: 1, name: 'Mini Quartz Lighting Controller' }, { qty: 2, name: 'Giant Light Stands' },
+      { qty: 1, name: 'Distro Box' }, { qty: 1, name: 'Cables and Connectors' }, { qty: 5, name: 'Rubber Humps' },
+    ],
+    crew: [{ qty: 1, name: 'Light Technician / Crew' }],
+  },
+  launch_audio: { name: 'Product Launch Audio', docCategory: 'evt_audio' as const,
+    equipment: [
+      { qty: 2, name: 'JBL PRX-One' }, { qty: 1, name: 'Yamaha DM3 Digital Mixer' }, { qty: 1, name: 'CDJ 350' }, { qty: 1, name: 'DJM 350' },
+      { qty: 10, name: 'AMS Wireless Microphone' }, { qty: 1, name: 'AMS Wireless Paddle' }, { qty: 1, name: 'AMS Wireless Receiver' },
+      { qty: 1, name: 'Microphone Stands' }, { qty: 1, name: 'Distro Box' }, { qty: 1, name: 'Cables and Connectors' }, { qty: 5, name: 'Rubber Humps' },
+    ],
+    crew: [{ qty: 1, name: 'Audio Technician / Crew' }],
+  },
+  launch_lighting: { name: 'Product Launch Lighting', docCategory: 'evt_lighting' as const,
+    equipment: [
+      { qty: 4, name: 'Mac Aura' }, { qty: 4, name: 'Diva Light' }, { qty: 1, name: 'Quartz Lighting Controller' },
+      { qty: 1, name: 'Distro Box' }, { qty: 1, name: 'Cables and Connectors' }, { qty: 5, name: 'Rubber Humps' },
+    ],
+    crew: [{ qty: 1, name: 'Light Technician / Crew' }],
+  },
+  led_wall: { name: 'LED Wall', docCategory: 'evt_led' as const,
+    equipment: [
+      { qty: 1, name: 'Tentech P3 9x12 LED Wall (set)' }, { qty: 1, name: 'LED Wall Riser, 3 ft (set)' }, { qty: 1, name: 'Video Processor' },
+      { qty: 1, name: 'HDMI Cables' }, { qty: 1, name: 'Laptop for Configuration/Playback' }, { qty: 1, name: 'Cables and Connectors' },
+    ],
+    crew: [{ qty: 1, name: 'Video Technician / Crew' }],
+  },
+  dj_equipment: { name: 'DJ Equipment', docCategory: 'evt_dj' as const,
+    equipment: [
+      { qty: 2, name: 'Turbo-sound Wedge Monitor' }, { qty: 1, name: 'CDJ 3000' }, { qty: 1, name: 'DJM A9' },
+      { qty: 1, name: 'AMS Wireless Microphone' }, { qty: 1, name: 'AMS Wireless Paddle' }, { qty: 1, name: 'AMS Wireless Receiver' },
+      { qty: 1, name: 'Cables and Connectors' },
+    ],
+    crew: [{ qty: 1, name: 'Audio Technician / Crew' }],
+  },
+  shared_logistics: { name: 'Shared Logistics', docCategory: 'evt_logistics' as const,
+    equipment: [
+      { qty: 1, name: 'Trucking and Mobilization' }, { qty: 1, name: 'Crew Transportation' },
+      { qty: 1, name: 'Black Cloth' }, { qty: 1, name: 'Duct Tapes / Caution Tapes / Warning Tapes' },
+    ],
+    crew: [],
+  },
+  generator: { name: 'Generator & Power', docCategory: 'evt_generator' as const,
+    equipment: [
+      { qty: 1, name: '100 kVA Generator' }, { qty: 1, name: 'Power Box' }, { qty: 1, name: 'Power Distribution System' },
+      { qty: 2, name: 'Generator Personnel' }, { qty: 1, name: 'Generator Truck Mobilization' },
+      { qty: 1, name: 'Generator Fuel (14 hours)' }, { qty: 1, name: 'Power Management and Monitoring' },
+    ],
+    crew: [],
+  },
 } as const;
 export type EquipmentModuleKey = keyof typeof EQUIPMENT_MODULES;
 
 export const EVENT_VENUE = {
   name: 'Dogzilla Studio Event Venue',
   price: 55000,
-  inclusions: ['14 Hours', 'Air-conditioning', '2 VIP Holding Rooms', 'Client Lounge', 'Parking', 'Restrooms'],
+  // Itemized breakdown shown under the "Studio / Event Venue" heading — the venue itself is
+  // listed here too (₱0, informational) alongside its amenities, separate from the priced
+  // ₱55,000 summary line that actually carries the charge.
+  inclusions: [
+    'Dogzilla Studio Event Venue — 14 Hours', 'Studio Holding Areas', 'Parking',
+    'Air-conditioning', 'Restrooms', 'Free Internet',
+  ],
 } as const;
 
 export const EVENT_GENERATOR_PRICE = 45000; // client allocation — itemized via the 'generator' module
 export const EVENT_OT_STUDIO_RATE = 4000;   // ₱/hr after the included 14 hours
-export const EVENT_OT_GENERATOR_RATE = 2500; // ₱/hr after the included 14 hours
+export const EVENT_OT_GENERATOR_RATE = 2500; // ₱/hr after the included 14 hours — kept separate from studio OT
 
 export const EVENT_PACKAGES = [
-  { id: 'EVT_VENUE', label: 'Venue Only', subtitle: '14-hour venue rental — no technical equipment or crew', technicalPrice: 0, hasGenerator: false, modules: [] as EquipmentModuleKey[], total: 55000 },
-  { id: 'EVT_ESSENTIALS', label: 'Event Essentials', subtitle: 'Venue + standard audio, standard lighting & power', technicalPrice: 69000, hasGenerator: true, modules: ['standard_audio', 'standard_lighting', 'shared_logistics'] as EquipmentModuleKey[], total: 169000 },
-  { id: 'EVT_LIVE_SHOWCASE', label: 'Live Showcase', subtitle: 'Standard audio + moving-head lighting rig', technicalPrice: 89000, hasGenerator: true, modules: ['standard_audio', 'standard_lighting', 'shared_logistics'] as EquipmentModuleKey[], total: 189000 },
-  { id: 'EVT_PRODUCT_LAUNCH', label: 'Product Launch', subtitle: 'Launch audio, presentation lighting & LED wall', technicalPrice: 99000, hasGenerator: true, modules: ['launch_audio', 'launch_lighting', 'led_wall', 'shared_logistics'] as EquipmentModuleKey[], total: 199000 },
-  { id: 'EVT_DANCE_PARTY', label: 'Dance Party', subtitle: 'Dance audio rig + standard lighting, no LED wall', technicalPrice: 109000, hasGenerator: true, modules: ['dj_equipment', 'standard_lighting', 'shared_logistics'] as EquipmentModuleKey[], total: 209000 },
-  { id: 'EVT_DANCE_PARTY_LED', label: 'Dance Party + LED Wall', subtitle: 'Dance Party, upgraded with a 9×12 P3 LED wall', technicalPrice: 129000, hasGenerator: true, modules: ['dj_equipment', 'standard_lighting', 'led_wall', 'shared_logistics'] as EquipmentModuleKey[], total: 229000 },
-] as const;
+  { id: 'EVT_VENUE', label: 'Venue Only', subtitle: '14-hour venue rental — no technical equipment or crew', technicalPrice: 0, hasGenerator: false, audioModule: null, lightingModule: null, djModule: null, ledModule: null, total: 55000 },
+  { id: 'EVT_ESSENTIALS', label: 'Event Essentials', subtitle: 'Venue + standard audio, basic lighting & power', technicalPrice: 69000, hasGenerator: true, audioModule: 'standard_audio', lightingModule: 'basic_lighting', djModule: null, ledModule: null, total: 169000 },
+  { id: 'EVT_LIVE_SHOWCASE', label: 'Live Showcase', subtitle: 'Standard audio + moving-head lighting rig', technicalPrice: 89000, hasGenerator: true, audioModule: 'standard_audio', lightingModule: 'standard_lighting', djModule: null, ledModule: null, total: 189000 },
+  { id: 'EVT_PRODUCT_LAUNCH', label: 'Product Launch', subtitle: 'Launch audio, presentation lighting & LED wall', technicalPrice: 99000, hasGenerator: true, audioModule: 'launch_audio', lightingModule: 'launch_lighting', djModule: null, ledModule: 'led_wall', total: 199000 },
+  { id: 'EVT_DANCE_PARTY', label: 'Dance Party', subtitle: 'Dance audio rig + standard lighting, no LED wall', technicalPrice: 109000, hasGenerator: true, audioModule: null, lightingModule: 'standard_lighting', djModule: 'dj_equipment', ledModule: null, total: 209000 },
+  { id: 'EVT_DANCE_PARTY_LED', label: 'Dance Party + LED Wall', subtitle: 'Dance Party, upgraded with a 9×12 P3 LED wall', technicalPrice: 129000, hasGenerator: true, audioModule: null, lightingModule: 'standard_lighting', djModule: 'dj_equipment', ledModule: 'led_wall', total: 229000 },
+] as const satisfies readonly { id: string; label: string; subtitle: string; technicalPrice: number; hasGenerator: boolean; audioModule: EquipmentModuleKey | null; lightingModule: EquipmentModuleKey | null; djModule: EquipmentModuleKey | null; ledModule: EquipmentModuleKey | null; total: number }[];
 export type EventPackage = typeof EVENT_PACKAGES[number];
+
+/** Every ₱0 itemized row (name only, brand/model included) an event package can produce
+ * across all its modules — used to build the full inclusions preview and, by
+ * isEventPackageRowName below, to recognize saved rows after a reload. */
+export function eventPackageItemizedRows(pkg: EventPackage): { name: string; category: string }[] {
+  const rows: { name: string; category: string }[] = EVENT_VENUE.inclusions.map(name => ({ name, category: 'evt_venue' }));
+  const crew: { qty: number; name: string }[] = [];
+  const pushModule = (modKey: EquipmentModuleKey | null) => {
+    if (!modKey) return;
+    const mod = EQUIPMENT_MODULES[modKey];
+    for (const it of mod.equipment) rows.push({ name: it.name, category: mod.docCategory });
+    crew.push(...mod.crew);
+  };
+  pushModule(pkg.audioModule);
+  pushModule(pkg.lightingModule);
+  pushModule(pkg.djModule);
+  pushModule(pkg.ledModule);
+  if (pkg.technicalPrice > 0) {
+    for (const it of EQUIPMENT_MODULES.shared_logistics.equipment) rows.push({ name: it.name, category: 'evt_logistics' });
+  }
+  for (const it of crew) rows.push({ name: it.name, category: 'evt_crew' });
+  if (pkg.hasGenerator) {
+    for (const it of EQUIPMENT_MODULES.generator.equipment) rows.push({ name: it.name, category: 'evt_generator' });
+  }
+  return rows;
+}
 
 // Name-based identification for event-package rows. In-session, sibling rows of the same
 // package share an `evt-<id>::<day>` key prefix — but only the row's `name` survives a
@@ -367,12 +433,12 @@ export type EventPackage = typeof EVENT_PACKAGES[number];
 export function isEventVenueName(name: string): boolean {
   return name.startsWith(EVENT_VENUE.name);
 }
-const EVENT_ITEM_NAME_SET: Set<string> = new Set([
-  ...EVENT_VENUE.inclusions,
-  ...Object.values(EQUIPMENT_MODULES).flatMap(m => m.items),
-]);
+const EVENT_ITEM_NAME_SET: Set<string> = new Set(
+  Object.values(EQUIPMENT_MODULES).flatMap(m => [...m.equipment, ...m.crew].map(it => it.name)),
+);
 export function isEventPackageRowName(name: string): boolean {
   if (isEventVenueName(name)) return true;
+  if ((EVENT_VENUE.inclusions as readonly string[]).includes(name)) return true;
   if (name.startsWith('Generator & Power Package (')) return true;
   if (/ — Technical Package( \(|$)/.test(name)) return true;
   // Strip a trailing " (Day N — ...)" day tag before checking the itemized-equipment set
