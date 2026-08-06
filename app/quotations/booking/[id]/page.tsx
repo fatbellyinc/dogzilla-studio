@@ -54,7 +54,7 @@ function DocView({ bookingId }: { bookingId: string }) {
   // not billable — they don't belong in the priced line-item table as ₱0 rows. Collected here
   // instead and rendered as a grouped bullet list right under the priced package rows.
   const EVT_CATEGORY_ORDER = ['evt_venue', 'evt_audio', 'evt_lighting', 'evt_dj', 'evt_led', 'evt_crew', 'evt_logistics', 'evt_generator'];
-  const inclusionGroups = new Map<string, { qty: number; name: string }[]>();
+  const inclusionGroups = new Map<string, Map<string, number>>(); // category -> (item name -> qty), deduped
 
   // Overtime is computed per day from each day's own call/wrap times — a booking-level
   // call_time/wrap_time no longer applies once a booking has more than one day, since each
@@ -66,8 +66,19 @@ function DocView({ bookingId }: { bookingId: string }) {
   // grouped right under that day's studio line — otherwise it's hard to tell which day rented
   // what on a multi-day booking.
   const equipmentByDay = groupByDayDate(equipment);
-  const equipmentForDay = (date: string) => equipmentByDay.find(g => g.dayDate === date)?.items ?? [];
-  const generalEquipment = equipmentByDay.find(g => g.dayDate === null)?.items ?? [];
+  const rawGeneralEquipment = equipmentByDay.find(g => g.dayDate === null)?.items ?? [];
+  // An event package added before a booking became multi-day keeps its rows tagged to no
+  // specific day (day_date null) — that used to render as its own trailing "extra" section
+  // after every real day's charges. Fold those rows into Day 1's listing instead of showing
+  // them as a separate standalone block; genuinely day-less non-package items (a booking-wide
+  // add-on, say) still land in the general bucket as before.
+  const strayEventEquipment = rawGeneralEquipment.filter(e => e.category === 'package' || e.category?.startsWith('evt_'));
+  const generalEquipment = rawGeneralEquipment.filter(e => !(e.category === 'package' || e.category?.startsWith('evt_')));
+  const firstDayDate = bookingDays?.[0]?.date;
+  const equipmentForDay = (date: string) => {
+    const items = equipmentByDay.find(g => g.dayDate === date)?.items ?? [];
+    return date === firstDayDate ? [...items, ...strayEventEquipment] : items;
+  };
 
   function pushEquipmentLines(items: BookingEquipment[]) {
     // Event-package inclusions never show as table rows — pull them out into the bullet-list
@@ -76,8 +87,12 @@ function DocView({ bookingId }: { bookingId: string }) {
     for (const e of items) {
       if (!e.category?.startsWith('evt_')) continue;
       const cat = e.category!;
-      if (!inclusionGroups.has(cat)) inclusionGroups.set(cat, []);
-      inclusionGroups.get(cat)!.push({ qty: e.quantity, name: e.name });
+      if (!inclusionGroups.has(cat)) inclusionGroups.set(cat, new Map());
+      // Dedupe by name: the same package selected across multiple days (or a stray untagged
+      // row folded in above) would otherwise list "Yamaha DM3 Digital Mixer" etc. once per
+      // occurrence — every included item should appear exactly once in the consolidated list.
+      const group = inclusionGroups.get(cat)!;
+      if (!group.has(e.name)) group.set(e.name, e.quantity);
     }
 
     const catGroups = groupByCategory(billable);
@@ -391,9 +406,9 @@ function DocView({ bookingId }: { bookingId: string }) {
               <div key={cat} style={{ breakInside: 'avoid', marginBottom: '8px' }}>
                 <div style={{ fontSize: '11px', fontWeight: 700, color: '#333', marginBottom: '2px' }}>{categoryLabel(cat)}</div>
                 <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
-                  {inclusionGroups.get(cat)!.map((it, i) => (
+                  {[...inclusionGroups.get(cat)!.entries()].map(([name, qty], i) => (
                     <li key={i} style={{ fontSize: '11px', color: '#555', padding: '1px 0' }}>
-                      {it.qty > 1 ? `${it.qty} × ` : ''}{it.name}
+                      {qty > 1 ? `${qty} × ` : ''}{name}
                     </li>
                   ))}
                 </ul>

@@ -63,7 +63,7 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
   // Event-package inclusions are informational, not billable — collected here instead of
   // added as ₱0 table rows, then rendered as a grouped bullet list under the priced rows.
   const EVT_CATEGORY_ORDER = ['evt_venue', 'evt_audio', 'evt_lighting', 'evt_dj', 'evt_led', 'evt_crew', 'evt_logistics', 'evt_generator'];
-  const inclusionGroups = new Map<string, { qty: number; name: string }[]>();
+  const inclusionGroups = new Map<string, Map<string, number>>(); // category -> (item name -> qty), deduped
 
   // Overtime is computed per day from each day's own call/wrap times — a booking-level
   // call_time/wrap_time no longer applies once a booking has more than one day, since each
@@ -75,16 +75,26 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
   // grouped right under that day's studio line instead of one flat list at the bottom —
   // otherwise it's hard to tell which day rented what on a multi-day booking.
   const equipmentByDay = groupByDayDate(equipment);
-  const equipmentForDay = (date: string) => equipmentByDay.find(g => g.dayDate === date)?.items ?? [];
-  const generalEquipment = equipmentByDay.find(g => g.dayDate === null)?.items ?? [];
+  const rawGeneralEquipment = equipmentByDay.find(g => g.dayDate === null)?.items ?? [];
+  // An event package added before a booking became multi-day keeps its rows tagged to no
+  // specific day — that used to render as its own trailing "extra" section after every real
+  // day's charges. Fold those rows into Day 1's listing instead of a standalone block.
+  const strayEventEquipment = rawGeneralEquipment.filter(e => e.category === 'package' || e.category?.startsWith('evt_'));
+  const generalEquipment = rawGeneralEquipment.filter(e => !(e.category === 'package' || e.category?.startsWith('evt_')));
+  const firstDayDate = bookingDays?.[0]?.date;
+  const equipmentForDay = (date: string) => {
+    const items = equipmentByDay.find(g => g.dayDate === date)?.items ?? [];
+    return date === firstDayDate ? [...items, ...strayEventEquipment] : items;
+  };
 
   function pushEquipmentLines(items: BookingEquipment[]) {
     const billable = items.filter(e => !e.category?.startsWith('evt_'));
     for (const e of items) {
       if (!e.category?.startsWith('evt_')) continue;
       const cat = e.category!;
-      if (!inclusionGroups.has(cat)) inclusionGroups.set(cat, []);
-      inclusionGroups.get(cat)!.push({ qty: e.quantity, name: e.name });
+      if (!inclusionGroups.has(cat)) inclusionGroups.set(cat, new Map());
+      const group = inclusionGroups.get(cat)!;
+      if (!group.has(e.name)) group.set(e.name, e.quantity);
     }
 
     const catGroups = groupByCategory(billable);
@@ -374,9 +384,9 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
               <div key={cat} style={{ breakInside: 'avoid', marginBottom: '8px' }}>
                 <div style={{ fontSize: '11px', fontWeight: 700, color: '#333', marginBottom: '2px' }}>{categoryLabel(cat)}</div>
                 <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
-                  {inclusionGroups.get(cat)!.map((it, i) => (
+                  {[...inclusionGroups.get(cat)!.entries()].map(([name, qty], i) => (
                     <li key={i} style={{ fontSize: '11px', color: '#555', padding: '1px 0' }}>
-                      {it.qty > 1 ? `${it.qty} × ` : ''}{it.name}
+                      {qty > 1 ? `${qty} × ` : ''}{name}
                     </li>
                   ))}
                 </ul>
