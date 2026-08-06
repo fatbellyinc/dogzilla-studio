@@ -20,12 +20,12 @@ export function groupByDayDate<T extends { day_date?: string | null }>(items: T[
 // Category order + labels for grouping line items within a day — real equipment catalog
 // categories first (camera, lighting, etc.), then the pseudo-categories for things that were
 // never in the catalog (packages, add-ons, personnel, custom one-off items).
-const CATEGORY_ORDER = ['camera', 'lens', 'lighting', 'lighting_old', 'grip', 'tripod', 'audio', 'monitor', 'rigging', 'misc', 'crew', 'package', 'addon', 'manpower', 'custom', 'other'];
+const CATEGORY_ORDER = ['camera', 'lens', 'lighting', 'lighting_old', 'grip', 'tripod', 'audio', 'monitor', 'rigging', 'misc', 'crew', 'package', 'package_item', 'addon', 'manpower', 'custom', 'other'];
 const CATEGORY_LABELS_ALL: Record<string, string> = {
   camera: 'Camera Bodies', lens: 'Lenses', lighting: 'Lights — LED', lighting_old: 'Lights — Old School',
   grip: 'Grip', tripod: 'Tripods', audio: 'Audio', monitor: 'Monitors & Wireless', rigging: 'Camera/Rigging Accessories',
   misc: 'Miscellaneous', crew: 'Crew',
-  package: 'Packages', addon: 'Add-ons', manpower: 'Personnel', custom: 'Custom Items', other: 'Other',
+  package: 'Packages', package_item: 'Included in Package', addon: 'Add-ons', manpower: 'Personnel', custom: 'Custom Items', other: 'Other',
 };
 export function categoryLabel(key: string): string {
   return CATEGORY_LABELS_ALL[key] || key;

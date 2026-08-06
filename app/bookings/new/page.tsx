@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { formatPHP, groupByDayDate, groupByCategory, categoryLabel } from '@/lib/utils';
-import { Equipment, STUDIO_RATES, EQUIPMENT_PACKAGES, ADDON_ITEMS, CATEGORY_LABELS, SHOOT_TYPES } from '@/lib/types';
+import { Equipment, STUDIO_RATES, EQUIPMENT_PACKAGES, EVENT_PACKAGES, EQUIPMENT_MODULES, EVENT_VENUE, EVENT_GENERATOR_PRICE, ADDON_ITEMS, CATEGORY_LABELS, SHOOT_TYPES } from '@/lib/types';
 import { Client } from '@/lib/types';
 import MultiDayPicker, { DayConfig } from '@/components/MultiDayPicker';
 
@@ -149,7 +149,7 @@ function NewBookingForm() {
   const [addonDay, setAddonDay] = useState('');
   const [discount, setDiscount] = useState({ type: '' as '' | 'percent' | 'fixed', value: '' });
   const [tab, setTab] = useState<'packages' | 'individual'>('packages');
-  const [equipmentTab, setEquipmentTab] = useState<PackageCategory>('camera');
+  const [equipmentTab, setEquipmentTab] = useState<PackageCategory | 'event'>('camera');
   const [individualCat, setIndividualCat] = useState('camera');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -222,6 +222,50 @@ function NewBookingForm() {
         return !sameCat;
       });
       return [...filtered, { key, name, rate: pkg.price, quantity: 1, is_package: true, day_date: day, category: 'package' }];
+    });
+  }
+
+  // Event packages expand into several real line items — a priced Venue row (always
+  // present, never duplicated), a priced Technical row, an optional priced Generator row,
+  // and one zero-rate "Included in Package" row per bundled piece of equipment — rather
+  // than the single flat-price row togglePackage() adds for the production-equipment
+  // packages. All rows share the `evt-<pkg.id>` key prefix so the whole group toggles
+  // and gets replaced together; only one event package can be active per day.
+  function toggleEventPackage(pkg: (typeof EVENT_PACKAGES)[number]) {
+    const day = isMultiDay ? effectiveAddonDay : undefined;
+    const dayTag2 = day || 'none'; // explicit sentinel so "no day" can't collide with a real day string
+    const groupPrefix = `evt-${pkg.id}::${dayTag2}`;
+    const dayTag = day ? ` (${dayLabel(day)})` : '';
+
+    setSelectedItems(prev => {
+      const alreadySelected = prev.some(e => e.key.startsWith(groupPrefix));
+      // Remove any existing event-package group for this day first — never charge the
+      // venue twice, and only one event package can be active at a time.
+      const withoutEventGroup = prev.filter(e => !e.key.startsWith('evt-') || !e.key.includes(`::${dayTag2}::`));
+      if (alreadySelected) return withoutEventGroup;
+
+      const rows: SelectedItem[] = [
+        { key: `${groupPrefix}::venue`, name: `${EVENT_VENUE.name} — 14 Hours${dayTag}`, rate: EVENT_VENUE.price, quantity: 1, is_package: true, day_date: day, category: 'package' },
+      ];
+      if (pkg.technicalPrice > 0) {
+        rows.push({ key: `${groupPrefix}::technical`, name: `${pkg.label} — Technical Package${dayTag}`, rate: pkg.technicalPrice, quantity: 1, is_package: true, day_date: day, category: 'package' });
+      }
+      if (pkg.hasGenerator) {
+        rows.push({ key: `${groupPrefix}::generator`, name: `Generator & Power Package (14 hours)${dayTag}`, rate: EVENT_GENERATOR_PRICE, quantity: 1, is_package: true, day_date: day, category: 'package' });
+      }
+      // Itemize every bundled piece of equipment — venue amenities plus every module the
+      // package includes — as ₱0 "Included in Package" rows so quotations/invoices show
+      // full itemization without exposing any internal cost or markup.
+      let idx = 0;
+      const itemRow = (label: string): SelectedItem => ({
+        key: `${groupPrefix}::item::${idx++}`, name: label, rate: 0, quantity: 1,
+        is_package: false, is_complimentary: true, day_date: day, category: 'package_item',
+      });
+      for (const inc of EVENT_VENUE.inclusions) rows.push(itemRow(inc));
+      for (const modKey of pkg.modules) for (const item of EQUIPMENT_MODULES[modKey].items) rows.push(itemRow(item));
+      if (pkg.hasGenerator) for (const item of EQUIPMENT_MODULES.generator.items) rows.push(itemRow(item));
+
+      return [...withoutEventGroup, ...rows];
     });
   }
 
@@ -543,11 +587,51 @@ function NewBookingForm() {
                     {(Object.keys(EQUIPMENT_PACKAGES) as PackageCategory[]).map(cat => (
                       <button key={cat} type="button" onClick={() => setEquipmentTab(cat)}
                         className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${equipmentTab === cat ? 'bg-[#2a2a2a] text-white' : 'text-white/40 hover:text-white'}`}>
-                        {cat === 'camera' ? '🎥 Camera' : cat === 'lighting' ? '💡 Lighting' : cat === 'beauty' ? '💄 Beauty' : cat === 'vtr' ? '📺 VTR' : '🎪 Event'}
+                        {cat === 'camera' ? '🎥 Camera' : cat === 'lighting' ? '💡 Lighting' : cat === 'beauty' ? '💄 Beauty' : '📺 VTR'}
                       </button>
                     ))}
+                    <button type="button" onClick={() => setEquipmentTab('event')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${equipmentTab === 'event' ? 'bg-[#2a2a2a] text-white' : 'text-white/40 hover:text-white'}`}>
+                      🎪 Event
+                    </button>
                   </div>
 
+                  {equipmentTab === 'event' ? (
+                    <div className="space-y-2">
+                      {EVENT_PACKAGES.map((pkg) => {
+                        const day = isMultiDay ? effectiveAddonDay : undefined;
+                        const groupPrefix = `evt-${pkg.id}::${day || 'none'}`;
+                        const sel = selectedItems.some(e => e.key.startsWith(groupPrefix));
+                        const moduleInclusions = pkg.modules.flatMap(m => EQUIPMENT_MODULES[m].items);
+                        return (
+                          <button key={pkg.id} type="button" onClick={() => toggleEventPackage(pkg)}
+                            className={`w-full text-left p-3 rounded-lg border transition-all ${sel ? 'border-[#E32726] bg-[#E32726]/10' : 'border-[#2a2a2a] hover:border-[#3a3a3a]'}`}>
+                            <div className="flex justify-between items-start">
+                              <div className="flex-1">
+                                <span className="text-sm font-semibold text-white">{pkg.label}</span>
+                                <div className="text-xs text-white/40 mt-0.5">{pkg.subtitle}</div>
+                              </div>
+                              <div className="text-right ml-3 shrink-0">
+                                <div className="text-sm font-bold text-[#E32726]">{formatPHP(pkg.total)}</div>
+                                <div className="text-[10px] text-white/30">Venue {formatPHP(EVENT_VENUE.price)}{pkg.technicalPrice > 0 ? ` + Tech ${formatPHP(pkg.technicalPrice)}` : ''}{pkg.hasGenerator ? ` + Gen ${formatPHP(EVENT_GENERATOR_PRICE)}` : ''}</div>
+                              </div>
+                            </div>
+                            <div className="mt-2 grid grid-cols-2 gap-x-2">
+                              {EVENT_VENUE.inclusions.map((inc, i) => (
+                                <div key={`v${i}`} className="text-xs text-white/40 flex items-start gap-1"><span className="text-[#E32726]/60 mt-0.5">·</span>{inc}</div>
+                              ))}
+                              {moduleInclusions.map((inc, i) => (
+                                <div key={`m${i}`} className="text-xs text-white/40 flex items-start gap-1"><span className="text-[#E32726]/60 mt-0.5">·</span>{inc}</div>
+                              ))}
+                              {pkg.hasGenerator && EQUIPMENT_MODULES.generator.items.map((inc, i) => (
+                                <div key={`g${i}`} className="text-xs text-white/40 flex items-start gap-1"><span className="text-[#E32726]/60 mt-0.5">·</span>{inc}</div>
+                              ))}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
                   <div className="space-y-2">
                     {EQUIPMENT_PACKAGES[equipmentTab].map((pkg) => {
                       const sel = selectedItems.find(e => e.key === (isMultiDay ? `${pkg.id}::${effectiveAddonDay}` : pkg.id));
@@ -576,6 +660,7 @@ function NewBookingForm() {
                       );
                     })}
                   </div>
+                  )}
                 </div>
               )}
 
@@ -881,7 +966,9 @@ function NewBookingForm() {
                           <div className="flex justify-between">
                             <span className="truncate max-w-[140px] text-xs text-white/70">{e.name}{e.quantity > 1 ? ` ×${e.quantity}` : ''}</span>
                             <span className="shrink-0 ml-1 text-xs">
-                              {e.is_complimentary ? <span className="text-green-400 font-semibold">COMP</span> : formatPHP(lineTotal)}
+                              {e.is_complimentary
+                                ? <span className="text-green-400 font-semibold">{e.category === 'package_item' ? 'Included' : 'COMP'}</span>
+                                : formatPHP(lineTotal)}
                             </span>
                           </div>
                           {/* Custom price + discount controls */}

@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { formatPHP, groupByDayDate, groupByCategory, categoryLabel } from '@/lib/utils';
-import { Equipment, BookingEquipment, BookingDay, STUDIO_RATES, CATEGORY_LABELS, EQUIPMENT_PACKAGES, ADDON_ITEMS } from '@/lib/types';
+import { Equipment, BookingEquipment, BookingDay, STUDIO_RATES, CATEGORY_LABELS, EQUIPMENT_PACKAGES, EVENT_PACKAGES, EQUIPMENT_MODULES, EVENT_VENUE, EVENT_GENERATOR_PRICE, ADDON_ITEMS, isEventVenueName, isEventPackageRowName } from '@/lib/types';
 
 type PackageCat = keyof typeof EQUIPMENT_PACKAGES;
 
@@ -110,7 +110,7 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
   });
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [tab, setTab] = useState<'packages' | 'individual' | 'addons' | 'manpower' | 'custom'>('packages');
-  const [pkgCat, setPkgCat] = useState<PackageCat>('camera');
+  const [pkgCat, setPkgCat] = useState<PackageCat | 'event'>('camera');
   const [indCat, setIndCat] = useState('camera');
   const [search, setSearch] = useState('');
   const [saving, setSaving] = useState(false);
@@ -133,6 +133,42 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
     const day = isMultiDay ? effectiveAddonDay : undefined;
     const name = `${pkg.label} Package — ${pkg.subtitle}` + (day ? ` (${dayShortLabel(day)})` : '');
     setItems(prev => [...prev, { key, name, rate: pkg.price, quantity: 1, is_complimentary: false, discount_pct: 0, item_type: 'package', day_date: day, category: 'package' }]);
+  }
+
+  // See toggleEventPackage in app/bookings/new/page.tsx for the full rationale — same
+  // multi-row expansion (priced Venue/Technical/Generator rows + ₱0 "Included in Package"
+  // rows for every bundled equipment item), mirrored here for editing existing bookings.
+  function addEventPackage(pkg: (typeof EVENT_PACKAGES)[number]) {
+    const day = isMultiDay ? effectiveAddonDay : undefined;
+    const dayTag2 = day || 'none';
+    const groupPrefix = `evt-${pkg.id}::${dayTag2}`;
+    const dayTag = day ? ` (${dayShortLabel(day)})` : '';
+
+    setItems(prev => {
+      const alreadySelected = prev.some(i => i.key.startsWith(groupPrefix));
+      const withoutEventGroup = prev.filter(i => !i.key.startsWith('evt-') || !i.key.includes(`::${dayTag2}::`));
+      if (alreadySelected) return withoutEventGroup;
+
+      const rows: EditItem[] = [
+        { key: `${groupPrefix}::venue`, name: `${EVENT_VENUE.name} — 14 Hours${dayTag}`, rate: EVENT_VENUE.price, quantity: 1, is_complimentary: false, discount_pct: 0, item_type: 'package', day_date: day, category: 'package' },
+      ];
+      if (pkg.technicalPrice > 0) {
+        rows.push({ key: `${groupPrefix}::technical`, name: `${pkg.label} — Technical Package${dayTag}`, rate: pkg.technicalPrice, quantity: 1, is_complimentary: false, discount_pct: 0, item_type: 'package', day_date: day, category: 'package' });
+      }
+      if (pkg.hasGenerator) {
+        rows.push({ key: `${groupPrefix}::generator`, name: `Generator & Power Package (14 hours)${dayTag}`, rate: EVENT_GENERATOR_PRICE, quantity: 1, is_complimentary: false, discount_pct: 0, item_type: 'package', day_date: day, category: 'package' });
+      }
+      let idx = 0;
+      const itemRow = (label: string): EditItem => ({
+        key: `${groupPrefix}::item::${idx++}`, name: label, rate: 0, quantity: 1,
+        is_complimentary: true, discount_pct: 0, item_type: 'package', day_date: day, category: 'package_item',
+      });
+      for (const inc of EVENT_VENUE.inclusions) rows.push(itemRow(inc));
+      for (const modKey of pkg.modules) for (const item of EQUIPMENT_MODULES[modKey].items) rows.push(itemRow(item));
+      if (pkg.hasGenerator) for (const item of EQUIPMENT_MODULES.generator.items) rows.push(itemRow(item));
+
+      return [...withoutEventGroup, ...rows];
+    });
   }
 
   function addEquipment(eq: Equipment) {
@@ -195,7 +231,19 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
     setShowCustom(false);
   }
 
-  function removeItem(key: string) { setItems(prev => prev.filter(i => i.key !== key)); }
+  function removeItem(key: string) {
+    // The venue line of an event package can't be removed on its own — that would leave
+    // technical/generator services billed with no venue underneath. Removing it removes
+    // the whole package group instead. Matched by name (not key) so this still works after
+    // a save/reload, when in-session `evt-<id>::<day>` keys have been replaced by generic
+    // `existing-<id>` ones — booking_equipment has no group-id column, only a name.
+    const target = items.find(i => i.key === key);
+    if (target && isEventVenueName(target.name)) {
+      setItems(prev => prev.filter(i => !(i.day_date === target.day_date && isEventPackageRowName(i.name))));
+      return;
+    }
+    setItems(prev => prev.filter(i => i.key !== key));
+  }
   function moveItem(key: string, direction: 'up' | 'down') {
     setItems(prev => {
       const idx = prev.findIndex(i => i.key === key);
@@ -363,7 +411,9 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
                       />
                     </div>
                     <div className="text-xs text-white/60 w-16 text-right shrink-0">
-                      {item.is_complimentary ? <span className="text-green-400">COMP</span> : formatPHP(lineTotal)}
+                      {item.is_complimentary
+                        ? <span className="text-green-400">{item.category === 'package_item' ? 'Included' : 'COMP'}</span>
+                        : formatPHP(lineTotal)}
                     </div>
                     <button onClick={() => removeItem(item.key)} className="text-white/20 hover:text-red-400 text-xs">✕</button>
                   </div>
@@ -442,10 +492,32 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
               {(Object.keys(EQUIPMENT_PACKAGES) as PackageCat[]).map(cat => (
                 <button key={cat} type="button" onClick={() => setPkgCat(cat)}
                   className={`px-2 py-1 rounded text-xs whitespace-nowrap transition-colors ${pkgCat === cat ? 'bg-[#2a2a2a] text-white' : 'text-white/40 hover:text-white'}`}>
-                  {cat === 'camera' ? '🎥' : cat === 'lighting' ? '💡' : cat === 'beauty' ? '💄' : cat === 'vtr' ? '📺' : '🎪'} {cat}
+                  {cat === 'camera' ? '🎥' : cat === 'lighting' ? '💡' : cat === 'beauty' ? '💄' : '📺'} {cat}
                 </button>
               ))}
+              <button type="button" onClick={() => setPkgCat('event')}
+                className={`px-2 py-1 rounded text-xs whitespace-nowrap transition-colors ${pkgCat === 'event' ? 'bg-[#2a2a2a] text-white' : 'text-white/40 hover:text-white'}`}>
+                🎪 event
+              </button>
             </div>
+            {pkgCat === 'event' ? (
+              <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                {EVENT_PACKAGES.map((pkg) => {
+                  const day = isMultiDay ? effectiveAddonDay : undefined;
+                  const sel = items.some(i => i.key.startsWith(`evt-${pkg.id}::${day || 'none'}`));
+                  return (
+                    <button key={pkg.id} type="button" onClick={() => addEventPackage(pkg)}
+                      className={`w-full text-left p-2.5 rounded-lg border text-xs transition-all ${sel ? 'border-[#E32726] bg-[#E32726]/10' : 'border-[#2a2a2a] hover:border-[#3a3a3a]'}`}>
+                      <div className="flex justify-between">
+                        <span className="text-white font-medium">{pkg.label}</span>
+                        <span className="text-[#E32726] font-bold">{formatPHP(pkg.total)}</span>
+                      </div>
+                      <div className="text-white/40 mt-0.5">{pkg.subtitle}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
             <div className="space-y-1.5 max-h-48 overflow-y-auto">
               {EQUIPMENT_PACKAGES[pkgCat].map((pkg) => {
                 const sel = items.find(i => i.key === addonKey(pkg.id));
@@ -461,6 +533,7 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
                 );
               })}
             </div>
+            )}
           </div>
         )}
 

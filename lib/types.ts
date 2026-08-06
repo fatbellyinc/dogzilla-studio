@@ -277,18 +277,6 @@ export const EQUIPMENT_PACKAGES = {
   vtr: [
     { id: 'VTR', label: 'VTR / Monitor Playback', subtitle: 'Multi-cam · Live switching · Director feed', price: 13000, was: 19500, savings: 6500, pct: 33, crew: 2, inclusions: ['2× Seetec P215 PRO Monitor (Full HD Director\'s Feed)', '2× Accsoon Cineview SE Wireless Video Transmitter', '1× Blackmagic ATEM Mini Pro (Live Switcher)', '2× V-Mount Battery 14.8V', '1× USB 3.0 Card Reader', '2× Studio Crew / Assistant'] },
   ],
-  // Flat-rate event/venue packages — fixed price with no "was" discount framing (unlike the
-  // production-equipment packages above), so was/savings/pct are set to price/0/0 and the
-  // UI hides the strikethrough/OFF badge whenever pct is 0. Inclusions here are the
-  // client-facing "Includes:" bullets only — never the itemized supplier equipment lists.
-  event: [
-    { id: 'EVT_VENUE', label: 'Venue Only', subtitle: '14-hour venue rental — no technical equipment or crew', price: 55000, was: 55000, savings: 0, pct: 0, crew: 0, inclusions: ['Event Venue, 14 hours', 'Air-conditioning', 'Holding Rooms', 'Client Lounge', 'Parking', 'Restrooms'] },
-    { id: 'EVT_ESSENTIALS', label: 'Event Essentials', subtitle: 'Venue + standard audio, basic lighting & power', price: 169000, was: 169000, savings: 0, pct: 0, crew: 2, inclusions: ['Event Venue, 14 hours', 'Professional Audio, Standard Rig', 'Basic Stage Lighting', 'Audio Technician / Crew', 'Light Technician / Crew', '100 kVA Generator & Power Package'] },
-    { id: 'EVT_LIVE_SHOWCASE', label: 'Live Showcase', subtitle: 'Standard audio + moving-head lighting rig', price: 189000, was: 189000, savings: 0, pct: 0, crew: 2, inclusions: ['Event Venue, 14 hours', 'Professional Audio, Standard Rig', 'Standard Lighting Rig with Moving Heads', '2 Wireless Microphones', 'Audio Technician / Crew', 'Light Technician / Crew', '100 kVA Generator & Power Package'] },
-    { id: 'EVT_PRODUCT_LAUNCH', label: 'Product Launch', subtitle: 'Launch audio, presentation lighting & LED wall', price: 199000, was: 199000, savings: 0, pct: 0, crew: 3, inclusions: ['Event Venue, 14 hours', 'Professional Audio, Launch Rig', 'Presentation Lighting', '9 ft × 12 ft P3 LED Wall', '10 Wireless Microphones', 'Audio Technician / Crew', 'Light Technician / Crew', 'Video Technician / Crew', '100 kVA Generator & Power Package'] },
-    { id: 'EVT_DANCE_PARTY', label: 'Dance Party', subtitle: 'Dance audio rig + standard lighting, no LED wall', price: 209000, was: 209000, savings: 0, pct: 0, crew: 2, inclusions: ['Event Venue, 14 hours', 'Professional Audio, Dance Rig', 'Standard Lighting Rig', 'Audio Technician / Crew', 'Light Technician / Crew', '100 kVA Generator & Power Package', 'No LED Wall'] },
-    { id: 'EVT_DANCE_PARTY_LED', label: 'Dance Party + LED Wall', subtitle: 'Dance Party, upgraded with a 9×12 P3 LED wall', price: 229000, was: 229000, savings: 0, pct: 0, crew: 3, inclusions: ['Event Venue, 14 hours', 'Professional Audio, Dance Rig', 'Standard Lighting Rig', 'Audio Technician / Crew', 'Light Technician / Crew', '100 kVA Generator & Power Package', '9 ft × 12 ft P3 LED Wall', 'Video Technician / Crew'] },
-  ],
 } as const;
 
 // name → inclusions lookup, built from every package across every EQUIPMENT_PACKAGES category.
@@ -298,6 +286,99 @@ export const EQUIPMENT_PACKAGES = {
 export const PACKAGE_INCLUSIONS_BY_NAME: Record<string, readonly string[]> = Object.fromEntries(
   Object.values(EQUIPMENT_PACKAGES).flatMap(pkgs => pkgs.map(p => [`${p.label} Package — ${p.subtitle}`, p.inclusions] as const)),
 );
+
+// ─── Event packages ─────────────────────────────────────────────────────────
+// Unlike EQUIPMENT_PACKAGES above (one flat-price line item per selection), an event
+// package expands into several real booking_equipment rows: a priced Venue line
+// (always present, never removable, never duplicated), a priced Technical line,
+// an optional priced Generator line, and a zero-rate "Included in Package" row for
+// every individual piece of equipment those modules bundle — so every document that
+// already renders booking_equipment (quotation, invoice, BIR docs, pull sheet) shows
+// full itemization for free, with no per-document special-casing needed.
+
+export const EQUIPMENT_MODULES = {
+  standard_audio: { name: 'Standard Audio', items: [
+    '4× Turbo-sound TBV123-AN Compact Line Array', '4× Turbo-sound TBV118 Subwoofer',
+    'Yamaha DM3 Digital Mixer', 'CDJ 350', 'DJM 350',
+    '2× AMS Wireless Microphones', 'AMS Wireless Paddle', 'AMS Wireless Receiver',
+    'Microphone Stand', 'Distro Box', 'Cable and Connectors', '5× Rubber Humps',
+    'Audio Technician / Crew',
+  ] },
+  standard_lighting: { name: 'Standard Lighting', items: [
+    '4× VLTG 290 Moving Lights', '4× Auto Light', '8× LED Par RGBW',
+    'Mini Quartz Lighting Controller', '2× Giant Light Stands',
+    'Distro Box', 'Cable and Connector', '5× Rubber Humps', 'Light Technician / Crew',
+  ] },
+  launch_audio: { name: 'Product Launch Audio', items: [
+    '2× JBL PRX-One', 'Yamaha DM3 Digital Mixer', 'CDJ 350', 'DJM 350',
+    '10× AMS Wireless Microphones', 'AMS Wireless Paddle', 'AMS Wireless Receiver',
+    'Microphone Stand', 'Distro Box', 'Cable and Connectors', '5× Rubber Humps',
+    'Audio Technician / Crew',
+  ] },
+  launch_lighting: { name: 'Product Launch Lighting', items: [
+    '4× Mac Aura', '4× Diva Light', 'Quartz Lighting Controller',
+    'Distro Box', 'Cable and Connector', '5× Rubber Humps', 'Light Technician / Crew',
+  ] },
+  led_wall: { name: 'LED Wall', items: [
+    'Tentech P3 9x12 LED Wall', 'LED Wall Riser', 'Video Processor',
+    'HDMI Cable', 'Laptop', 'Cable and Connector', 'Video Technician / Crew',
+  ] },
+  dj_equipment: { name: 'DJ Equipment', items: [
+    '2× Turbo-sound Wedge Monitor', 'CDJ 3000', 'DJM A9',
+    'AMS Wireless Microphone', 'AMS Wireless Paddle', 'AMS Wireless Receiver',
+    'Cable and Connectors', 'Audio Technician / Crew',
+  ] },
+  shared_logistics: { name: 'Shared Logistics', items: [
+    'Trucking and Mobilization', 'Crew Transportation', 'Black Cloth', 'Duct / Caution / Warning Tapes',
+  ] },
+  generator: { name: 'Generator & Power', items: [
+    '100 kVA Generator', 'Power Box', 'Power Distribution',
+    '2 Generator Personnel', 'Generator Truck', 'Fuel (14 hours)',
+  ] },
+} as const;
+export type EquipmentModuleKey = keyof typeof EQUIPMENT_MODULES;
+
+export const EVENT_VENUE = {
+  name: 'Dogzilla Studio Event Venue',
+  price: 55000,
+  inclusions: ['14 Hours', 'Air-conditioning', '2 VIP Holding Rooms', 'Client Lounge', 'Parking', 'Restrooms'],
+} as const;
+
+export const EVENT_GENERATOR_PRICE = 45000; // client allocation — itemized via the 'generator' module
+export const EVENT_OT_STUDIO_RATE = 4000;   // ₱/hr after the included 14 hours
+export const EVENT_OT_GENERATOR_RATE = 2500; // ₱/hr after the included 14 hours
+
+export const EVENT_PACKAGES = [
+  { id: 'EVT_VENUE', label: 'Venue Only', subtitle: '14-hour venue rental — no technical equipment or crew', technicalPrice: 0, hasGenerator: false, modules: [] as EquipmentModuleKey[], total: 55000 },
+  { id: 'EVT_ESSENTIALS', label: 'Event Essentials', subtitle: 'Venue + standard audio, standard lighting & power', technicalPrice: 69000, hasGenerator: true, modules: ['standard_audio', 'standard_lighting', 'shared_logistics'] as EquipmentModuleKey[], total: 169000 },
+  { id: 'EVT_LIVE_SHOWCASE', label: 'Live Showcase', subtitle: 'Standard audio + moving-head lighting rig', technicalPrice: 89000, hasGenerator: true, modules: ['standard_audio', 'standard_lighting', 'shared_logistics'] as EquipmentModuleKey[], total: 189000 },
+  { id: 'EVT_PRODUCT_LAUNCH', label: 'Product Launch', subtitle: 'Launch audio, presentation lighting & LED wall', technicalPrice: 99000, hasGenerator: true, modules: ['launch_audio', 'launch_lighting', 'led_wall', 'shared_logistics'] as EquipmentModuleKey[], total: 199000 },
+  { id: 'EVT_DANCE_PARTY', label: 'Dance Party', subtitle: 'Dance audio rig + standard lighting, no LED wall', technicalPrice: 109000, hasGenerator: true, modules: ['dj_equipment', 'standard_lighting', 'shared_logistics'] as EquipmentModuleKey[], total: 209000 },
+  { id: 'EVT_DANCE_PARTY_LED', label: 'Dance Party + LED Wall', subtitle: 'Dance Party, upgraded with a 9×12 P3 LED wall', technicalPrice: 129000, hasGenerator: true, modules: ['dj_equipment', 'standard_lighting', 'led_wall', 'shared_logistics'] as EquipmentModuleKey[], total: 229000 },
+] as const;
+export type EventPackage = typeof EVENT_PACKAGES[number];
+
+// Name-based identification for event-package rows. In-session, sibling rows of the same
+// package share an `evt-<id>::<day>` key prefix — but only the row's `name` survives a
+// save/reload (booking_equipment has no group-id column), so anything that needs to find
+// "every row belonging to this event package" after a reload (e.g. blocking a lone venue
+// row from being deleted while leaving its technical/generator/itemized siblings behind)
+// has to match on name instead.
+export function isEventVenueName(name: string): boolean {
+  return name.startsWith(EVENT_VENUE.name);
+}
+const EVENT_ITEM_NAME_SET: Set<string> = new Set([
+  ...EVENT_VENUE.inclusions,
+  ...Object.values(EQUIPMENT_MODULES).flatMap(m => m.items),
+]);
+export function isEventPackageRowName(name: string): boolean {
+  if (isEventVenueName(name)) return true;
+  if (name.startsWith('Generator & Power Package (')) return true;
+  if (/ — Technical Package( \(|$)/.test(name)) return true;
+  // Strip a trailing " (Day N — ...)" day tag before checking the itemized-equipment set
+  const base = name.replace(/ \([^)]*\)$/, '');
+  return EVENT_ITEM_NAME_SET.has(name) || EVENT_ITEM_NAME_SET.has(base);
+}
 
 export const ADDON_ITEMS = [
   { id: 'ADD_HOLDING', label: 'Additional Holding Areas', price: 12500, description: 'Extra rooms with restrooms for larger productions' },

@@ -57,7 +57,7 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
   const studioRate = STUDIO_RATES[booking.studio_rate];
   const isMultiDay = bookingDays && bookingDays.length > 1;
 
-  type Line = { desc: string; qty: number; unit: number; total: number; bold?: boolean; indent?: boolean; comp?: boolean; disc?: number; isCategoryLabel?: boolean };
+  type Line = { desc: string; qty: number; unit: number; total: number; bold?: boolean; indent?: boolean; comp?: boolean; disc?: number; isCategoryLabel?: boolean; category?: string | null };
   const lines: Line[] = [];
 
   // Overtime is computed per day from each day's own call/wrap times — a booking-level
@@ -83,7 +83,7 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
         const comp = !!e.is_complimentary;
         const discPct = e.discount_pct || 0;
         const lineTotal = comp ? 0 : e.rate * e.quantity * (1 - discPct / 100);
-        lines.push({ desc: e.name, qty: e.quantity, unit: e.rate, total: lineTotal, indent: true, comp, disc: discPct > 0 ? discPct : undefined });
+        lines.push({ desc: e.name, qty: e.quantity, unit: e.rate, total: lineTotal, indent: true, comp, disc: discPct > 0 ? discPct : undefined, category: e.category });
       });
     });
   }
@@ -326,7 +326,7 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
             <tr key={i} style={{ borderBottom: '1px solid #e5e5e5', background: line.bold ? '#f8f8f8' : i % 2 === 0 ? '#fff' : '#fafafa' }}>
               <td style={{ padding: '8px 10px', paddingLeft: line.indent ? '22px' : '10px' }}>
                 <div style={{ fontWeight: line.bold ? 700 : 400 }}>{line.desc}</div>
-                {line.comp && <span style={{ fontSize: '10px', background: '#dcfce7', color: '#166534', padding: '1px 5px', borderRadius: '3px', fontWeight: 700 }}>COMPLIMENTARY</span>}
+                {line.comp && <span style={{ fontSize: '10px', background: '#dcfce7', color: '#166534', padding: '1px 5px', borderRadius: '3px', fontWeight: 700 }}>{line.category === 'package_item' ? 'INCLUDED IN PACKAGE' : 'COMPLIMENTARY'}</span>}
               </td>
               <td style={{ padding: '8px 10px', textAlign: 'center' }}>{line.qty}</td>
               <td style={{ padding: '8px 10px', textAlign: 'right' }}>{line.comp ? '—' : formatPHP(line.unit)}</td>

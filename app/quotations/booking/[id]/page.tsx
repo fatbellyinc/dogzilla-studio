@@ -47,7 +47,7 @@ function DocView({ bookingId }: { bookingId: string }) {
   const vatExempt = !!booking.vat_exempt;
   const isMultiDay = bookingDays && bookingDays.length > 1;
 
-  type Line = { code: string; desc: string; qty: number; unit: number; total: number; bold?: boolean; indent?: boolean; comp?: boolean; disc?: number; isCategoryLabel?: boolean; inclusions?: readonly string[] };
+  type Line = { code: string; desc: string; qty: number; unit: number; total: number; bold?: boolean; indent?: boolean; comp?: boolean; disc?: number; isCategoryLabel?: boolean; inclusions?: readonly string[]; category?: string | null };
   const lines: Line[] = [];
 
   // Overtime is computed per day from each day's own call/wrap times — a booking-level
@@ -83,6 +83,7 @@ function DocView({ bookingId }: { bookingId: string }) {
           comp,
           disc: disc > 0 ? disc : undefined,
           inclusions: PACKAGE_INCLUSIONS_BY_NAME[e.name],
+          category: e.category,
         });
       });
     });
@@ -332,7 +333,9 @@ function DocView({ bookingId }: { bookingId: string }) {
               <td style={{ padding: '8px 10px', paddingLeft: line.indent ? '22px' : '10px' }}>
                 <div style={{ fontWeight: line.bold ? 700 : 400 }}>{line.desc}</div>
                 {line.comp && (
-                  <span style={{ fontSize: '10px', background: '#dcfce7', color: '#166534', padding: '1px 5px', borderRadius: '3px', fontWeight: 700 }}>COMPLIMENTARY</span>
+                  <span style={{ fontSize: '10px', background: '#dcfce7', color: '#166534', padding: '1px 5px', borderRadius: '3px', fontWeight: 700 }}>
+                    {line.category === 'package_item' ? 'INCLUDED IN PACKAGE' : 'COMPLIMENTARY'}
+                  </span>
                 )}
                 {line.inclusions && line.inclusions.length > 0 && (
                   <ul style={{ margin: '3px 0 0', padding: 0, listStyle: 'none', fontSize: '10px', color: '#777' }}>
