@@ -19,9 +19,22 @@ export function recomputeBookingTotals(db: Database.Database, bookingId: number)
   const days = db.prepare('SELECT * FROM booking_days WHERE booking_id = ? ORDER BY date').all(bookingId) as
     { date: string; day_type: string; studio_rate: string; hours: number; subtotal: number; call_time: string | null; wrap_time: string | null }[];
   const equipment = db.prepare('SELECT * FROM booking_equipment WHERE booking_id = ?').all(bookingId) as
-    { rate: number; quantity: number; is_complimentary: number; discount_pct: number }[];
+    { rate: number; quantity: number; is_complimentary: number; discount_pct: number; category: string | null; day_date: string | null }[];
 
-  const studioSubtotal = days.length ? days.reduce((s, d) => s + d.subtotal, 0) : booking.subtotal;
+  // A day that has an event package's own Venue line (evt_venue category) already has its
+  // venue charge covered by that ₱55,000 line — its own default studio-rate subtotal (e.g.
+  // ₱45,000 Full Day) must NOT also be counted, or the venue is billed twice. This is computed
+  // from the actual stored equipment rather than trusted from booking_days.subtotal, so the
+  // total is correct even if some UI path failed to zero it out when the package was added.
+  // A day-less event-venue row (added before the booking became multi-day) is folded into the
+  // first day, matching how quotation/invoice documents already display it.
+  const eventVenueDates = new Set(equipment.filter(e => e.category === 'evt_venue' && e.day_date).map(e => e.day_date));
+  const hasDaylessEventVenue = equipment.some(e => e.category === 'evt_venue' && !e.day_date);
+  if (hasDaylessEventVenue && days.length) eventVenueDates.add(days[0].date);
+
+  const studioSubtotal = days.length
+    ? days.reduce((s, d) => s + (eventVenueDates.has(d.date) ? 0 : d.subtotal), 0)
+    : booking.subtotal;
   const eqTotal = equipment.reduce((s, e) => s + (e.is_complimentary ? 0 : e.rate * e.quantity * (1 - (e.discount_pct || 0) / 100)), 0);
 
   // Overtime: per-day when there's more than one day (each day can run different hours),

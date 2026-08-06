@@ -2,7 +2,7 @@
 import { use, useEffect, useState, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { formatPHP, formatDate, fmt24, calcOT, OT_RATE, groupByDayDate, groupByCategory, categoryLabel } from '@/lib/utils';
-import { Booking, BookingEquipment, Quotation, BookingDay, Payment, STUDIO_RATES, VAT_RATE, PAYMENT_ACCOUNTS, NO_DATE_SENTINEL, PACKAGE_INCLUSIONS_BY_NAME } from '@/lib/types';
+import { Booking, BookingEquipment, Quotation, BookingDay, Payment, STUDIO_RATES, VAT_RATE, PAYMENT_ACCOUNTS, NO_DATE_SENTINEL, PACKAGE_INCLUSIONS_BY_NAME, EVENT_OT_STUDIO_RATE } from '@/lib/types';
 
 function fullDayLabel(date: string) {
   if (date === NO_DATE_SENTINEL) return '📌 No date yet';
@@ -66,6 +66,13 @@ function DocView({ bookingId }: { bookingId: string }) {
   // grouped right under that day's studio line — otherwise it's hard to tell which day rented
   // what on a multi-day booking.
   const equipmentByDay = groupByDayDate(equipment);
+  // A day whose own venue charge is carried by an event package's Venue line must show ₱0 on
+  // its own heading, not the default studio rate — matches the server-side total calc in
+  // recomputeBookingTotals (lib/booking-calc.ts), which already excludes these days from the
+  // studio subtotal. Derived from the actual stored equipment, not the raw day.subtotal.
+  const eventVenueDates = new Set(equipment.filter(e => e.category === 'evt_venue' && e.day_date).map(e => e.day_date));
+  const hasDaylessEventVenue = equipment.some(e => e.category === 'evt_venue' && !e.day_date);
+  if (hasDaylessEventVenue && bookingDays?.length) eventVenueDates.add(bookingDays[0].date);
   const rawGeneralEquipment = equipmentByDay.find(g => g.dayDate === null)?.items ?? [];
   // An event package added before a booking became multi-day keeps its rows tagged to no
   // specific day (day_date null) — that used to render as its own trailing "extra" section
@@ -124,18 +131,24 @@ function DocView({ bookingId }: { bookingId: string }) {
     // Multi-day: show each day as a separate studio line, with that day's own OT and
     // equipment right under it
     bookingDays.forEach((d, i) => {
+      const isEventVenueDay = eventVenueDates.has(d.date);
       const dayRate = STUDIO_RATES[d.studio_rate as keyof typeof STUDIO_RATES];
-      const dayLabel = d.day_type === 'setup' ? '🔧 Set-Up Day' : d.day_type === 'cancelled' ? '🚫 Cancelled' : '🎬 Shoot Day';
+      const dayLabel = d.day_type === 'setup' ? '🔧 Set-Up Day' : d.day_type === 'cancelled' ? '🚫 Cancelled' : isEventVenueDay ? '🎪 Event Day' : '🎬 Shoot Day';
       const dateStr = fullDayLabel(d.date);
+      const dayAmount = isEventVenueDay ? 0 : d.subtotal;
       lines.push({
         code: d.studio_rate.toUpperCase(),
-        desc: `Day ${i + 1} — ${dayLabel} · ${dateStr} · ${dayRate?.label || d.studio_rate}`,
+        desc: `Day ${i + 1} — ${dayLabel} · ${dateStr}${isEventVenueDay ? '' : ` · ${dayRate?.label || d.studio_rate}`}`,
         qty: 1,
-        unit: d.subtotal,
-        total: d.subtotal,
+        unit: dayAmount,
+        total: dayAmount,
         bold: true,
       });
-      const dayOT = d.day_type === 'cancelled' ? { otHrs: 0, otAmount: 0, otRate: 0 } : calcOT(d.studio_rate, d.call_time || null, d.wrap_time || null);
+      let dayOT = d.day_type === 'cancelled' ? { otHrs: 0, otAmount: 0, otRate: 0 } : calcOT(d.studio_rate, d.call_time || null, d.wrap_time || null);
+      // Event overtime is billed at its own rate, separate from the regular studio OT rate.
+      if (isEventVenueDay && dayOT.otHrs > 0) {
+        dayOT = { ...dayOT, otRate: EVENT_OT_STUDIO_RATE, otAmount: dayOT.otHrs * EVENT_OT_STUDIO_RATE };
+      }
       if (dayOT.otHrs > 0) {
         otHrs += dayOT.otHrs;
         otAmount += dayOT.otAmount;
