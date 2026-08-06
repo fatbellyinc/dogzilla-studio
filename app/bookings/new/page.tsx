@@ -543,7 +543,7 @@ function NewBookingForm() {
                     {(Object.keys(EQUIPMENT_PACKAGES) as PackageCategory[]).map(cat => (
                       <button key={cat} type="button" onClick={() => setEquipmentTab(cat)}
                         className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${equipmentTab === cat ? 'bg-[#2a2a2a] text-white' : 'text-white/40 hover:text-white'}`}>
-                        {cat === 'camera' ? '🎥 Camera' : cat === 'lighting' ? '💡 Lighting' : cat === 'beauty' ? '💄 Beauty' : '📺 VTR'}
+                        {cat === 'camera' ? '🎥 Camera' : cat === 'lighting' ? '💡 Lighting' : cat === 'beauty' ? '💄 Beauty' : cat === 'vtr' ? '📺 VTR' : '🎪 Event'}
                       </button>
                     ))}
                   </div>
@@ -558,13 +558,13 @@ function NewBookingForm() {
                             <div className="flex-1">
                               <div className="flex items-center gap-2">
                                 <span className="text-sm font-semibold text-white">{pkg.label}</span>
-                                <span className="text-xs bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded">{pkg.pct}% OFF</span>
+                                {pkg.pct > 0 && <span className="text-xs bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded">{pkg.pct}% OFF</span>}
                               </div>
                               <div className="text-xs text-white/40 mt-0.5">{pkg.subtitle}</div>
                             </div>
                             <div className="text-right ml-3 shrink-0">
                               <div className="text-sm font-bold text-[#E32726]">{formatPHP(pkg.price)}</div>
-                              <div className="text-xs text-white/30 line-through">{formatPHP(pkg.was)}</div>
+                              {pkg.pct > 0 && <div className="text-xs text-white/30 line-through">{formatPHP(pkg.was)}</div>}
                             </div>
                           </div>
                           <div className="mt-2 grid grid-cols-2 gap-x-2">
@@ -675,9 +675,11 @@ function NewBookingForm() {
                         <button type="button" onClick={() => toggleAddon(addon)} className="w-full text-left">
                           <div className="font-medium text-white text-xs">{addon.label}</div>
                           <div className="flex items-center gap-1.5 mt-0.5">
-                            <span className="text-[#E32726] text-xs font-bold">{formatPHP(discountedPrice)}</span>
+                            {addon.price === 0
+                              ? <span className="text-yellow-400 text-xs font-bold">Custom Quote</span>
+                              : <span className="text-[#E32726] text-xs font-bold">{formatPHP(discountedPrice)}</span>}
                             {sel?.discount_pct ? <span className="text-[10px] text-white/40 line-through">{formatPHP(effectivePrice)}</span> : null}
-                            {qty > 1 && <span className="text-[10px] text-white/40">({formatPHP(addon.price)} × {qty})</span>}
+                            {addon.price > 0 && qty > 1 && <span className="text-[10px] text-white/40">({formatPHP(addon.price)} × {qty})</span>}
                           </div>
                           <div className="text-white/30 text-xs mt-0.5 leading-tight">{addon.description}</div>
                         </button>

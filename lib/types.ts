@@ -277,7 +277,27 @@ export const EQUIPMENT_PACKAGES = {
   vtr: [
     { id: 'VTR', label: 'VTR / Monitor Playback', subtitle: 'Multi-cam · Live switching · Director feed', price: 13000, was: 19500, savings: 6500, pct: 33, crew: 2, inclusions: ['2× Seetec P215 PRO Monitor (Full HD Director\'s Feed)', '2× Accsoon Cineview SE Wireless Video Transmitter', '1× Blackmagic ATEM Mini Pro (Live Switcher)', '2× V-Mount Battery 14.8V', '1× USB 3.0 Card Reader', '2× Studio Crew / Assistant'] },
   ],
+  // Flat-rate event/venue packages — fixed price with no "was" discount framing (unlike the
+  // production-equipment packages above), so was/savings/pct are set to price/0/0 and the
+  // UI hides the strikethrough/OFF badge whenever pct is 0. Inclusions here are the
+  // client-facing "Includes:" bullets only — never the itemized supplier equipment lists.
+  event: [
+    { id: 'EVT_VENUE', label: 'Venue Only', subtitle: '14-hour venue rental — no technical equipment or crew', price: 55000, was: 55000, savings: 0, pct: 0, crew: 0, inclusions: ['Event Venue, 14 hours', 'Air-conditioning', 'Holding Rooms', 'Client Lounge', 'Parking', 'Restrooms'] },
+    { id: 'EVT_ESSENTIALS', label: 'Event Essentials', subtitle: 'Venue + standard audio, basic lighting & power', price: 169000, was: 169000, savings: 0, pct: 0, crew: 2, inclusions: ['Event Venue, 14 hours', 'Professional Audio, Standard Rig', 'Basic Stage Lighting', 'Audio Technician / Crew', 'Light Technician / Crew', '100 kVA Generator & Power Package'] },
+    { id: 'EVT_LIVE_SHOWCASE', label: 'Live Showcase', subtitle: 'Standard audio + moving-head lighting rig', price: 189000, was: 189000, savings: 0, pct: 0, crew: 2, inclusions: ['Event Venue, 14 hours', 'Professional Audio, Standard Rig', 'Standard Lighting Rig with Moving Heads', '2 Wireless Microphones', 'Audio Technician / Crew', 'Light Technician / Crew', '100 kVA Generator & Power Package'] },
+    { id: 'EVT_PRODUCT_LAUNCH', label: 'Product Launch', subtitle: 'Launch audio, presentation lighting & LED wall', price: 199000, was: 199000, savings: 0, pct: 0, crew: 3, inclusions: ['Event Venue, 14 hours', 'Professional Audio, Launch Rig', 'Presentation Lighting', '9 ft × 12 ft P3 LED Wall', '10 Wireless Microphones', 'Audio Technician / Crew', 'Light Technician / Crew', 'Video Technician / Crew', '100 kVA Generator & Power Package'] },
+    { id: 'EVT_DANCE_PARTY', label: 'Dance Party', subtitle: 'Dance audio rig + standard lighting, no LED wall', price: 209000, was: 209000, savings: 0, pct: 0, crew: 2, inclusions: ['Event Venue, 14 hours', 'Professional Audio, Dance Rig', 'Standard Lighting Rig', 'Audio Technician / Crew', 'Light Technician / Crew', '100 kVA Generator & Power Package', 'No LED Wall'] },
+    { id: 'EVT_DANCE_PARTY_LED', label: 'Dance Party + LED Wall', subtitle: 'Dance Party, upgraded with a 9×12 P3 LED wall', price: 229000, was: 229000, savings: 0, pct: 0, crew: 3, inclusions: ['Event Venue, 14 hours', 'Professional Audio, Dance Rig', 'Standard Lighting Rig', 'Audio Technician / Crew', 'Light Technician / Crew', '100 kVA Generator & Power Package', '9 ft × 12 ft P3 LED Wall', 'Video Technician / Crew'] },
+  ],
 } as const;
+
+// name → inclusions lookup, built from every package across every EQUIPMENT_PACKAGES category.
+// Booking line items only persist a free-text name (not the originating package id), so
+// documents that want to show inclusions for a selected package match on this exact name —
+// the same string togglePackage()/addPackage() write when a package is added to a booking.
+export const PACKAGE_INCLUSIONS_BY_NAME: Record<string, readonly string[]> = Object.fromEntries(
+  Object.values(EQUIPMENT_PACKAGES).flatMap(pkgs => pkgs.map(p => [`${p.label} Package — ${p.subtitle}`, p.inclusions] as const)),
+);
 
 export const ADDON_ITEMS = [
   { id: 'ADD_HOLDING', label: 'Additional Holding Areas', price: 12500, description: 'Extra rooms with restrooms for larger productions' },
@@ -287,6 +307,18 @@ export const ADDON_ITEMS = [
   { id: 'ADD_INTERCOM', label: 'Intercom (Hollyland Solidcom SE 8S)', price: 6500, description: 'Full-duplex wireless intercom, 8 headsets' },
   { id: 'ADD_REPAINT_FULL', label: 'Chroma Repaint — Full', price: 40000, description: 'Paint, tools & labor. Full cyc color change' },
   { id: 'ADD_REPAINT_FLOOR', label: 'Repaint — Floor Only', price: 15000, description: 'White floor retouching only. Book in advance' },
+  // Event package add-ons
+  { id: 'ADD_LED_UPGRADE', label: 'LED Wall Upgrade for Dance Party', price: 25000, description: 'Adds a 9 ft × 12 ft P3 LED Wall + Video Technician to the Dance Party package' },
+  { id: 'ADD_EVENT_HOURS', label: 'Additional Event Hours', price: 4000, description: '₱4,000/hour beyond the included 14 hours', perHour: true },
+  // Custom-quotation items — price 0 on purpose; the rate is set manually once quoted
+  { id: 'ADD_LIVESTREAM', label: 'Livestream', price: 0, description: 'Custom quotation — price set manually' },
+  { id: 'ADD_PHOTOGRAPHY', label: 'Photography', price: 0, description: 'Custom quotation — price set manually' },
+  { id: 'ADD_VIDEOGRAPHY', label: 'Videography', price: 0, description: 'Custom quotation — price set manually' },
+  { id: 'ADD_PIPE_DRAPE', label: 'Pipe & Drape', price: 0, description: 'Custom quotation — price set manually' },
+  { id: 'ADD_STAGE_PLATFORM', label: 'Stage Platform', price: 0, description: 'Custom quotation — price set manually' },
+  { id: 'ADD_WIRELESS_MICS', label: 'Additional Wireless Microphones', price: 0, description: 'Custom quotation — price set manually' },
+  { id: 'ADD_TECH_CREW', label: 'Additional Technical Crew', price: 0, description: 'Custom quotation — price set manually' },
+  { id: 'ADD_GENERATOR_UPGRADE', label: 'Generator Upgrade, 150 kVA or higher', price: 0, description: 'Custom quotation — price set manually' },
 ] as const;
 
 export const CATEGORY_LABELS: Record<string, string> = {

@@ -442,7 +442,7 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
               {(Object.keys(EQUIPMENT_PACKAGES) as PackageCat[]).map(cat => (
                 <button key={cat} type="button" onClick={() => setPkgCat(cat)}
                   className={`px-2 py-1 rounded text-xs whitespace-nowrap transition-colors ${pkgCat === cat ? 'bg-[#2a2a2a] text-white' : 'text-white/40 hover:text-white'}`}>
-                  {cat === 'camera' ? '🎥' : cat === 'lighting' ? '💡' : cat === 'beauty' ? '💄' : '📺'} {cat}
+                  {cat === 'camera' ? '🎥' : cat === 'lighting' ? '💡' : cat === 'beauty' ? '💄' : cat === 'vtr' ? '📺' : '🎪'} {cat}
                 </button>
               ))}
             </div>
@@ -561,7 +561,9 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
                   <button key={addon.id} type="button" onClick={() => addAddon(addon)}
                     className={`text-left p-2.5 rounded-lg border text-xs transition-all ${sel ? 'border-[#E32726] bg-[#E32726]/10' : 'border-[#2a2a2a] hover:border-[#3a3a3a]'}`}>
                     <div className="text-white font-medium">{addon.label}</div>
-                    <div className="text-[#E32726] font-bold mt-0.5">{formatPHP(addon.price)}</div>
+                    {addon.price === 0
+                      ? <div className="text-yellow-400 font-bold mt-0.5">Custom Quote</div>
+                      : <div className="text-[#E32726] font-bold mt-0.5">{formatPHP(addon.price)}</div>}
                   </button>
                 );
               })}

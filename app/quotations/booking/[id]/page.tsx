@@ -2,7 +2,7 @@
 import { use, useEffect, useState, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { formatPHP, formatDate, fmt24, calcOT, OT_RATE, groupByDayDate, groupByCategory, categoryLabel } from '@/lib/utils';
-import { Booking, BookingEquipment, Quotation, BookingDay, Payment, STUDIO_RATES, VAT_RATE, PAYMENT_ACCOUNTS, NO_DATE_SENTINEL } from '@/lib/types';
+import { Booking, BookingEquipment, Quotation, BookingDay, Payment, STUDIO_RATES, VAT_RATE, PAYMENT_ACCOUNTS, NO_DATE_SENTINEL, PACKAGE_INCLUSIONS_BY_NAME } from '@/lib/types';
 
 function fullDayLabel(date: string) {
   if (date === NO_DATE_SENTINEL) return '📌 No date yet';
@@ -47,7 +47,7 @@ function DocView({ bookingId }: { bookingId: string }) {
   const vatExempt = !!booking.vat_exempt;
   const isMultiDay = bookingDays && bookingDays.length > 1;
 
-  type Line = { code: string; desc: string; qty: number; unit: number; total: number; bold?: boolean; indent?: boolean; comp?: boolean; disc?: number; isCategoryLabel?: boolean };
+  type Line = { code: string; desc: string; qty: number; unit: number; total: number; bold?: boolean; indent?: boolean; comp?: boolean; disc?: number; isCategoryLabel?: boolean; inclusions?: readonly string[] };
   const lines: Line[] = [];
 
   // Overtime is computed per day from each day's own call/wrap times — a booking-level
@@ -82,6 +82,7 @@ function DocView({ bookingId }: { bookingId: string }) {
           indent: true,
           comp,
           disc: disc > 0 ? disc : undefined,
+          inclusions: PACKAGE_INCLUSIONS_BY_NAME[e.name],
         });
       });
     });
@@ -332,6 +333,11 @@ function DocView({ bookingId }: { bookingId: string }) {
                 <div style={{ fontWeight: line.bold ? 700 : 400 }}>{line.desc}</div>
                 {line.comp && (
                   <span style={{ fontSize: '10px', background: '#dcfce7', color: '#166534', padding: '1px 5px', borderRadius: '3px', fontWeight: 700 }}>COMPLIMENTARY</span>
+                )}
+                {line.inclusions && line.inclusions.length > 0 && (
+                  <ul style={{ margin: '3px 0 0', padding: 0, listStyle: 'none', fontSize: '10px', color: '#777' }}>
+                    {line.inclusions.map((inc, ii) => <li key={ii}>· {inc}</li>)}
+                  </ul>
                 )}
               </td>
               <td style={{ padding: '8px 10px', textAlign: 'center' }}>{line.qty}</td>
