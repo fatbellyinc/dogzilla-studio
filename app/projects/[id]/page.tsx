@@ -69,8 +69,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const clientTotal = costs.reduce((s, c) => s + c.client_cost, 0);
   const margin = clientTotal - internalTotal;
   const vatExempt = !!project.vat_exempt;
-  const withDP = calcScenario(clientTotal, project.markup_pct_dp, vatExempt);
-  const noDP = calcScenario(clientTotal, project.markup_pct_no_dp, vatExempt);
+  const noMarkup = !!project.no_markup;
+  const withDP = calcScenario(clientTotal, noMarkup ? 0 : project.markup_pct_dp, vatExempt);
+  const noDP = calcScenario(clientTotal, noMarkup ? 0 : project.markup_pct_no_dp, vatExempt);
 
   const byCategory = PROJECT_CATEGORIES.map(cat => ({
     category: cat,
@@ -370,11 +371,15 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
           <div className="text-xs text-white/40 mt-1">Margin (before markup/VAT)</div>
         </div>
         <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4">
-          <div className="text-lg font-black text-yellow-400">{vatExempt ? 'VAT-Exempt' : '12% VAT'}</div>
-          <div className="text-xs text-white/40 mt-1 flex items-center gap-1.5">
+          <div className="text-lg font-black text-yellow-400">{noMarkup ? 'At Cost' : vatExempt ? 'VAT-Exempt' : '12% VAT'}</div>
+          <div className="text-xs text-white/40 mt-1 flex flex-col gap-1">
             <label className="flex items-center gap-1 cursor-pointer">
               <input type="checkbox" checked={vatExempt} onChange={e => updateProject({ vat_exempt: e.target.checked ? 1 : 0 })} />
               VAT-exempt client
+            </label>
+            <label className="flex items-center gap-1 cursor-pointer">
+              <input type="checkbox" checked={noMarkup} onChange={e => updateProject({ no_markup: e.target.checked ? 1 : 0 })} />
+              No markup (bill at cost)
             </label>
           </div>
         </div>
@@ -394,8 +399,8 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             </div>
             <div className="flex items-center justify-between text-xs mb-1">
               <span className="text-white/40 flex items-center gap-1">
-                Markup <input type="number" value={s.pct} onChange={e => updateProject({ [s.key]: Number(e.target.value) } as Partial<Project>)}
-                  className="w-12 bg-[#0f0f0f] border border-[#2a2a2a] rounded px-1 py-0.5 text-white text-xs" />%
+                Markup <input type="number" value={s.pct} disabled={noMarkup} onChange={e => updateProject({ [s.key]: Number(e.target.value) } as Partial<Project>)}
+                  className="w-12 bg-[#0f0f0f] border border-[#2a2a2a] rounded px-1 py-0.5 text-white text-xs disabled:opacity-30" />%{noMarkup && <span className="text-white/30">(off)</span>}
               </span>
               <span className="text-white">{formatPHP(s.calc.markup)}</span>
             </div>

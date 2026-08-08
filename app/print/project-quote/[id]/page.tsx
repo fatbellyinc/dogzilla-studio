@@ -48,6 +48,7 @@ export default function ProjectQuotePage({ params }: { params: Promise<{ id: str
   if (!data) return <div className="p-8 text-gray-400">Loading...</div>;
   const { project, costs } = data;
   const vatExempt = !!project.vat_exempt;
+  const noMarkup = !!project.no_markup;
 
   if (typeof document !== 'undefined') {
     document.title = `Dogzilla_CostEstimate_${(project.quote_number || 'DZCE').replace(/[^a-zA-Z0-9-]+/g, '')}_${(project.client_name || project.name).replace(/[^a-zA-Z0-9]+/g, '-')}`;
@@ -57,8 +58,8 @@ export default function ProjectQuotePage({ params }: { params: Promise<{ id: str
     .map(cat => ({ category: cat, items: costs.filter(c => c.category === cat) }))
     .filter(g => g.items.length > 0);
   const clientTotal = costs.reduce((s, c) => s + c.client_cost, 0);
-  const withDP = calcScenario(clientTotal, project.markup_pct_dp, vatExempt);
-  const noDP = calcScenario(clientTotal, project.markup_pct_no_dp, vatExempt);
+  const withDP = calcScenario(clientTotal, noMarkup ? 0 : project.markup_pct_dp, vatExempt);
+  const noDP = calcScenario(clientTotal, noMarkup ? 0 : project.markup_pct_no_dp, vatExempt);
 
   async function saveDoc() {
     await fetch(`/api/projects/${id}`, {
@@ -94,7 +95,7 @@ export default function ProjectQuotePage({ params }: { params: Promise<{ id: str
             <td style={{ padding: '8px 12px', color: 'white', fontWeight: 700, textAlign: 'right' }}>{formatPHP(clientTotal)}</td>
           </tr>
           <tr style={{ borderBottom: '1px solid #eee' }}>
-            <td style={{ padding: '8px 12px', textAlign: 'right' }}>MARK-UP ({pctLabel}%)</td>
+            <td style={{ padding: '8px 12px', textAlign: 'right' }}>MARK-UP ({noMarkup ? '0' : pctLabel}%{noMarkup ? ' — waived' : ''})</td>
             <td style={{ padding: '8px 12px', textAlign: 'right' }}>{formatPHP(calc.markup)}</td>
           </tr>
           <tr style={{ borderBottom: '1px solid #eee' }}>

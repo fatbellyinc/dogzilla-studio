@@ -166,6 +166,7 @@ function initSchema(db: Database.Database) {
       markup_pct_dp REAL NOT NULL DEFAULT 10,
       markup_pct_no_dp REAL NOT NULL DEFAULT 15,
       vat_exempt INTEGER DEFAULT 0,
+      no_markup INTEGER DEFAULT 0,
       cost_exclusions TEXT,
       payment_terms TEXT,
       notes TEXT,
@@ -420,6 +421,7 @@ function initSchema(db: Database.Database) {
     `ALTER TABLE project_costs ADD COLUMN contact_id INTEGER REFERENCES contacts(id)`,
     `ALTER TABLE contacts ADD COLUMN default_category TEXT NOT NULL DEFAULT 'others'`,
     `ALTER TABLE project_costs ADD COLUMN qty INTEGER NOT NULL DEFAULT 1`,
+    `ALTER TABLE projects ADD COLUMN no_markup INTEGER DEFAULT 0`,
   ];
   for (const sql of migrations) {
     try { db.exec(sql); } catch { /* column already exists */ }

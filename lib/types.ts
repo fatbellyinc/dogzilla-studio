@@ -200,6 +200,7 @@ export interface Project {
   markup_pct_dp: number;
   markup_pct_no_dp: number;
   vat_exempt: number;
+  no_markup: number;
   cost_exclusions: string | null;
   payment_terms: string | null;
   notes: string | null;

@@ -16,7 +16,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   const body = await req.json();
   const {
     name, client_name, client_company, client_title, description, status,
-    markup_pct_dp, markup_pct_no_dp, vat_exempt, cost_exclusions, payment_terms, notes,
+    markup_pct_dp, markup_pct_no_dp, vat_exempt, no_markup, cost_exclusions, payment_terms, notes,
   } = body;
 
   if (name !== undefined) db.prepare('UPDATE projects SET name = ? WHERE id = ?').run(name, id);
@@ -28,6 +28,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   if (markup_pct_dp !== undefined) db.prepare('UPDATE projects SET markup_pct_dp = ? WHERE id = ?').run(Number(markup_pct_dp) || 0, id);
   if (markup_pct_no_dp !== undefined) db.prepare('UPDATE projects SET markup_pct_no_dp = ? WHERE id = ?').run(Number(markup_pct_no_dp) || 0, id);
   if (vat_exempt !== undefined) db.prepare('UPDATE projects SET vat_exempt = ? WHERE id = ?').run(vat_exempt ? 1 : 0, id);
+  if (no_markup !== undefined) db.prepare('UPDATE projects SET no_markup = ? WHERE id = ?').run(no_markup ? 1 : 0, id);
   if (cost_exclusions !== undefined) db.prepare('UPDATE projects SET cost_exclusions = ? WHERE id = ?').run(cost_exclusions || null, id);
   if (payment_terms !== undefined) db.prepare('UPDATE projects SET payment_terms = ? WHERE id = ?').run(payment_terms || null, id);
   if (notes !== undefined) db.prepare('UPDATE projects SET notes = ? WHERE id = ?').run(notes || null, id);
