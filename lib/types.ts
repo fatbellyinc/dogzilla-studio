@@ -220,6 +220,26 @@ export interface ProjectCost {
   qty: number;
   discount_type: 'percent' | 'fixed' | null;
   discount_value: number;
+  cost_flow: 'external' | 'internal';
+}
+
+export interface ProjectPayment {
+  id: number;
+  project_id: number;
+  amount: number;
+  type: 'deposit' | 'balance' | 'full';
+  method: string | null;
+  reference: string | null;
+  paid_at: string;
+  notes: string | null;
+}
+
+export interface ProjectInvoice {
+  id: number;
+  project_id: number;
+  invoice_number: string;
+  notes: string | null;
+  created_at: string;
 }
 
 export const CONTACT_TYPES = ['crew', 'vendor'] as const;

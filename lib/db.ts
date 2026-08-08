@@ -204,7 +204,33 @@ function initSchema(db: Database.Database) {
       contact_id INTEGER REFERENCES contacts(id) ON DELETE SET NULL,
       qty INTEGER NOT NULL DEFAULT 1,
       discount_type TEXT DEFAULT NULL, -- 'percent' | 'fixed' | null
-      discount_value REAL DEFAULT 0
+      discount_value REAL DEFAULT 0,
+      -- 'external': internal_cost actually leaves the business (paid to a vendor/contractor).
+      -- 'internal': Dogzilla owns the resource (own studio/equipment/crew) so the "cost" is
+      -- really revenue captured in-house, not real cash going out — drives the earnings summary.
+      cost_flow TEXT NOT NULL DEFAULT 'external'
+    );
+
+    -- One row per payment received against a project, mirroring the booking payments table.
+    -- Deposits print as an Acknowledgement Receipt, full/balance payments as an Official Receipt.
+    CREATE TABLE IF NOT EXISTS project_payments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      amount REAL NOT NULL,
+      type TEXT NOT NULL DEFAULT 'deposit', -- 'deposit' | 'balance' | 'full'
+      method TEXT,
+      reference TEXT,
+      paid_at TEXT DEFAULT (datetime('now')),
+      notes TEXT
+    );
+
+    -- Generated invoice records for a project, mirroring the booking invoices table.
+    CREATE TABLE IF NOT EXISTS project_invoices (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      invoice_number TEXT UNIQUE NOT NULL,
+      notes TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
     );
 
     CREATE TABLE IF NOT EXISTS blockout_dates (
@@ -426,6 +452,7 @@ function initSchema(db: Database.Database) {
     `ALTER TABLE projects ADD COLUMN no_markup INTEGER DEFAULT 0`,
     `ALTER TABLE project_costs ADD COLUMN discount_type TEXT DEFAULT NULL`,
     `ALTER TABLE project_costs ADD COLUMN discount_value REAL DEFAULT 0`,
+    `ALTER TABLE project_costs ADD COLUMN cost_flow TEXT NOT NULL DEFAULT 'external'`,
   ];
   for (const sql of migrations) {
     try { db.exec(sql); } catch { /* column already exists */ }

@@ -7,7 +7,9 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
   const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
   if (!project) return NextResponse.json({ error: 'Not found' }, { status: 404 });
   const costs = db.prepare('SELECT * FROM project_costs WHERE project_id = ? ORDER BY sort_order, id').all(id);
-  return NextResponse.json({ project, costs });
+  const payments = db.prepare('SELECT * FROM project_payments WHERE project_id = ? ORDER BY paid_at, id').all(id);
+  const invoices = db.prepare('SELECT * FROM project_invoices WHERE project_id = ? ORDER BY created_at, id').all(id);
+  return NextResponse.json({ project, costs, payments, invoices });
 }
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

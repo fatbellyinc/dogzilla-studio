@@ -2,7 +2,7 @@
 import { use, useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { formatPHP, calcDiscountAmount, calcListPriceFromNet } from '@/lib/utils';
-import { Project, ProjectCost, PROJECT_CATEGORIES, PROJECT_CATEGORY_LABELS, PROJECT_STATUSES, ProjectCategory, Contact, RATE_UNIT_LABELS, Equipment, STUDIO_RATES, CATEGORY_LABELS, PROJECT_CATEGORY_EQUIPMENT_CATALOG_CATS, PROJECT_CATEGORY_SHOWS_STUDIO, PROJECT_CATEGORY_ROLE_SUGGESTIONS, ADDON_ITEMS } from '@/lib/types';
+import { Project, ProjectCost, ProjectPayment, PROJECT_CATEGORIES, PROJECT_CATEGORY_LABELS, PROJECT_STATUSES, ProjectCategory, Contact, RATE_UNIT_LABELS, Equipment, STUDIO_RATES, CATEGORY_LABELS, PROJECT_CATEGORY_EQUIPMENT_CATALOG_CATS, PROJECT_CATEGORY_SHOWS_STUDIO, PROJECT_CATEGORY_ROLE_SUGGESTIONS, ADDON_ITEMS } from '@/lib/types';
 import BackButton from '@/components/BackButton';
 
 const STATUS_LABELS: Record<string, string> = {
@@ -10,13 +10,14 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 type DiscountType = 'percent' | 'fixed' | null;
+type CostFlow = 'external' | 'internal';
 interface EmptyItem {
   category: ProjectCategory; description: string; note: string; internal_cost: string; client_cost: string;
-  contact_id: number | null; qty: string; discount_type: DiscountType; discount_value: string;
+  contact_id: number | null; qty: string; discount_type: DiscountType; discount_value: string; cost_flow: CostFlow;
 }
 const emptyItem = (category: ProjectCategory): EmptyItem => ({
   category, description: '', note: '', internal_cost: '', client_cost: '', contact_id: null, qty: '1',
-  discount_type: null, discount_value: '',
+  discount_type: null, discount_value: '', cost_flow: 'external',
 });
 const CLIENT_MODES = ['sync', 'markup', 'custom'] as const;
 type ClientMode = typeof CLIENT_MODES[number];
@@ -52,6 +53,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const { id } = use(params);
   const [project, setProject] = useState<Project | null>(null);
   const [costs, setCosts] = useState<ProjectCost[]>([]);
+  const [payments, setPayments] = useState<ProjectPayment[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [newItem, setNewItem] = useState<EmptyItem>(emptyItem('pre_production'));
@@ -61,11 +63,13 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const [editingHeader, setEditingHeader] = useState(false);
   const [headerForm, setHeaderForm] = useState({ name: '', client_name: '', client_company: '', client_title: '', description: '' });
   const [saving, setSaving] = useState(false);
+  const [paymentForm, setPaymentForm] = useState({ amount: '', type: 'deposit', method: '', reference: '' });
 
   const load = useCallback(() => {
     fetch(`/api/projects/${id}`).then(r => r.json()).then(d => {
       setProject(d.project);
       setCosts(d.costs);
+      setPayments(d.payments || []);
     });
   }, [id]);
 
@@ -78,6 +82,12 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const internalTotal = costs.reduce((s, c) => s + c.internal_cost, 0);
   const clientTotal = costs.reduce((s, c) => s + c.client_cost, 0);
   const margin = clientTotal - internalTotal;
+  // What actually leaves the business (paid to vendors/contractors/crew) vs. what stays with
+  // Dogzilla because the "cost" is our own studio/equipment/in-house crew — that in-house
+  // portion is really captured revenue, not a real expense, so it belongs in earnings.
+  const paidOut = costs.filter(c => c.cost_flow === 'external').reduce((s, c) => s + c.internal_cost, 0);
+  const keptInHouse = costs.filter(c => c.cost_flow === 'internal').reduce((s, c) => s + c.internal_cost, 0);
+  const trueEarnings = clientTotal - paidOut;
   const vatExempt = !!project.vat_exempt;
   const noMarkup = !!project.no_markup;
   const withDP = calcScenario(clientTotal, noMarkup ? 0 : project.markup_pct_dp, vatExempt);
@@ -152,7 +162,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       category, contact_id: contact.id,
       description: `${contact.role ? `${contact.role} — ` : ''}${contact.name}`,
       note: '', internal_cost: unit > 0 ? String(unit) : '', client_cost: unit > 0 ? String(unit) : '',
-      qty: '1', unit_internal: unit, client_mode: 'sync', markup_pct: '0', discount_type: null, discount_value: '',
+      qty: '1', unit_internal: unit, client_mode: 'sync', markup_pct: '0', discount_type: null, discount_value: '', cost_flow: 'external',
     }));
   }
 
@@ -162,7 +172,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   function toggleRoleSuggestionStage(label: string, category: ProjectCategory) {
     toggleStage(`role:${label}`, () => ({
       category, contact_id: null, description: label, note: '', internal_cost: '', client_cost: '',
-      qty: '1', unit_internal: 0, client_mode: 'sync', markup_pct: '0', discount_type: null, discount_value: '',
+      qty: '1', unit_internal: 0, client_mode: 'sync', markup_pct: '0', discount_type: null, discount_value: '', cost_flow: 'external',
     }));
   }
 
@@ -170,18 +180,18 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     if (value.startsWith('studio:')) {
       const rateKey = value.slice('studio:'.length) as keyof typeof STUDIO_RATES;
       const rate = STUDIO_RATES[rateKey];
-      toggleStage(value, () => ({ category, contact_id: null, description: rate.label, note: '', internal_cost: String(rate.price), client_cost: String(rate.price), qty: '1', unit_internal: rate.price, client_mode: 'sync', markup_pct: '0', discount_type: null, discount_value: '' }));
+      toggleStage(value, () => ({ category, contact_id: null, description: rate.label, note: '', internal_cost: String(rate.price), client_cost: String(rate.price), qty: '1', unit_internal: rate.price, client_mode: 'sync', markup_pct: '0', discount_type: null, discount_value: '', cost_flow: 'internal' }));
     } else if (value.startsWith('eq:')) {
       const eq = equipment.find(e => e.id === Number(value.slice('eq:'.length)));
       if (!eq) return;
-      toggleStage(value, () => ({ category, contact_id: null, description: eq.name, note: '', internal_cost: String(eq.daily_rate), client_cost: String(eq.daily_rate), qty: '1', unit_internal: eq.daily_rate, client_mode: 'sync', markup_pct: '0', discount_type: null, discount_value: '' }));
+      toggleStage(value, () => ({ category, contact_id: null, description: eq.name, note: '', internal_cost: String(eq.daily_rate), client_cost: String(eq.daily_rate), qty: '1', unit_internal: eq.daily_rate, client_mode: 'sync', markup_pct: '0', discount_type: null, discount_value: '', cost_flow: 'internal' }));
     } else if (value.startsWith('addon:')) {
       const addon = ADDON_ITEMS.find(a => a.id === value.slice('addon:'.length));
       if (!addon) return;
       toggleStage(value, () => ({
         category, contact_id: null, description: addon.label,
         note: 'perHour' in addon && addon.perHour ? addon.description : '',
-        internal_cost: String(addon.price), client_cost: String(addon.price), qty: '1', unit_internal: addon.price, client_mode: 'sync', markup_pct: '0', discount_type: null, discount_value: '',
+        internal_cost: String(addon.price), client_cost: String(addon.price), qty: '1', unit_internal: addon.price, client_mode: 'sync', markup_pct: '0', discount_type: null, discount_value: '', cost_flow: 'internal',
       }));
     }
   }
@@ -229,7 +239,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     if (!items.length) return;
     await Promise.all(items.map(item => fetch('/api/project-costs', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ project_id: Number(id), category: item.category, description: item.description, note: item.note, internal_cost: item.internal_cost, client_cost: item.client_cost, contact_id: item.contact_id, qty: item.qty, discount_type: item.client_mode === 'custom' ? null : item.discount_type, discount_value: item.client_mode === 'custom' ? 0 : item.discount_value }),
+      body: JSON.stringify({ project_id: Number(id), category: item.category, description: item.description, note: item.note, internal_cost: item.internal_cost, client_cost: item.client_cost, contact_id: item.contact_id, qty: item.qty, discount_type: item.client_mode === 'custom' ? null : item.discount_type, discount_value: item.client_mode === 'custom' ? 0 : item.discount_value, cost_flow: item.cost_flow }),
     })));
     setStaged([]);
     load();
@@ -240,6 +250,22 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     await fetch(`/api/projects/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(fields) });
     await load();
     setSaving(false);
+  }
+
+  async function addPayment() {
+    if (!paymentForm.amount || Number(paymentForm.amount) <= 0) return;
+    await fetch('/api/project-payments', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project_id: Number(id), ...paymentForm }),
+    });
+    setPaymentForm({ amount: '', type: 'deposit', method: '', reference: '' });
+    load();
+  }
+
+  async function deletePayment(paymentId: number) {
+    if (!confirm('Delete this payment record?')) return;
+    await fetch(`/api/project-payments/${paymentId}`, { method: 'DELETE' });
+    load();
   }
 
   // Client Cost in this form is the list/sticker price; the discount (if any) is applied on
@@ -299,6 +325,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       category: c.category, description: c.description, note: c.note || '', internal_cost: String(c.internal_cost),
       client_cost: String(Math.round(listClient * 100) / 100), contact_id: c.contact_id, qty: String(c.qty || 1),
       discount_type: c.discount_type, discount_value: c.discount_value > 0 ? String(c.discount_value) : '',
+      cost_flow: c.cost_flow || 'external',
     });
   }
 
@@ -383,6 +410,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                 {PROJECT_STATUSES.map(s => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
               </select>
               <Link href={`/print/project-quote/${id}`} target="_blank" className="bg-[#E32726] text-white text-xs px-3 py-1.5 rounded-lg font-medium hover:bg-[#c41f1e] transition-colors">📄 Cost Estimate / Quotation</Link>
+              <Link href={`/print/project-invoice/${id}`} target="_blank" className="bg-[#1a1a1a] border border-[#2a2a2a] text-white text-xs px-3 py-1.5 rounded-lg font-medium hover:border-white/30 transition-colors">🧾 Invoice</Link>
               <button onClick={deleteProject} className="text-white/20 hover:text-red-400 text-xs border border-white/10 hover:border-red-400/40 px-2 py-1.5 rounded">✕ Delete</button>
             </div>
           </div>
@@ -415,6 +443,24 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
               No markup (bill at cost)
             </label>
           </div>
+        </div>
+      </div>
+
+      {/* Earnings — separates cost that actually leaves the business (paid to vendors/crew)
+          from cost the project "pays" to Dogzilla's own studio/equipment, which is really
+          captured revenue, not a real expense. Mark each line item 💸/🏠 below to drive this. */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+        <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4">
+          <div className="text-lg font-black text-red-400">{formatPHP(paidOut)}</div>
+          <div className="text-xs text-white/40 mt-1">💸 Paid Out (vendors/crew)</div>
+        </div>
+        <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4">
+          <div className="text-lg font-black text-white/70">{formatPHP(keptInHouse)}</div>
+          <div className="text-xs text-white/40 mt-1">🏠 Kept In-House (own studio/gear)</div>
+        </div>
+        <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4">
+          <div className={`text-lg font-black ${trueEarnings >= 0 ? 'text-green-400' : 'text-red-400'}`}>{formatPHP(trueEarnings)}</div>
+          <div className="text-xs text-white/40 mt-1">✅ True Earnings (client cost − paid out)</div>
         </div>
       </div>
 
@@ -702,6 +748,17 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                             </span>
                           )}
                         </div>
+                        <div className="flex items-center gap-2 text-[10px] text-white/40">
+                          <span>Internal cost:</span>
+                          <button type="button" onClick={() => setEditForm(f => ({ ...f, cost_flow: 'external' }))}
+                            className={`px-2 py-1 rounded border ${editForm.cost_flow === 'external' ? 'border-red-500/30 text-red-400 bg-red-500/10' : 'border-[#2a2a2a] text-white/40'}`}>
+                            💸 Paid out
+                          </button>
+                          <button type="button" onClick={() => setEditForm(f => ({ ...f, cost_flow: 'internal' }))}
+                            className={`px-2 py-1 rounded border ${editForm.cost_flow === 'internal' ? 'border-green-500/30 text-green-400 bg-green-500/10' : 'border-[#2a2a2a] text-white/40'}`}>
+                            🏠 Kept in-house
+                          </button>
+                        </div>
                         <div className="flex gap-2 justify-end">
                           <button onClick={() => setEditingId(null)} className="text-xs text-white/50 border border-[#2a2a2a] px-3 py-1.5 rounded">Cancel</button>
                           <button onClick={() => saveEdit(c.id)} className="text-xs bg-[#E32726] text-white px-3 py-1.5 rounded font-medium">Save</button>
@@ -720,6 +777,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                                 🏷️ -{c.discount_type === 'percent' ? `${c.discount_value}%` : formatPHP(c.discount_value)}
                               </span>
                             )}
+                            <span className={`text-[9px] px-1.5 py-0.5 rounded shrink-0 ${c.cost_flow === 'internal' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                              {c.cost_flow === 'internal' ? '🏠 in-house' : '💸 paid out'}
+                            </span>
                             {c.contact_id && contacts.find(ct => ct.id === c.contact_id) && (
                               <span className="text-[9px] bg-white/10 text-white/50 px-1.5 py-0.5 rounded shrink-0">
                                 {contacts.find(ct => ct.id === c.contact_id)!.type === 'crew' ? '🎬' : '🏢'} linked
@@ -747,6 +807,49 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             </div>
           );
         })}
+      </div>
+
+      {/* Payments — recording one here immediately makes an Acknowledgement Receipt (deposit)
+          or Official Receipt (balance/full) available to print/share for that specific payment. */}
+      <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4 mt-4">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-xs text-white/40 uppercase tracking-wider">Payments</h2>
+          <div className="text-xs text-white/50">
+            Paid: <span className="text-green-400 font-semibold">{formatPHP(payments.reduce((s, p) => s + p.amount, 0))}</span>
+          </div>
+        </div>
+        {payments.length > 0 && (
+          <div className="divide-y divide-[#2a2a2a] mb-3">
+            {payments.map(p => (
+              <div key={p.id} className="flex items-center justify-between py-2 text-sm">
+                <div>
+                  <span className="text-white font-medium">{formatPHP(p.amount)}</span>
+                  <span className="text-white/40 ml-2 capitalize">{p.type}</span>
+                  {p.method && <span className="text-white/30 ml-2">· {p.method}</span>}
+                  {p.reference && <span className="text-white/30 ml-2 font-mono text-xs">#{p.reference}</span>}
+                </div>
+                <div className="flex items-center gap-3 text-xs">
+                  <span className="text-white/30">{new Date(p.paid_at).toLocaleDateString('en-PH')}</span>
+                  <Link href={`/print/project-receipt/${p.id}`} target="_blank" className="text-[#E32726] hover:underline">
+                    {p.type === 'deposit' ? '🧾 AR' : '🧾 OR'}
+                  </Link>
+                  <button onClick={() => deletePayment(p.id)} className="text-white/20 hover:text-red-400">✕</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+          <input value={paymentForm.amount} onChange={e => setPaymentForm(f => ({ ...f, amount: e.target.value }))} type="number" placeholder="Amount ₱" className={ic} />
+          <select value={paymentForm.type} onChange={e => setPaymentForm(f => ({ ...f, type: e.target.value }))} className={ic}>
+            <option value="deposit">Deposit (→ AR)</option>
+            <option value="balance">Balance (→ OR)</option>
+            <option value="full">Full Payment (→ OR)</option>
+          </select>
+          <input value={paymentForm.method} onChange={e => setPaymentForm(f => ({ ...f, method: e.target.value }))} placeholder="Method (bank, cash...)" className={ic} />
+          <input value={paymentForm.reference} onChange={e => setPaymentForm(f => ({ ...f, reference: e.target.value }))} placeholder="Reference #" className={ic} />
+          <button onClick={addPayment} disabled={!paymentForm.amount} className="bg-[#E32726] text-white text-sm px-4 py-2 rounded-lg font-medium disabled:opacity-40">+ Record Payment</button>
+        </div>
       </div>
     </div>
   );
