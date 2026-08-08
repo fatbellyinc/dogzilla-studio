@@ -94,10 +94,12 @@ export default function ProjectQuotePage({ params }: { params: Promise<{ id: str
             <td style={{ padding: '8px 12px', color: 'white', fontWeight: 700, textAlign: 'right' }}>SUB TOTAL</td>
             <td style={{ padding: '8px 12px', color: 'white', fontWeight: 700, textAlign: 'right' }}>{formatPHP(clientTotal)}</td>
           </tr>
-          <tr style={{ borderBottom: '1px solid #eee' }}>
-            <td style={{ padding: '8px 12px', textAlign: 'right' }}>MARK-UP ({noMarkup ? '0' : pctLabel}%{noMarkup ? ' — waived' : ''})</td>
-            <td style={{ padding: '8px 12px', textAlign: 'right' }}>{formatPHP(calc.markup)}</td>
-          </tr>
+          {!noMarkup && (
+            <tr style={{ borderBottom: '1px solid #eee' }}>
+              <td style={{ padding: '8px 12px', textAlign: 'right' }}>MARK-UP ({pctLabel}%)</td>
+              <td style={{ padding: '8px 12px', textAlign: 'right' }}>{formatPHP(calc.markup)}</td>
+            </tr>
+          )}
           <tr style={{ borderBottom: '1px solid #eee' }}>
             <td style={{ padding: '8px 12px', textAlign: 'right' }}>SUB TOTAL 2</td>
             <td style={{ padding: '8px 12px', textAlign: 'right' }}>{formatPHP(calc.subtotal2)}</td>
