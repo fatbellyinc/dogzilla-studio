@@ -268,6 +268,21 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     load();
   }
 
+  // One-click flip for a single item, right from the list — no need to open the edit form
+  // just to change whether a cost is paid out or kept in-house.
+  async function quickToggleCostFlow(c: ProjectCost) {
+    const flow: CostFlow = c.cost_flow === 'internal' ? 'external' : 'internal';
+    await fetch(`/api/project-costs/${c.id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        category: c.category, description: c.description, note: c.note, internal_cost: c.internal_cost,
+        client_cost: c.client_cost, contact_id: c.contact_id, qty: c.qty, discount_type: c.discount_type,
+        discount_value: c.discount_value, cost_flow: flow,
+      }),
+    });
+    load();
+  }
+
   // Bulk-flip every item in a category at once — e.g. "all my Equipment Rental items are our
   // own gear, not paid out to a rental house" — instead of opening each line item one by one.
   async function markCategoryFlow(category: ProjectCategory, flow: CostFlow) {
@@ -803,9 +818,10 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                                 🏷️ -{c.discount_type === 'percent' ? `${c.discount_value}%` : formatPHP(c.discount_value)}
                               </span>
                             )}
-                            <span className={`text-[9px] px-1.5 py-0.5 rounded shrink-0 ${c.cost_flow === 'internal' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                            <button onClick={() => quickToggleCostFlow(c)} title="Click to flip in-house / paid out"
+                              className={`text-[9px] px-1.5 py-0.5 rounded shrink-0 cursor-pointer hover:opacity-80 ${c.cost_flow === 'internal' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
                               {c.cost_flow === 'internal' ? '🏠 in-house' : '💸 paid out'}
-                            </span>
+                            </button>
                             {c.contact_id && contacts.find(ct => ct.id === c.contact_id) && (
                               <span className="text-[9px] bg-white/10 text-white/50 px-1.5 py-0.5 rounded shrink-0">
                                 {contacts.find(ct => ct.id === c.contact_id)!.type === 'crew' ? '🎬' : '🏢'} linked
@@ -822,8 +838,8 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                             )}
                             <div className="text-xs text-blue-400">{formatPHP(c.client_cost)}</div>
                           </div>
-                          <button onClick={() => startEdit(c)} className="text-white/20 hover:text-white text-xs">✏</button>
-                          <button onClick={() => deleteItem(c.id)} className="text-white/20 hover:text-red-400 text-xs">✕</button>
+                          <button onClick={() => startEdit(c)} className="text-white/60 hover:text-white hover:bg-white/10 text-xs border border-[#2a2a2a] rounded px-2 py-1">✏️ Edit</button>
+                          <button onClick={() => deleteItem(c.id)} className="text-white/40 hover:text-red-400 hover:bg-red-500/10 text-xs border border-[#2a2a2a] rounded px-2 py-1">✕</button>
                         </div>
                       </div>
                     )
