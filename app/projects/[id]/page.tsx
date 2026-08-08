@@ -2,16 +2,16 @@
 import { use, useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { formatPHP } from '@/lib/utils';
-import { Project, ProjectCost, PROJECT_CATEGORIES, PROJECT_CATEGORY_LABELS, PROJECT_STATUSES, ProjectCategory, Contact, RATE_UNIT_LABELS, Equipment, STUDIO_RATES, CATEGORY_LABELS, PROJECT_CATEGORY_EQUIPMENT_CATALOG_CATS, PROJECT_CATEGORY_SHOWS_STUDIO, ADDON_ITEMS } from '@/lib/types';
+import { Project, ProjectCost, PROJECT_CATEGORIES, PROJECT_CATEGORY_LABELS, PROJECT_STATUSES, ProjectCategory, Contact, RATE_UNIT_LABELS, Equipment, STUDIO_RATES, CATEGORY_LABELS, PROJECT_CATEGORY_EQUIPMENT_CATALOG_CATS, PROJECT_CATEGORY_SHOWS_STUDIO, PROJECT_CATEGORY_ROLE_SUGGESTIONS, ADDON_ITEMS } from '@/lib/types';
 import BackButton from '@/components/BackButton';
 
 const STATUS_LABELS: Record<string, string> = {
   draft: 'Draft', quoted: 'Quoted', won: 'Won', lost: 'Lost', in_production: 'In Production', completed: 'Completed',
 };
 
-interface EmptyItem { category: ProjectCategory; description: string; note: string; internal_cost: string; client_cost: string; contact_id: number | null; }
-const emptyItem = (category: ProjectCategory): EmptyItem => ({ category, description: '', note: '', internal_cost: '', client_cost: '', contact_id: null });
-interface StagedItem extends EmptyItem { key: string; }
+interface EmptyItem { category: ProjectCategory; description: string; note: string; internal_cost: string; client_cost: string; contact_id: number | null; qty: string; }
+const emptyItem = (category: ProjectCategory): EmptyItem => ({ category, description: '', note: '', internal_cost: '', client_cost: '', contact_id: null, qty: '1' });
+interface StagedItem extends EmptyItem { key: string; unit_internal: number; unit_client: number; }
 
 function calcScenario(subtotal: number, markupPct: number, vatExempt: boolean) {
   const markup = subtotal * (markupPct / 100);
@@ -119,10 +119,20 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   }
 
   function toggleContactStage(contact: Contact, category: ProjectCategory) {
+    const unit = contact.default_rate > 0 ? contact.default_rate : 0;
     toggleStage(`contact:${contact.id}`, () => ({
       category, contact_id: contact.id,
       description: `${contact.role ? `${contact.role} — ` : ''}${contact.name}`,
-      note: '', internal_cost: contact.default_rate > 0 ? String(contact.default_rate) : '', client_cost: '',
+      note: '', internal_cost: unit > 0 ? String(unit) : '', client_cost: '', qty: '1', unit_internal: unit, unit_client: 0,
+    }));
+  }
+
+  // Quick-add checklist chips (e.g. "Cinematographer", "Assistant Director") so a producer can
+  // click through the roles/items a shoot of this type usually needs without first having every
+  // one of them saved as a Contact — a ₱0 reminder placeholder, cost filled in once quoted.
+  function toggleRoleSuggestionStage(label: string, category: ProjectCategory) {
+    toggleStage(`role:${label}`, () => ({
+      category, contact_id: null, description: label, note: '', internal_cost: '', client_cost: '', qty: '1', unit_internal: 0, unit_client: 0,
     }));
   }
 
@@ -130,24 +140,39 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     if (value.startsWith('studio:')) {
       const rateKey = value.slice('studio:'.length) as keyof typeof STUDIO_RATES;
       const rate = STUDIO_RATES[rateKey];
-      toggleStage(value, () => ({ category, contact_id: null, description: rate.label, note: '', internal_cost: String(rate.price), client_cost: String(rate.price) }));
+      toggleStage(value, () => ({ category, contact_id: null, description: rate.label, note: '', internal_cost: String(rate.price), client_cost: String(rate.price), qty: '1', unit_internal: rate.price, unit_client: rate.price }));
     } else if (value.startsWith('eq:')) {
       const eq = equipment.find(e => e.id === Number(value.slice('eq:'.length)));
       if (!eq) return;
-      toggleStage(value, () => ({ category, contact_id: null, description: eq.name, note: '', internal_cost: String(eq.daily_rate), client_cost: String(eq.daily_rate) }));
+      toggleStage(value, () => ({ category, contact_id: null, description: eq.name, note: '', internal_cost: String(eq.daily_rate), client_cost: String(eq.daily_rate), qty: '1', unit_internal: eq.daily_rate, unit_client: eq.daily_rate }));
     } else if (value.startsWith('addon:')) {
       const addon = ADDON_ITEMS.find(a => a.id === value.slice('addon:'.length));
       if (!addon) return;
       toggleStage(value, () => ({
         category, contact_id: null, description: addon.label,
         note: 'perHour' in addon && addon.perHour ? addon.description : '',
-        internal_cost: String(addon.price), client_cost: String(addon.price),
+        internal_cost: String(addon.price), client_cost: String(addon.price), qty: '1', unit_internal: addon.price, unit_client: addon.price,
       }));
     }
   }
 
   function updateStaged(key: string, fields: Partial<EmptyItem>) {
     setStaged(prev => prev.map(s => (s.key === key ? { ...s, ...fields } : s)));
+  }
+
+  // Changing quantity recalculates both cost columns off the item's per-unit rate — e.g. 3x
+  // Camera Operators or 2x LED Panels — while a direct edit to the cost fields themselves still
+  // works and simply stops tracking the per-unit rate until quantity is touched again.
+  function updateStagedQty(key: string, qty: string) {
+    setStaged(prev => prev.map(s => {
+      if (s.key !== key) return s;
+      const n = Math.max(1, Number(qty) || 1);
+      return {
+        ...s, qty: String(n),
+        internal_cost: s.unit_internal > 0 ? String(s.unit_internal * n) : s.internal_cost,
+        client_cost: s.unit_client > 0 ? String(s.unit_client * n) : s.client_cost,
+      };
+    }));
   }
 
   function removeStaged(key: string) {
@@ -159,7 +184,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     if (!items.length) return;
     await Promise.all(items.map(item => fetch('/api/project-costs', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ project_id: Number(id), category: item.category, description: item.description, note: item.note, internal_cost: item.internal_cost, client_cost: item.client_cost, contact_id: item.contact_id }),
+      body: JSON.stringify({ project_id: Number(id), category: item.category, description: item.description, note: item.note, internal_cost: item.internal_cost, client_cost: item.client_cost, contact_id: item.contact_id, qty: item.qty }),
     })));
     setStaged([]);
     load();
@@ -220,7 +245,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
 
   function startEdit(c: ProjectCost) {
     setEditingId(c.id);
-    setEditForm({ category: c.category, description: c.description, note: c.note || '', internal_cost: String(c.internal_cost), client_cost: String(c.client_cost), contact_id: c.contact_id });
+    setEditForm({ category: c.category, description: c.description, note: c.note || '', internal_cost: String(c.internal_cost), client_cost: String(c.client_cost), contact_id: c.contact_id, qty: String(c.qty || 1) });
   }
 
   async function saveEdit(costId: number) {
@@ -372,6 +397,23 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
           {PROJECT_CATEGORIES.map(c => <option key={c} value={c}>{PROJECT_CATEGORY_LABELS[c]}</option>)}
         </select>
 
+        {(PROJECT_CATEGORY_ROLE_SUGGESTIONS[newItem.category] ?? []).length > 0 && (
+          <div className="mb-3">
+            <div className="text-[10px] text-white/40 uppercase tracking-wider mb-1.5">Common items for this category — click to add (₱0 reminder, edit cost after)</div>
+            <div className="flex flex-wrap gap-1.5">
+              {PROJECT_CATEGORY_ROLE_SUGGESTIONS[newItem.category]!.map(label => {
+                const active = staged.some(s => s.key === `role:${label}`);
+                return (
+                  <button key={label} onClick={() => toggleRoleSuggestionStage(label, newItem.category)}
+                    className={`text-xs px-2.5 py-1.5 rounded-lg border transition-all ${active ? 'bg-[#E32726] border-[#E32726] text-white' : 'bg-[#0f0f0f] border-[#2a2a2a] text-white/70 hover:border-white/30'}`}>
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {contacts.some(c => c.default_category === newItem.category) && (
           <div className="mb-3">
             <div className="text-[10px] text-white/40 uppercase tracking-wider mb-1.5">Personnel / Vendor — click to add</div>
@@ -461,6 +503,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             {staged.map(s => (
               <div key={s.key} className="flex items-center gap-2">
                 <input value={s.description} onChange={e => updateStaged(s.key, { description: e.target.value })} className={ic + ' flex-1 min-w-0'} />
+                <input value={s.qty} onChange={e => updateStagedQty(s.key, e.target.value)} type="number" min="1" title="Quantity" className={ic + ' w-14'} />
                 <input value={s.internal_cost} onChange={e => updateStaged(s.key, { internal_cost: e.target.value })} type="number" placeholder="Internal ₱" className={ic + ' w-24'} />
                 <input value={s.client_cost} onChange={e => updateStaged(s.key, { client_cost: e.target.value })} type="number" placeholder="Client ₱" className={ic + ' w-24'} />
                 <button onClick={() => removeStaged(s.key)} className="text-white/30 hover:text-red-400 text-xs shrink-0">✕</button>
@@ -474,7 +517,11 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
           <summary className="text-white/40 cursor-pointer select-none mb-2">✏️ Custom / one-off item</summary>
           <input value={newItem.description} onChange={e => setNewItem(i => ({ ...i, description: e.target.value }))} placeholder="Description (e.g. Director — Treb Monteras)" className={ic + ' w-full mb-2'} />
           <input value={newItem.note} onChange={e => setNewItem(i => ({ ...i, note: e.target.value }))} placeholder="Note (optional — e.g. 2x AC, 2 Cam Op, Gaffer)" className={ic + ' w-full mb-2'} />
-          <div className="grid grid-cols-2 gap-2 mb-2">
+          <div className="grid grid-cols-3 gap-2 mb-2">
+            <div>
+              <label className="text-[10px] text-white/40 block mb-1">Qty</label>
+              <input value={newItem.qty} onChange={e => setNewItem(i => ({ ...i, qty: e.target.value }))} type="number" min="1" className={ic + ' w-full'} />
+            </div>
             <div>
               <label className="text-[10px] text-white/40 block mb-1">Internal Cost (₱) — actual cost to Dogzilla</label>
               <input value={newItem.internal_cost} onChange={e => setNewItem(i => ({ ...i, internal_cost: e.target.value }))} type="number" className={ic + ' w-full'} />
@@ -523,7 +570,8 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                         )}
                         <input value={editForm.description} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))} className={ic + ' w-full'} />
                         <input value={editForm.note} onChange={e => setEditForm(f => ({ ...f, note: e.target.value }))} placeholder="Note" className={ic + ' w-full'} />
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="grid grid-cols-3 gap-2">
+                          <input value={editForm.qty} onChange={e => setEditForm(f => ({ ...f, qty: e.target.value }))} type="number" min="1" className={ic} placeholder="Qty" />
                           <input value={editForm.internal_cost} onChange={e => setEditForm(f => ({ ...f, internal_cost: e.target.value }))} type="number" className={ic} placeholder="Internal cost" />
                           <input value={editForm.client_cost} onChange={e => setEditForm(f => ({ ...f, client_cost: e.target.value }))} type="number" className={ic} placeholder="Client cost" />
                         </div>
@@ -537,6 +585,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                         <div className="min-w-0">
                           <div className="text-sm text-white truncate flex items-center gap-1.5">
                             {c.description}
+                            {c.qty > 1 && (
+                              <span className="text-[9px] bg-white/10 text-white/50 px-1.5 py-0.5 rounded shrink-0">× {c.qty}</span>
+                            )}
                             {c.contact_id && contacts.find(ct => ct.id === c.contact_id) && (
                               <span className="text-[9px] bg-white/10 text-white/50 px-1.5 py-0.5 rounded shrink-0">
                                 {contacts.find(ct => ct.id === c.contact_id)!.type === 'crew' ? '🎬' : '🏢'} linked

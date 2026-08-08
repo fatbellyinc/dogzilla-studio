@@ -200,7 +200,8 @@ function initSchema(db: Database.Database) {
       internal_cost REAL NOT NULL DEFAULT 0,
       client_cost REAL NOT NULL DEFAULT 0,
       sort_order INTEGER DEFAULT 0,
-      contact_id INTEGER REFERENCES contacts(id) ON DELETE SET NULL
+      contact_id INTEGER REFERENCES contacts(id) ON DELETE SET NULL,
+      qty INTEGER NOT NULL DEFAULT 1
     );
 
     CREATE TABLE IF NOT EXISTS blockout_dates (
@@ -418,6 +419,7 @@ function initSchema(db: Database.Database) {
     `ALTER TABLE booking_costs ADD COLUMN day_date TEXT`,
     `ALTER TABLE project_costs ADD COLUMN contact_id INTEGER REFERENCES contacts(id)`,
     `ALTER TABLE contacts ADD COLUMN default_category TEXT NOT NULL DEFAULT 'others'`,
+    `ALTER TABLE project_costs ADD COLUMN qty INTEGER NOT NULL DEFAULT 1`,
   ];
   for (const sql of migrations) {
     try { db.exec(sql); } catch { /* column already exists */ }

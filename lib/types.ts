@@ -167,6 +167,27 @@ export const PROJECT_CATEGORY_SHOWS_STUDIO: Partial<Record<ProjectCategory, bool
   set_props_location: true,
 };
 
+// Quick-add checklist chips per category, pulled from past ballpark costs/quotations — lets a
+// producer click through the roles/line items a shoot of this type usually needs (so nothing
+// gets forgotten) without first having every one of them saved as a Contact.
+export const PROJECT_CATEGORY_ROLE_SUGGESTIONS: Partial<Record<ProjectCategory, readonly string[]>> = {
+  pre_production: ['Workshop / Casting', 'Communications', 'Storyboard Artist', 'Recce / Location Scout'],
+  production_personnel: [
+    'Director & DOP', 'Director', 'Cinematographer', 'Executive Producer', 'Line Producer',
+    'Assistant Director', 'Production Designer', 'Casting Director', 'Hair & Make-Up Artist',
+    'Stylist', 'Gaffer', 'Grip', 'Production Assistant', 'Utility',
+  ],
+  raw_stock: ['Hard Drive (Shoot & Master Copy)', 'Memory Cards'],
+  equipment: ['Camera & Lighting Rental Package', 'Livestream, VTR & PA System'],
+  set_props_location: ['Production Design Package', 'Props', 'Wardrobe', 'Location Permit'],
+  talents: ['Lead Talent', 'Supporting Talent', 'Extras', 'VO Talent'],
+  celebrity_entourage: ['Celebrity Talent Fee', 'Manager / Handler', 'Personal Assistant', 'Security'],
+  food_transpo: ['Food', 'Transportation', 'Groceries & Supplies'],
+  sanitation: ['Sanitation Kit', 'COVID / Health Testing'],
+  post_production: ['Full Post Production', 'Network Music', 'Stock Photos / AI Generation', 'VO Talent'],
+  others: [],
+};
+
 export interface Project {
   id: number;
   quote_number: string | null;
@@ -195,6 +216,7 @@ export interface ProjectCost {
   client_cost: number;
   sort_order: number;
   contact_id: number | null;
+  qty: number;
 }
 
 export const CONTACT_TYPES = ['crew', 'vendor'] as const;
