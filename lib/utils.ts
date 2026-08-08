@@ -86,6 +86,15 @@ export function calcDiscountAmount(subtotal: number, type: 'percent' | 'fixed' |
   return Math.min(value, subtotal);
 }
 
+// Inverse of calcDiscountAmount — given the already-discounted (net) amount and the discount
+// that produced it, recovers the pre-discount (list) price. Used to re-populate an editable
+// "list price" field for an item whose stored amount is already net of its discount.
+export function calcListPriceFromNet(net: number, type: 'percent' | 'fixed' | null, value: number): number {
+  if (!type || !value || value <= 0) return net;
+  if (type === 'percent') return value >= 100 ? net : net / (1 - value / 100);
+  return net + value;
+}
+
 // VAT-inclusive total from a VAT-exclusive subtotal, using the shared VAT_RATE from lib/types
 // (TRAIN Law, RA 10963). VAT-exempt bookings owe no VAT.
 export function calcVAT(subtotalExVAT: number, vatExempt: boolean, vatRate: number): { vatAmount: number; totalIncVAT: number } {

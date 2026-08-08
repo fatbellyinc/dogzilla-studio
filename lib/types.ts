@@ -218,6 +218,8 @@ export interface ProjectCost {
   sort_order: number;
   contact_id: number | null;
   qty: number;
+  discount_type: 'percent' | 'fixed' | null;
+  discount_value: number;
 }
 
 export const CONTACT_TYPES = ['crew', 'vendor'] as const;

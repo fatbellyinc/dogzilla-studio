@@ -1,7 +1,7 @@
 'use client';
 import { use, useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { formatPHP } from '@/lib/utils';
+import { formatPHP, calcDiscountAmount, calcListPriceFromNet } from '@/lib/utils';
 import { Project, ProjectCost, PROJECT_CATEGORIES, PROJECT_CATEGORY_LABELS, PROJECT_STATUSES, ProjectCategory, Contact, RATE_UNIT_LABELS, Equipment, STUDIO_RATES, CATEGORY_LABELS, PROJECT_CATEGORY_EQUIPMENT_CATALOG_CATS, PROJECT_CATEGORY_SHOWS_STUDIO, PROJECT_CATEGORY_ROLE_SUGGESTIONS, ADDON_ITEMS } from '@/lib/types';
 import BackButton from '@/components/BackButton';
 
@@ -9,24 +9,34 @@ const STATUS_LABELS: Record<string, string> = {
   draft: 'Draft', quoted: 'Quoted', won: 'Won', lost: 'Lost', in_production: 'In Production', completed: 'Completed',
 };
 
-interface EmptyItem { category: ProjectCategory; description: string; note: string; internal_cost: string; client_cost: string; contact_id: number | null; qty: string; }
-const emptyItem = (category: ProjectCategory): EmptyItem => ({ category, description: '', note: '', internal_cost: '', client_cost: '', contact_id: null, qty: '1' });
+type DiscountType = 'percent' | 'fixed' | null;
+interface EmptyItem {
+  category: ProjectCategory; description: string; note: string; internal_cost: string; client_cost: string;
+  contact_id: number | null; qty: string; discount_type: DiscountType; discount_value: string;
+}
+const emptyItem = (category: ProjectCategory): EmptyItem => ({
+  category, description: '', note: '', internal_cost: '', client_cost: '', contact_id: null, qty: '1',
+  discount_type: null, discount_value: '',
+});
 const CLIENT_MODES = ['sync', 'markup', 'custom'] as const;
 type ClientMode = typeof CLIENT_MODES[number];
+const DISCOUNT_TYPES: DiscountType[] = [null, 'percent', 'fixed'];
 interface StagedItem extends EmptyItem {
   key: string;
   unit_internal: number; // per-unit rate — qty × this = internal cost, recomputed automatically
   client_mode: ClientMode; // 'sync': client cost auto-copies internal (default); 'markup': internal × (1 + markup_pct); 'custom': a flat client price typed in directly
   markup_pct: string;
 }
-function recomputeStaged(s: Pick<StagedItem, 'qty' | 'unit_internal' | 'client_mode' | 'markup_pct' | 'internal_cost' | 'client_cost'>) {
+function recomputeStaged(s: Pick<StagedItem, 'qty' | 'unit_internal' | 'client_mode' | 'markup_pct' | 'internal_cost' | 'client_cost' | 'discount_type' | 'discount_value'>) {
   const qty = Math.max(1, Number(s.qty) || 1);
   const internal = s.unit_internal > 0 ? s.unit_internal * qty : Number(s.internal_cost) || 0;
-  const client = s.client_mode === 'markup'
-    ? internal * (1 + (Number(s.markup_pct) || 0) / 100)
-    : s.client_mode === 'custom'
-      ? Number(s.client_cost) || 0
-      : internal;
+  // Discount only applies on top of Sync/Markup — Custom mode already lets the price be typed
+  // in directly, so discounting it further would be redundant and confusing.
+  if (s.client_mode === 'custom') {
+    return { internal_cost: String(internal), client_cost: s.client_cost };
+  }
+  const listClient = s.client_mode === 'markup' ? internal * (1 + (Number(s.markup_pct) || 0) / 100) : internal;
+  const client = listClient - calcDiscountAmount(listClient, s.discount_type, Number(s.discount_value) || 0);
   return { internal_cost: String(internal), client_cost: String(Math.round(client * 100) / 100) };
 }
 
@@ -142,7 +152,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       category, contact_id: contact.id,
       description: `${contact.role ? `${contact.role} — ` : ''}${contact.name}`,
       note: '', internal_cost: unit > 0 ? String(unit) : '', client_cost: unit > 0 ? String(unit) : '',
-      qty: '1', unit_internal: unit, client_mode: 'sync', markup_pct: '0',
+      qty: '1', unit_internal: unit, client_mode: 'sync', markup_pct: '0', discount_type: null, discount_value: '',
     }));
   }
 
@@ -152,7 +162,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   function toggleRoleSuggestionStage(label: string, category: ProjectCategory) {
     toggleStage(`role:${label}`, () => ({
       category, contact_id: null, description: label, note: '', internal_cost: '', client_cost: '',
-      qty: '1', unit_internal: 0, client_mode: 'sync', markup_pct: '0',
+      qty: '1', unit_internal: 0, client_mode: 'sync', markup_pct: '0', discount_type: null, discount_value: '',
     }));
   }
 
@@ -160,18 +170,18 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     if (value.startsWith('studio:')) {
       const rateKey = value.slice('studio:'.length) as keyof typeof STUDIO_RATES;
       const rate = STUDIO_RATES[rateKey];
-      toggleStage(value, () => ({ category, contact_id: null, description: rate.label, note: '', internal_cost: String(rate.price), client_cost: String(rate.price), qty: '1', unit_internal: rate.price, client_mode: 'sync', markup_pct: '0' }));
+      toggleStage(value, () => ({ category, contact_id: null, description: rate.label, note: '', internal_cost: String(rate.price), client_cost: String(rate.price), qty: '1', unit_internal: rate.price, client_mode: 'sync', markup_pct: '0', discount_type: null, discount_value: '' }));
     } else if (value.startsWith('eq:')) {
       const eq = equipment.find(e => e.id === Number(value.slice('eq:'.length)));
       if (!eq) return;
-      toggleStage(value, () => ({ category, contact_id: null, description: eq.name, note: '', internal_cost: String(eq.daily_rate), client_cost: String(eq.daily_rate), qty: '1', unit_internal: eq.daily_rate, client_mode: 'sync', markup_pct: '0' }));
+      toggleStage(value, () => ({ category, contact_id: null, description: eq.name, note: '', internal_cost: String(eq.daily_rate), client_cost: String(eq.daily_rate), qty: '1', unit_internal: eq.daily_rate, client_mode: 'sync', markup_pct: '0', discount_type: null, discount_value: '' }));
     } else if (value.startsWith('addon:')) {
       const addon = ADDON_ITEMS.find(a => a.id === value.slice('addon:'.length));
       if (!addon) return;
       toggleStage(value, () => ({
         category, contact_id: null, description: addon.label,
         note: 'perHour' in addon && addon.perHour ? addon.description : '',
-        internal_cost: String(addon.price), client_cost: String(addon.price), qty: '1', unit_internal: addon.price, client_mode: 'sync', markup_pct: '0',
+        internal_cost: String(addon.price), client_cost: String(addon.price), qty: '1', unit_internal: addon.price, client_mode: 'sync', markup_pct: '0', discount_type: null, discount_value: '',
       }));
     }
   }
@@ -184,10 +194,19 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   // auto-compute: internal cost = rate × qty, and client cost either mirrors internal cost
   // (default), applies a markup% on top, or is a flat price typed in directly — matching
   // "3 Grip @ ₱1,500" auto-totaling to ₱4,500 without retyping the total by hand.
-  function updateStagedCompute(key: string, fields: Partial<Pick<StagedItem, 'qty' | 'unit_internal' | 'client_mode' | 'markup_pct' | 'client_cost'>>) {
+  function updateStagedCompute(key: string, fields: Partial<Pick<StagedItem, 'qty' | 'unit_internal' | 'client_mode' | 'markup_pct' | 'client_cost' | 'discount_type' | 'discount_value'>>) {
     setStaged(prev => prev.map(s => {
       if (s.key !== key) return s;
       const next = { ...s, ...fields };
+      return { ...next, ...recomputeStaged(next) };
+    }));
+  }
+
+  function cycleStagedDiscountType(key: string) {
+    setStaged(prev => prev.map(s => {
+      if (s.key !== key) return s;
+      const idx = DISCOUNT_TYPES.indexOf(s.discount_type);
+      const next = { ...s, discount_type: DISCOUNT_TYPES[(idx + 1) % DISCOUNT_TYPES.length] };
       return { ...next, ...recomputeStaged(next) };
     }));
   }
@@ -210,7 +229,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     if (!items.length) return;
     await Promise.all(items.map(item => fetch('/api/project-costs', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ project_id: Number(id), category: item.category, description: item.description, note: item.note, internal_cost: item.internal_cost, client_cost: item.client_cost, contact_id: item.contact_id, qty: item.qty }),
+      body: JSON.stringify({ project_id: Number(id), category: item.category, description: item.description, note: item.note, internal_cost: item.internal_cost, client_cost: item.client_cost, contact_id: item.contact_id, qty: item.qty, discount_type: item.client_mode === 'custom' ? null : item.discount_type, discount_value: item.client_mode === 'custom' ? 0 : item.discount_value }),
     })));
     setStaged([]);
     load();
@@ -223,11 +242,15 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     setSaving(false);
   }
 
+  // Client Cost in this form is the list/sticker price; the discount (if any) is applied on
+  // top when saving, so what's actually stored/billed is already net of the discount.
   async function addItem() {
     if (!newItem.description.trim()) return;
+    const listClient = Number(newItem.client_cost) || 0;
+    const netClient = listClient - calcDiscountAmount(listClient, newItem.discount_type, Number(newItem.discount_value) || 0);
     await fetch('/api/project-costs', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ project_id: Number(id), ...newItem }),
+      body: JSON.stringify({ project_id: Number(id), ...newItem, client_cost: String(Math.round(netClient * 100) / 100) }),
     });
     setNewItem(emptyItem(newItem.category));
     load();
@@ -271,12 +294,22 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
 
   function startEdit(c: ProjectCost) {
     setEditingId(c.id);
-    setEditForm({ category: c.category, description: c.description, note: c.note || '', internal_cost: String(c.internal_cost), client_cost: String(c.client_cost), contact_id: c.contact_id, qty: String(c.qty || 1) });
+    const listClient = calcListPriceFromNet(c.client_cost, c.discount_type, c.discount_value);
+    setEditForm({
+      category: c.category, description: c.description, note: c.note || '', internal_cost: String(c.internal_cost),
+      client_cost: String(Math.round(listClient * 100) / 100), contact_id: c.contact_id, qty: String(c.qty || 1),
+      discount_type: c.discount_type, discount_value: c.discount_value > 0 ? String(c.discount_value) : '',
+    });
   }
 
+  // Mirrors addItem: editForm.client_cost is the list price shown for editing (re-derived from
+  // the stored net amount), the discount is re-applied on save to produce the new net amount.
   async function saveEdit(costId: number) {
+    const listClient = Number(editForm.client_cost) || 0;
+    const netClient = listClient - calcDiscountAmount(listClient, editForm.discount_type, Number(editForm.discount_value) || 0);
     await fetch(`/api/project-costs/${costId}`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(editForm),
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...editForm, client_cost: String(Math.round(netClient * 100) / 100) }),
     });
     setEditingId(null);
     load();
@@ -558,7 +591,17 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                       = Client ₱ <input value={s.client_cost} onChange={e => updateStagedCompute(s.key, { client_cost: e.target.value })} type="number" title="Custom client price" className={ic + ' w-24'} />
                     </span>
                   ) : (
-                    <span className="text-blue-400">= Client {formatPHP(Number(s.client_cost) || 0)}</span>
+                    <>
+                      <button onClick={() => cycleStagedDiscountType(s.key)}
+                        className={`px-2 py-1 rounded border ${s.discount_type ? 'border-orange-500/30 text-orange-400 bg-orange-500/10' : 'border-[#2a2a2a] text-white/40'}`}>
+                        {s.discount_type === 'percent' ? '🏷️ % off' : s.discount_type === 'fixed' ? '🏷️ ₱ off' : '🏷️ No discount'}
+                      </button>
+                      {s.discount_type && (
+                        <input value={s.discount_value} onChange={e => updateStagedCompute(s.key, { discount_value: e.target.value })} type="number" min="0"
+                          title={s.discount_type === 'percent' ? 'Discount %' : 'Discount ₱'} className={ic + ' w-16'} />
+                      )}
+                      <span className="text-blue-400">= Client {formatPHP(Number(s.client_cost) || 0)}</span>
+                    </>
                   )}
                 </div>
               </div>
@@ -581,9 +624,24 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
               <input value={newItem.internal_cost} onChange={e => setNewItem(i => ({ ...i, internal_cost: e.target.value }))} type="number" className={ic + ' w-full'} />
             </div>
             <div>
-              <label className="text-[10px] text-white/40 block mb-1">Client Cost (₱) — pre-markup, shown to client</label>
+              <label className="text-[10px] text-white/40 block mb-1">Client Cost (₱) — list price, before discount</label>
               <input value={newItem.client_cost} onChange={e => setNewItem(i => ({ ...i, client_cost: e.target.value }))} type="number" className={ic + ' w-full'} />
             </div>
+          </div>
+          <div className="flex items-center gap-2 mb-2 text-[10px] text-white/40">
+            <button type="button" onClick={() => setNewItem(i => ({ ...i, discount_type: DISCOUNT_TYPES[(DISCOUNT_TYPES.indexOf(i.discount_type) + 1) % DISCOUNT_TYPES.length] }))}
+              className={`px-2 py-1 rounded border ${newItem.discount_type ? 'border-orange-500/30 text-orange-400 bg-orange-500/10' : 'border-[#2a2a2a] text-white/40'}`}>
+              {newItem.discount_type === 'percent' ? '🏷️ % off' : newItem.discount_type === 'fixed' ? '🏷️ ₱ off' : '🏷️ No discount'}
+            </button>
+            {newItem.discount_type && (
+              <input value={newItem.discount_value} onChange={e => setNewItem(i => ({ ...i, discount_value: e.target.value }))} type="number" min="0"
+                title={newItem.discount_type === 'percent' ? 'Discount %' : 'Discount ₱'} className={ic + ' w-16'} />
+            )}
+            {newItem.discount_type && (
+              <span className="text-blue-400">
+                = Net {formatPHP((Number(newItem.client_cost) || 0) - calcDiscountAmount(Number(newItem.client_cost) || 0, newItem.discount_type, Number(newItem.discount_value) || 0))}
+              </span>
+            )}
           </div>
           <button onClick={addItem} disabled={!newItem.description.trim()} className="bg-[#E32726] text-white text-sm px-4 py-2 rounded-lg font-medium disabled:opacity-40">+ Add Item</button>
         </details>
@@ -627,7 +685,22 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                         <div className="grid grid-cols-3 gap-2">
                           <input value={editForm.qty} onChange={e => setEditForm(f => ({ ...f, qty: e.target.value }))} type="number" min="1" className={ic} placeholder="Qty" />
                           <input value={editForm.internal_cost} onChange={e => setEditForm(f => ({ ...f, internal_cost: e.target.value }))} type="number" className={ic} placeholder="Internal cost" />
-                          <input value={editForm.client_cost} onChange={e => setEditForm(f => ({ ...f, client_cost: e.target.value }))} type="number" className={ic} placeholder="Client cost" />
+                          <input value={editForm.client_cost} onChange={e => setEditForm(f => ({ ...f, client_cost: e.target.value }))} type="number" className={ic} placeholder="Client cost (list price)" />
+                        </div>
+                        <div className="flex items-center gap-2 text-[10px] text-white/40">
+                          <button type="button" onClick={() => setEditForm(f => ({ ...f, discount_type: DISCOUNT_TYPES[(DISCOUNT_TYPES.indexOf(f.discount_type) + 1) % DISCOUNT_TYPES.length] }))}
+                            className={`px-2 py-1 rounded border ${editForm.discount_type ? 'border-orange-500/30 text-orange-400 bg-orange-500/10' : 'border-[#2a2a2a] text-white/40'}`}>
+                            {editForm.discount_type === 'percent' ? '🏷️ % off' : editForm.discount_type === 'fixed' ? '🏷️ ₱ off' : '🏷️ No discount'}
+                          </button>
+                          {editForm.discount_type && (
+                            <input value={editForm.discount_value} onChange={e => setEditForm(f => ({ ...f, discount_value: e.target.value }))} type="number" min="0"
+                              title={editForm.discount_type === 'percent' ? 'Discount %' : 'Discount ₱'} className={ic + ' w-16'} />
+                          )}
+                          {editForm.discount_type && (
+                            <span className="text-blue-400">
+                              = Net {formatPHP((Number(editForm.client_cost) || 0) - calcDiscountAmount(Number(editForm.client_cost) || 0, editForm.discount_type, Number(editForm.discount_value) || 0))}
+                            </span>
+                          )}
                         </div>
                         <div className="flex gap-2 justify-end">
                           <button onClick={() => setEditingId(null)} className="text-xs text-white/50 border border-[#2a2a2a] px-3 py-1.5 rounded">Cancel</button>
@@ -642,6 +715,11 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                             {c.qty > 1 && (
                               <span className="text-[9px] bg-white/10 text-white/50 px-1.5 py-0.5 rounded shrink-0">× {c.qty}</span>
                             )}
+                            {c.discount_type && c.discount_value > 0 && (
+                              <span className="text-[9px] bg-orange-500/20 text-orange-400 px-1.5 py-0.5 rounded shrink-0">
+                                🏷️ -{c.discount_type === 'percent' ? `${c.discount_value}%` : formatPHP(c.discount_value)}
+                              </span>
+                            )}
                             {c.contact_id && contacts.find(ct => ct.id === c.contact_id) && (
                               <span className="text-[9px] bg-white/10 text-white/50 px-1.5 py-0.5 rounded shrink-0">
                                 {contacts.find(ct => ct.id === c.contact_id)!.type === 'crew' ? '🎬' : '🏢'} linked
@@ -653,6 +731,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                         <div className="flex items-center gap-3 shrink-0 ml-2">
                           <div className="text-right">
                             <div className="text-xs text-white/60">{formatPHP(c.internal_cost)}</div>
+                            {c.discount_type && c.discount_value > 0 && (
+                              <div className="text-[10px] text-white/30 line-through">{formatPHP(calcListPriceFromNet(c.client_cost, c.discount_type, c.discount_value))}</div>
+                            )}
                             <div className="text-xs text-blue-400">{formatPHP(c.client_cost)}</div>
                           </div>
                           <button onClick={() => startEdit(c)} className="text-white/20 hover:text-white text-xs">✏</button>
