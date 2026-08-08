@@ -145,10 +145,25 @@ export default function ProjectQuotePage({ params }: { params: Promise<{ id: str
           </div>
         </div>
 
-        <div style={{ marginBottom: '16px', fontSize: '13px' }}>Dear</div>
+        <div style={{ marginBottom: '16px', fontSize: '13px' }}>Dear {(project.client_name || '').trim().split(/\s+/)[0] || 'Sir/Ma’am'},</div>
         <div style={{ marginBottom: '20px', fontSize: '13px', lineHeight: '1.6' }}>
           Please see below quotation for <strong>Project {project.name}</strong>.
           {project.description && <div style={{ marginTop: '8px', whiteSpace: 'pre-wrap' }}>{project.description}</div>}
+        </div>
+
+        {/* Headline totals, styled like the standard Dogzilla quotation letter — the numbers a
+            client reads first, before the line-item breakdown further down */}
+        <div style={{ marginBottom: '24px', display: 'flex', gap: '32px', flexWrap: 'wrap' }}>
+          {[
+            { label: 'With 50% DP Before Shoot', calc: withDP },
+            { label: 'Without 50% DP', calc: noDP },
+          ].map(s => (
+            <div key={s.label} style={{ fontSize: '13px', lineHeight: '1.7' }}>
+              <div style={{ fontWeight: 700, marginBottom: '2px' }}>{s.label}</div>
+              <div>Basic Production Cost VAT Inc. <strong style={{ color: '#E32726' }}>{formatPHP(s.calc.total)}</strong></div>
+              <div>Net Cost <strong>{formatPHP(s.calc.subtotal2)}</strong></div>
+            </div>
+          ))}
         </div>
 
         {renderScenario({ label: 'With 50% DP Before Shoot', calc: withDP, pctLabel: String(project.markup_pct_dp) })}
