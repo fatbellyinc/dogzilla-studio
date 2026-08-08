@@ -2,7 +2,7 @@
 import { use, useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { formatPHP } from '@/lib/utils';
-import { Project, ProjectCost, PROJECT_CATEGORIES, PROJECT_CATEGORY_LABELS, PROJECT_STATUSES, ProjectCategory, Contact, RATE_UNIT_LABELS } from '@/lib/types';
+import { Project, ProjectCost, PROJECT_CATEGORIES, PROJECT_CATEGORY_LABELS, PROJECT_STATUSES, ProjectCategory, Contact, RATE_UNIT_LABELS, Equipment, STUDIO_RATES, CATEGORY_LABELS } from '@/lib/types';
 import BackButton from '@/components/BackButton';
 
 const STATUS_LABELS: Record<string, string> = {
@@ -25,6 +25,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const [project, setProject] = useState<Project | null>(null);
   const [costs, setCosts] = useState<ProjectCost[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [newItem, setNewItem] = useState<EmptyItem>(emptyItem('pre_production'));
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editForm, setEditForm] = useState<EmptyItem>(emptyItem('pre_production'));
@@ -41,6 +42,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => { fetch('/api/contacts').then(r => r.json()).then(setContacts); }, []);
+  useEffect(() => { fetch('/api/equipment').then(r => r.json()).then(setEquipment); }, []);
 
   if (!project) return <div className="flex items-center justify-center h-64 text-white/30 pt-14 md:pt-0">Loading project...</div>;
 
@@ -55,6 +57,15 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     category: cat,
     items: costs.filter(c => c.category === cat),
   })).filter(g => g.items.length > 0 || g.category === newItem.category);
+
+  // Equipment catalog grouped by category for the "Pick Equipment / Studio" selector, so
+  // budgeting our own gear/venue against a project pulls from the same rate card used for
+  // studio bookings instead of retyping numbers.
+  const equipmentByCat = new Map<string, Equipment[]>();
+  for (const e of equipment) {
+    if (!equipmentByCat.has(e.category)) equipmentByCat.set(e.category, []);
+    equipmentByCat.get(e.category)!.push(e);
+  }
 
   async function updateProject(fields: Partial<Project>) {
     setSaving(true);
@@ -85,6 +96,26 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       description: contact ? `${contact.role ? `${contact.role} — ` : ''}${contact.name}` : i.description,
       internal_cost: contact && contact.default_rate > 0 ? String(contact.default_rate) : i.internal_cost,
     });
+    if (target === 'new') setNewItem(update);
+    else setEditForm(update);
+  }
+
+  // Picking a catalog equipment item or a studio rate prefills description + both cost
+  // columns from the same rate card used for studio bookings, so a project can budget "our
+  // own" gear/venue alongside outside vendors without retyping numbers that already live in
+  // the equipment database.
+  function pickCatalogItem(value: string, target: 'new' | 'edit') {
+    const update = (i: EmptyItem): EmptyItem => {
+      if (!value) return i;
+      if (value.startsWith('studio:')) {
+        const rateKey = value.slice('studio:'.length) as keyof typeof STUDIO_RATES;
+        const rate = STUDIO_RATES[rateKey];
+        return { ...i, description: rate.label, internal_cost: String(rate.price), client_cost: String(rate.price) };
+      }
+      const eq = equipment.find(e => e.id === Number(value.slice('eq:'.length)));
+      if (!eq) return i;
+      return { ...i, description: eq.name, internal_cost: String(eq.daily_rate), client_cost: String(eq.daily_rate) };
+    };
     if (target === 'new') setNewItem(update);
     else setEditForm(update);
   }
@@ -250,6 +281,19 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             ))}
           </select>
         </div>
+        <select defaultValue="" onChange={e => { pickCatalogItem(e.target.value, 'new'); e.target.value = ''; }} className={ic + ' w-full mb-2'}>
+          <option value="">— Pick Equipment / Studio Rate (optional) —</option>
+          <optgroup label="Studio">
+            {(Object.entries(STUDIO_RATES) as [keyof typeof STUDIO_RATES, typeof STUDIO_RATES[keyof typeof STUDIO_RATES]][]).map(([key, rate]) => (
+              <option key={key} value={`studio:${key}`}>{rate.label} ({formatPHP(rate.price)})</option>
+            ))}
+          </optgroup>
+          {[...equipmentByCat.entries()].map(([cat, items]) => (
+            <optgroup key={cat} label={CATEGORY_LABELS[cat] || cat}>
+              {items.map(e => <option key={e.id} value={`eq:${e.id}`}>{e.name} ({formatPHP(e.daily_rate)}/day)</option>)}
+            </optgroup>
+          ))}
+        </select>
         <input value={newItem.description} onChange={e => setNewItem(i => ({ ...i, description: e.target.value }))} placeholder="Description (e.g. Director — Treb Monteras)" className={ic + ' w-full mb-2'} />
         <input value={newItem.note} onChange={e => setNewItem(i => ({ ...i, note: e.target.value }))} placeholder="Note (optional — e.g. 2x AC, 2 Cam Op, Gaffer)" className={ic + ' w-full mb-2'} />
         <div className="grid grid-cols-2 gap-2 mb-2">
@@ -290,6 +334,19 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                           <option value="">— Pick Personnel / Vendor (optional) —</option>
                           {contacts.map(ct => (
                             <option key={ct.id} value={ct.id}>{ct.name}{ct.role ? ` — ${ct.role}` : ''}{ct.default_rate > 0 ? ` (${formatPHP(ct.default_rate)}${RATE_UNIT_LABELS[ct.rate_unit]})` : ''}</option>
+                          ))}
+                        </select>
+                        <select defaultValue="" onChange={e => { pickCatalogItem(e.target.value, 'edit'); e.target.value = ''; }} className={ic + ' w-full'}>
+                          <option value="">— Pick Equipment / Studio Rate (optional) —</option>
+                          <optgroup label="Studio">
+                            {(Object.entries(STUDIO_RATES) as [keyof typeof STUDIO_RATES, typeof STUDIO_RATES[keyof typeof STUDIO_RATES]][]).map(([key, rate]) => (
+                              <option key={key} value={`studio:${key}`}>{rate.label} ({formatPHP(rate.price)})</option>
+                            ))}
+                          </optgroup>
+                          {[...equipmentByCat.entries()].map(([cat, items]) => (
+                            <optgroup key={cat} label={CATEGORY_LABELS[cat] || cat}>
+                              {items.map(e => <option key={e.id} value={`eq:${e.id}`}>{e.name} ({formatPHP(e.daily_rate)}/day)</option>)}
+                            </optgroup>
                           ))}
                         </select>
                         <input value={editForm.description} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))} className={ic + ' w-full'} />
