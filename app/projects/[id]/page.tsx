@@ -2,7 +2,7 @@
 import { use, useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { formatPHP } from '@/lib/utils';
-import { Project, ProjectCost, PROJECT_CATEGORIES, PROJECT_CATEGORY_LABELS, PROJECT_STATUSES, ProjectCategory, Contact, RATE_UNIT_LABELS, Equipment, STUDIO_RATES, CATEGORY_LABELS, PROJECT_CATEGORY_EQUIPMENT_CATALOG_CATS, PROJECT_CATEGORY_SHOWS_STUDIO } from '@/lib/types';
+import { Project, ProjectCost, PROJECT_CATEGORIES, PROJECT_CATEGORY_LABELS, PROJECT_STATUSES, ProjectCategory, Contact, RATE_UNIT_LABELS, Equipment, STUDIO_RATES, CATEGORY_LABELS, PROJECT_CATEGORY_EQUIPMENT_CATALOG_CATS, PROJECT_CATEGORY_SHOWS_STUDIO, ADDON_ITEMS } from '@/lib/types';
 import BackButton from '@/components/BackButton';
 
 const STATUS_LABELS: Record<string, string> = {
@@ -11,6 +11,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 interface EmptyItem { category: ProjectCategory; description: string; note: string; internal_cost: string; client_cost: string; contact_id: number | null; }
 const emptyItem = (category: ProjectCategory): EmptyItem => ({ category, description: '', note: '', internal_cost: '', client_cost: '', contact_id: null });
+interface StagedItem extends EmptyItem { key: string; }
 
 function calcScenario(subtotal: number, markupPct: number, vatExempt: boolean) {
   const markup = subtotal * (markupPct / 100);
@@ -27,6 +28,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [newItem, setNewItem] = useState<EmptyItem>(emptyItem('pre_production'));
+  const [staged, setStaged] = useState<StagedItem[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editForm, setEditForm] = useState<EmptyItem>(emptyItem('pre_production'));
   const [editingHeader, setEditingHeader] = useState(false);
@@ -104,6 +106,63 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         ))}
       </>
     );
+  }
+
+  // Card-based multi-select staging, matching the booking flow's "click to toggle, add many
+  // at once" pattern — clicking a card immediately queues (or un-queues) a fully-formed line
+  // item instead of forcing a pick-then-click-Add cycle per item.
+  function toggleStage(key: string, build: () => Omit<StagedItem, 'key'>) {
+    setStaged(prev => {
+      if (prev.some(s => s.key === key)) return prev.filter(s => s.key !== key);
+      return [...prev, { key, ...build() }];
+    });
+  }
+
+  function toggleContactStage(contact: Contact, category: ProjectCategory) {
+    toggleStage(`contact:${contact.id}`, () => ({
+      category, contact_id: contact.id,
+      description: `${contact.role ? `${contact.role} — ` : ''}${contact.name}`,
+      note: '', internal_cost: contact.default_rate > 0 ? String(contact.default_rate) : '', client_cost: '',
+    }));
+  }
+
+  function toggleCatalogStage(value: string, category: ProjectCategory) {
+    if (value.startsWith('studio:')) {
+      const rateKey = value.slice('studio:'.length) as keyof typeof STUDIO_RATES;
+      const rate = STUDIO_RATES[rateKey];
+      toggleStage(value, () => ({ category, contact_id: null, description: rate.label, note: '', internal_cost: String(rate.price), client_cost: String(rate.price) }));
+    } else if (value.startsWith('eq:')) {
+      const eq = equipment.find(e => e.id === Number(value.slice('eq:'.length)));
+      if (!eq) return;
+      toggleStage(value, () => ({ category, contact_id: null, description: eq.name, note: '', internal_cost: String(eq.daily_rate), client_cost: String(eq.daily_rate) }));
+    } else if (value.startsWith('addon:')) {
+      const addon = ADDON_ITEMS.find(a => a.id === value.slice('addon:'.length));
+      if (!addon) return;
+      toggleStage(value, () => ({
+        category, contact_id: null, description: addon.label,
+        note: 'perHour' in addon && addon.perHour ? addon.description : '',
+        internal_cost: String(addon.price), client_cost: String(addon.price),
+      }));
+    }
+  }
+
+  function updateStaged(key: string, fields: Partial<EmptyItem>) {
+    setStaged(prev => prev.map(s => (s.key === key ? { ...s, ...fields } : s)));
+  }
+
+  function removeStaged(key: string) {
+    setStaged(prev => prev.filter(s => s.key !== key));
+  }
+
+  async function commitStaged() {
+    const items = staged.filter(s => s.description.trim());
+    if (!items.length) return;
+    await Promise.all(items.map(item => fetch('/api/project-costs', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project_id: Number(id), category: item.category, description: item.description, note: item.note, internal_cost: item.internal_cost, client_cost: item.client_cost, contact_id: item.contact_id }),
+    })));
+    setStaged([]);
+    load();
   }
 
   async function updateProject(fields: Partial<Project>) {
@@ -306,39 +365,127 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         ))}
       </div>
 
-      {/* Add line item */}
+      {/* Add line items — click cards to multi-select (like the booking picker), then commit the batch */}
       <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4 mb-4">
-        <h2 className="text-xs text-white/40 uppercase tracking-wider mb-3">Add Cost Line Item</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-2">
-          <select value={newItem.category} onChange={e => setNewItem(i => ({ ...i, category: e.target.value as ProjectCategory }))} className={ic}>
-            {PROJECT_CATEGORIES.map(c => <option key={c} value={c}>{PROJECT_CATEGORY_LABELS[c]}</option>)}
-          </select>
-          {contacts.some(c => c.default_category === newItem.category) && (
-            <select value={newItem.contact_id ?? ''} onChange={e => pickContact(e.target.value, 'new')} className={ic}>
-              <option value="">— Pick Personnel / Vendor (optional) —</option>
-              {contactOptionGroups(newItem.category)}
-            </select>
-          )}
-        </div>
-        {(PROJECT_CATEGORY_SHOWS_STUDIO[newItem.category] || (PROJECT_CATEGORY_EQUIPMENT_CATALOG_CATS[newItem.category] ?? []).some(cat => equipmentByCat.has(cat))) && (
-          <select defaultValue="" onChange={e => { pickCatalogItem(e.target.value, 'new'); e.target.value = ''; }} className={ic + ' w-full mb-2'}>
-            <option value="">— Pick Equipment / Studio Rate (optional) —</option>
-            {equipmentOptionGroups(newItem.category)}
-          </select>
+        <h2 className="text-xs text-white/40 uppercase tracking-wider mb-3">Add Cost Line Items</h2>
+        <select value={newItem.category} onChange={e => setNewItem(i => ({ ...i, category: e.target.value as ProjectCategory }))} className={ic + ' w-full mb-3'}>
+          {PROJECT_CATEGORIES.map(c => <option key={c} value={c}>{PROJECT_CATEGORY_LABELS[c]}</option>)}
+        </select>
+
+        {contacts.some(c => c.default_category === newItem.category) && (
+          <div className="mb-3">
+            <div className="text-[10px] text-white/40 uppercase tracking-wider mb-1.5">Personnel / Vendor — click to add</div>
+            {(['crew', 'vendor'] as const).map(t => {
+              const list = contacts.filter(c => c.default_category === newItem.category && c.type === t);
+              if (!list.length) return null;
+              return (
+                <div key={t} className="mb-1.5">
+                  <div className="text-[10px] text-white/30 mb-1">{t === 'crew' ? '🎬 Crew & Talent' : '🏢 Vendors & Suppliers'}</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {list.map(c => {
+                      const active = staged.some(s => s.key === `contact:${c.id}`);
+                      return (
+                        <button key={c.id} onClick={() => toggleContactStage(c, newItem.category)}
+                          className={`text-xs px-2.5 py-1.5 rounded-lg border transition-all ${active ? 'bg-[#E32726] border-[#E32726] text-white' : 'bg-[#0f0f0f] border-[#2a2a2a] text-white/70 hover:border-white/30'}`}>
+                          {c.name}{c.role ? ` — ${c.role}` : ''}{c.default_rate > 0 ? ` (${formatPHP(c.default_rate)}${RATE_UNIT_LABELS[c.rate_unit]})` : ''}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         )}
-        <input value={newItem.description} onChange={e => setNewItem(i => ({ ...i, description: e.target.value }))} placeholder="Description (e.g. Director — Treb Monteras)" className={ic + ' w-full mb-2'} />
-        <input value={newItem.note} onChange={e => setNewItem(i => ({ ...i, note: e.target.value }))} placeholder="Note (optional — e.g. 2x AC, 2 Cam Op, Gaffer)" className={ic + ' w-full mb-2'} />
-        <div className="grid grid-cols-2 gap-2 mb-2">
-          <div>
-            <label className="text-[10px] text-white/40 block mb-1">Internal Cost (₱) — actual cost to Dogzilla</label>
-            <input value={newItem.internal_cost} onChange={e => setNewItem(i => ({ ...i, internal_cost: e.target.value }))} type="number" className={ic + ' w-full'} />
+
+        {(PROJECT_CATEGORY_SHOWS_STUDIO[newItem.category] || (PROJECT_CATEGORY_EQUIPMENT_CATALOG_CATS[newItem.category] ?? []).some(cat => equipmentByCat.has(cat))) && (
+          <div className="mb-3">
+            <div className="text-[10px] text-white/40 uppercase tracking-wider mb-1.5">Equipment / Studio / Add-ons — click to add</div>
+            {PROJECT_CATEGORY_SHOWS_STUDIO[newItem.category] && (
+              <div className="mb-1.5">
+                <div className="text-[10px] text-white/30 mb-1">Studio</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {(Object.entries(STUDIO_RATES) as [keyof typeof STUDIO_RATES, typeof STUDIO_RATES[keyof typeof STUDIO_RATES]][]).map(([key, rate]) => {
+                    const value = `studio:${key}`;
+                    const active = staged.some(s => s.key === value);
+                    return (
+                      <button key={key} onClick={() => toggleCatalogStage(value, newItem.category)}
+                        className={`text-xs px-2.5 py-1.5 rounded-lg border transition-all ${active ? 'bg-[#E32726] border-[#E32726] text-white' : 'bg-[#0f0f0f] border-[#2a2a2a] text-white/70 hover:border-white/30'}`}>
+                        {rate.label} ({formatPHP(rate.price)})
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            {(PROJECT_CATEGORY_EQUIPMENT_CATALOG_CATS[newItem.category] ?? []).filter(cat => equipmentByCat.has(cat)).map(cat => (
+              <div key={cat} className="mb-1.5">
+                <div className="text-[10px] text-white/30 mb-1">{CATEGORY_LABELS[cat] || cat}</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {equipmentByCat.get(cat)!.map(e => {
+                    const value = `eq:${e.id}`;
+                    const active = staged.some(s => s.key === value);
+                    return (
+                      <button key={e.id} onClick={() => toggleCatalogStage(value, newItem.category)}
+                        className={`text-xs px-2.5 py-1.5 rounded-lg border transition-all ${active ? 'bg-[#E32726] border-[#E32726] text-white' : 'bg-[#0f0f0f] border-[#2a2a2a] text-white/70 hover:border-white/30'}`}>
+                        {e.name} ({formatPHP(e.daily_rate)}/day)
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+            {PROJECT_CATEGORY_SHOWS_STUDIO[newItem.category] && (
+              <div className="mb-1.5">
+                <div className="text-[10px] text-white/30 mb-1">Add-ons (from the booking app)</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {ADDON_ITEMS.map(a => {
+                    const value = `addon:${a.id}`;
+                    const active = staged.some(s => s.key === value);
+                    return (
+                      <button key={a.id} onClick={() => toggleCatalogStage(value, newItem.category)} title={a.description}
+                        className={`text-xs px-2.5 py-1.5 rounded-lg border transition-all ${active ? 'bg-[#E32726] border-[#E32726] text-white' : 'bg-[#0f0f0f] border-[#2a2a2a] text-white/70 hover:border-white/30'}`}>
+                        {a.label}{a.price > 0 ? ` (${formatPHP(a.price)}${'perHour' in a && a.perHour ? '/hr' : ''})` : ' (custom quote)'}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
-          <div>
-            <label className="text-[10px] text-white/40 block mb-1">Client Cost (₱) — pre-markup, shown to client</label>
-            <input value={newItem.client_cost} onChange={e => setNewItem(i => ({ ...i, client_cost: e.target.value }))} type="number" className={ic + ' w-full'} />
+        )}
+
+        {staged.length > 0 && (
+          <div className="mb-3 bg-[#0f0f0f] border border-[#2a2a2a] rounded-lg p-3 space-y-2">
+            <div className="text-[10px] text-white/40 uppercase tracking-wider">Staged — review before adding ({staged.length})</div>
+            {staged.map(s => (
+              <div key={s.key} className="flex items-center gap-2">
+                <input value={s.description} onChange={e => updateStaged(s.key, { description: e.target.value })} className={ic + ' flex-1 min-w-0'} />
+                <input value={s.internal_cost} onChange={e => updateStaged(s.key, { internal_cost: e.target.value })} type="number" placeholder="Internal ₱" className={ic + ' w-24'} />
+                <input value={s.client_cost} onChange={e => updateStaged(s.key, { client_cost: e.target.value })} type="number" placeholder="Client ₱" className={ic + ' w-24'} />
+                <button onClick={() => removeStaged(s.key)} className="text-white/30 hover:text-red-400 text-xs shrink-0">✕</button>
+              </div>
+            ))}
+            <button onClick={commitStaged} className="bg-[#E32726] text-white text-sm px-4 py-2 rounded-lg font-medium">+ Add {staged.length} Item{staged.length > 1 ? 's' : ''} to Budget</button>
           </div>
-        </div>
-        <button onClick={addItem} disabled={!newItem.description.trim()} className="bg-[#E32726] text-white text-sm px-4 py-2 rounded-lg font-medium disabled:opacity-40">+ Add Item</button>
+        )}
+
+        <details className="text-xs">
+          <summary className="text-white/40 cursor-pointer select-none mb-2">✏️ Custom / one-off item</summary>
+          <input value={newItem.description} onChange={e => setNewItem(i => ({ ...i, description: e.target.value }))} placeholder="Description (e.g. Director — Treb Monteras)" className={ic + ' w-full mb-2'} />
+          <input value={newItem.note} onChange={e => setNewItem(i => ({ ...i, note: e.target.value }))} placeholder="Note (optional — e.g. 2x AC, 2 Cam Op, Gaffer)" className={ic + ' w-full mb-2'} />
+          <div className="grid grid-cols-2 gap-2 mb-2">
+            <div>
+              <label className="text-[10px] text-white/40 block mb-1">Internal Cost (₱) — actual cost to Dogzilla</label>
+              <input value={newItem.internal_cost} onChange={e => setNewItem(i => ({ ...i, internal_cost: e.target.value }))} type="number" className={ic + ' w-full'} />
+            </div>
+            <div>
+              <label className="text-[10px] text-white/40 block mb-1">Client Cost (₱) — pre-markup, shown to client</label>
+              <input value={newItem.client_cost} onChange={e => setNewItem(i => ({ ...i, client_cost: e.target.value }))} type="number" className={ic + ' w-full'} />
+            </div>
+          </div>
+          <button onClick={addItem} disabled={!newItem.description.trim()} className="bg-[#E32726] text-white text-sm px-4 py-2 rounded-lg font-medium disabled:opacity-40">+ Add Item</button>
+        </details>
       </div>
 
       {/* Line items by category */}
