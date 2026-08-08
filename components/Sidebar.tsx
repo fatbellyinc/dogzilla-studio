@@ -21,6 +21,7 @@ const NAV_GROUPS = [
     label: 'Production',
     items: [
       { href: '/projects', label: 'Projects', icon: '🎬' },
+      { href: '/contacts', label: 'Personnel & Vendors', icon: '📇' },
     ],
   },
   {

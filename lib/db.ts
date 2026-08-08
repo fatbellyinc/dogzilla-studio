@@ -172,6 +172,24 @@ function initSchema(db: Database.Database) {
       created_at TEXT DEFAULT (datetime('now'))
     );
 
+    -- Reusable roster of crew/talent and outside vendors (cinematographer, caterer, equipment
+    -- rental house, etc.) — a lightweight take on Gorilla Budgeting's contact database, so a
+    -- project's cost line items can pull a known person/company and their going rate instead
+    -- of retyping it project after project.
+    CREATE TABLE IF NOT EXISTS contacts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      type TEXT NOT NULL DEFAULT 'crew', -- 'crew' | 'vendor'
+      role TEXT,                          -- e.g. 'Cinematographer', 'Gaffer', 'Caterer', 'Equipment Rental'
+      company TEXT,
+      phone TEXT,
+      email TEXT,
+      default_rate REAL DEFAULT 0,
+      rate_unit TEXT DEFAULT 'day',       -- 'day' | 'hour' | 'flat' | 'project'
+      notes TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
     CREATE TABLE IF NOT EXISTS project_costs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -180,7 +198,8 @@ function initSchema(db: Database.Database) {
       note TEXT,
       internal_cost REAL NOT NULL DEFAULT 0,
       client_cost REAL NOT NULL DEFAULT 0,
-      sort_order INTEGER DEFAULT 0
+      sort_order INTEGER DEFAULT 0,
+      contact_id INTEGER REFERENCES contacts(id) ON DELETE SET NULL
     );
 
     CREATE TABLE IF NOT EXISTS blockout_dates (
@@ -396,6 +415,7 @@ function initSchema(db: Database.Database) {
     `ALTER TABLE booking_days ADD COLUMN is_pencil INTEGER DEFAULT 0`,
     `ALTER TABLE booking_equipment ADD COLUMN category TEXT`,
     `ALTER TABLE booking_costs ADD COLUMN day_date TEXT`,
+    `ALTER TABLE project_costs ADD COLUMN contact_id INTEGER REFERENCES contacts(id)`,
   ];
   for (const sql of migrations) {
     try { db.exec(sql); } catch { /* column already exists */ }

@@ -183,7 +183,42 @@ export interface ProjectCost {
   internal_cost: number;
   client_cost: number;
   sort_order: number;
+  contact_id: number | null;
 }
+
+export const CONTACT_TYPES = ['crew', 'vendor'] as const;
+export type ContactType = typeof CONTACT_TYPES[number];
+
+export interface Contact {
+  id: number;
+  name: string;
+  type: ContactType;
+  role: string | null;
+  company: string | null;
+  phone: string | null;
+  email: string | null;
+  default_rate: number;
+  rate_unit: 'day' | 'hour' | 'flat' | 'project';
+  notes: string | null;
+  created_at: string;
+}
+
+export const RATE_UNIT_LABELS: Record<Contact['rate_unit'], string> = {
+  day: '/day', hour: '/hour', flat: ' flat', project: '/project',
+};
+
+// Common crew titles and vendor categories — suggestions only, the role field stays free text
+// so anything not on this list can still be typed in directly.
+export const CREW_ROLE_SUGGESTIONS = [
+  'Director', 'Cinematographer / DOP', 'Assistant Director', 'Producer', 'Line Producer',
+  'Production Manager', 'Production Assistant', 'Gaffer', 'Key Grip', 'Sound Mixer',
+  'Boom Operator', 'Editor', 'Colorist', 'Sound Designer', 'Production Designer',
+  'Stylist', 'Hair & Makeup Artist', 'Talent / Actor', 'Camera Operator', 'Drone Operator',
+];
+export const VENDOR_CATEGORY_SUGGESTIONS = [
+  'Equipment Rental', 'Caterer', 'Location', 'Transportation', 'Generator Rental',
+  'Wardrobe', 'Props House', 'Post-Production House', 'Talent Agency', 'Insurance', 'Permits',
+];
 
 export interface BlockoutDate {
   id: number;

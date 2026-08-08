@@ -2,15 +2,15 @@
 import { use, useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { formatPHP } from '@/lib/utils';
-import { Project, ProjectCost, PROJECT_CATEGORIES, PROJECT_CATEGORY_LABELS, PROJECT_STATUSES, ProjectCategory } from '@/lib/types';
+import { Project, ProjectCost, PROJECT_CATEGORIES, PROJECT_CATEGORY_LABELS, PROJECT_STATUSES, ProjectCategory, Contact, RATE_UNIT_LABELS } from '@/lib/types';
 import BackButton from '@/components/BackButton';
 
 const STATUS_LABELS: Record<string, string> = {
   draft: 'Draft', quoted: 'Quoted', won: 'Won', lost: 'Lost', in_production: 'In Production', completed: 'Completed',
 };
 
-interface EmptyItem { category: ProjectCategory; description: string; note: string; internal_cost: string; client_cost: string; }
-const emptyItem = (category: ProjectCategory): EmptyItem => ({ category, description: '', note: '', internal_cost: '', client_cost: '' });
+interface EmptyItem { category: ProjectCategory; description: string; note: string; internal_cost: string; client_cost: string; contact_id: number | null; }
+const emptyItem = (category: ProjectCategory): EmptyItem => ({ category, description: '', note: '', internal_cost: '', client_cost: '', contact_id: null });
 
 function calcScenario(subtotal: number, markupPct: number, vatExempt: boolean) {
   const markup = subtotal * (markupPct / 100);
@@ -24,6 +24,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const { id } = use(params);
   const [project, setProject] = useState<Project | null>(null);
   const [costs, setCosts] = useState<ProjectCost[]>([]);
+  const [contacts, setContacts] = useState<Contact[]>([]);
   const [newItem, setNewItem] = useState<EmptyItem>(emptyItem('pre_production'));
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editForm, setEditForm] = useState<EmptyItem>(emptyItem('pre_production'));
@@ -39,6 +40,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   }, [id]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { fetch('/api/contacts').then(r => r.json()).then(setContacts); }, []);
 
   if (!project) return <div className="flex items-center justify-center h-64 text-white/30 pt-14 md:pt-0">Loading project...</div>;
 
@@ -71,9 +73,25 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     load();
   }
 
+  // Picking a Personnel/Vendor prefills the description and internal cost from their default
+  // rate, and remembers the link (contact_id) so this line item shows up in that contact's
+  // project history later — matches every other field staying editable after loading.
+  function pickContact(contactId: string, target: 'new' | 'edit') {
+    const cid = contactId ? Number(contactId) : null;
+    const contact = contacts.find(c => c.id === cid) || null;
+    const update = (i: EmptyItem): EmptyItem => ({
+      ...i,
+      contact_id: cid,
+      description: contact ? `${contact.role ? `${contact.role} — ` : ''}${contact.name}` : i.description,
+      internal_cost: contact && contact.default_rate > 0 ? String(contact.default_rate) : i.internal_cost,
+    });
+    if (target === 'new') setNewItem(update);
+    else setEditForm(update);
+  }
+
   function startEdit(c: ProjectCost) {
     setEditingId(c.id);
-    setEditForm({ category: c.category, description: c.description, note: c.note || '', internal_cost: String(c.internal_cost), client_cost: String(c.client_cost) });
+    setEditForm({ category: c.category, description: c.description, note: c.note || '', internal_cost: String(c.internal_cost), client_cost: String(c.client_cost), contact_id: c.contact_id });
   }
 
   async function saveEdit(costId: number) {
@@ -225,8 +243,14 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
           <select value={newItem.category} onChange={e => setNewItem(i => ({ ...i, category: e.target.value as ProjectCategory }))} className={ic}>
             {PROJECT_CATEGORIES.map(c => <option key={c} value={c}>{PROJECT_CATEGORY_LABELS[c]}</option>)}
           </select>
-          <input value={newItem.description} onChange={e => setNewItem(i => ({ ...i, description: e.target.value }))} placeholder="Description (e.g. Director — Treb Monteras)" className={ic} />
+          <select value={newItem.contact_id ?? ''} onChange={e => pickContact(e.target.value, 'new')} className={ic}>
+            <option value="">— Pick Personnel / Vendor (optional) —</option>
+            {contacts.map(c => (
+              <option key={c.id} value={c.id}>{c.name}{c.role ? ` — ${c.role}` : ''}{c.default_rate > 0 ? ` (${formatPHP(c.default_rate)}${RATE_UNIT_LABELS[c.rate_unit]})` : ''}</option>
+            ))}
+          </select>
         </div>
+        <input value={newItem.description} onChange={e => setNewItem(i => ({ ...i, description: e.target.value }))} placeholder="Description (e.g. Director — Treb Monteras)" className={ic + ' w-full mb-2'} />
         <input value={newItem.note} onChange={e => setNewItem(i => ({ ...i, note: e.target.value }))} placeholder="Note (optional — e.g. 2x AC, 2 Cam Op, Gaffer)" className={ic + ' w-full mb-2'} />
         <div className="grid grid-cols-2 gap-2 mb-2">
           <div>
@@ -262,6 +286,12 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                   {g.items.map(c => (
                     editingId === c.id ? (
                       <div key={c.id} className="px-4 py-3 space-y-1.5">
+                        <select value={editForm.contact_id ?? ''} onChange={e => pickContact(e.target.value, 'edit')} className={ic + ' w-full'}>
+                          <option value="">— Pick Personnel / Vendor (optional) —</option>
+                          {contacts.map(ct => (
+                            <option key={ct.id} value={ct.id}>{ct.name}{ct.role ? ` — ${ct.role}` : ''}{ct.default_rate > 0 ? ` (${formatPHP(ct.default_rate)}${RATE_UNIT_LABELS[ct.rate_unit]})` : ''}</option>
+                          ))}
+                        </select>
                         <input value={editForm.description} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))} className={ic + ' w-full'} />
                         <input value={editForm.note} onChange={e => setEditForm(f => ({ ...f, note: e.target.value }))} placeholder="Note" className={ic + ' w-full'} />
                         <div className="grid grid-cols-2 gap-2">
@@ -276,7 +306,14 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                     ) : (
                       <div key={c.id} className="flex items-center justify-between px-4 py-2.5">
                         <div className="min-w-0">
-                          <div className="text-sm text-white truncate">{c.description}</div>
+                          <div className="text-sm text-white truncate flex items-center gap-1.5">
+                            {c.description}
+                            {c.contact_id && contacts.find(ct => ct.id === c.contact_id) && (
+                              <span className="text-[9px] bg-white/10 text-white/50 px-1.5 py-0.5 rounded shrink-0">
+                                {contacts.find(ct => ct.id === c.contact_id)!.type === 'crew' ? '🎬' : '🏢'} linked
+                              </span>
+                            )}
+                          </div>
                           {c.note && <div className="text-[11px] text-white/30 truncate">{c.note}</div>}
                         </div>
                         <div className="flex items-center gap-3 shrink-0 ml-2">
