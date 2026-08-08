@@ -268,6 +268,22 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     load();
   }
 
+  // Bulk-flip every item in a category at once — e.g. "all my Equipment Rental items are our
+  // own gear, not paid out to a rental house" — instead of opening each line item one by one.
+  async function markCategoryFlow(category: ProjectCategory, flow: CostFlow) {
+    const items = costs.filter(c => c.category === category && c.cost_flow !== flow);
+    if (!items.length) return;
+    await Promise.all(items.map(c => fetch(`/api/project-costs/${c.id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        category: c.category, description: c.description, note: c.note, internal_cost: c.internal_cost,
+        client_cost: c.client_cost, contact_id: c.contact_id, qty: c.qty, discount_type: c.discount_type,
+        discount_value: c.discount_value, cost_flow: flow,
+      }),
+    })));
+    load();
+  }
+
   // Client Cost in this form is the list/sticker price; the discount (if any) is applied on
   // top when saving, so what's actually stored/billed is already net of the discount.
   async function addItem() {
@@ -703,6 +719,16 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
               <div className="flex items-center justify-between px-4 py-2.5 bg-[#0f0f0f]">
                 <span className="text-xs font-semibold text-white">{PROJECT_CATEGORY_LABELS[g.category]}</span>
                 <div className="flex items-center gap-3 text-[10px] text-white/40">
+                  {g.items.length > 0 && (
+                    <>
+                      <button onClick={() => markCategoryFlow(g.category, 'internal')} className="text-green-400/70 hover:text-green-400" title="Mark every item in this category as kept in-house">
+                        🏠 Mark all in-house
+                      </button>
+                      <button onClick={() => markCategoryFlow(g.category, 'external')} className="text-red-400/70 hover:text-red-400" title="Mark every item in this category as paid out">
+                        💸 Mark all paid out
+                      </button>
+                    </>
+                  )}
                   <span>Internal: <span className="text-white/70">{formatPHP(catInternal)}</span></span>
                   <span>Client: <span className="text-blue-400">{formatPHP(catClient)}</span></span>
                 </div>
