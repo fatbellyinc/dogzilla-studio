@@ -11,7 +11,18 @@ const STATUS_LABELS: Record<string, string> = {
 
 interface EmptyItem { category: ProjectCategory; description: string; note: string; internal_cost: string; client_cost: string; contact_id: number | null; qty: string; }
 const emptyItem = (category: ProjectCategory): EmptyItem => ({ category, description: '', note: '', internal_cost: '', client_cost: '', contact_id: null, qty: '1' });
-interface StagedItem extends EmptyItem { key: string; unit_internal: number; unit_client: number; }
+interface StagedItem extends EmptyItem {
+  key: string;
+  unit_internal: number; // per-unit rate — qty × this = internal cost, recomputed automatically
+  sync_client: boolean;  // true: client cost auto-copies internal cost (default); false: client cost = internal × (1 + markup_pct)
+  markup_pct: string;
+}
+function recomputeStaged(s: Pick<StagedItem, 'qty' | 'unit_internal' | 'sync_client' | 'markup_pct' | 'internal_cost' | 'client_cost'>) {
+  const qty = Math.max(1, Number(s.qty) || 1);
+  const internal = s.unit_internal > 0 ? s.unit_internal * qty : Number(s.internal_cost) || 0;
+  const client = s.sync_client ? internal : internal * (1 + (Number(s.markup_pct) || 0) / 100);
+  return { internal_cost: String(internal), client_cost: String(Math.round(client * 100) / 100) };
+}
 
 function calcScenario(subtotal: number, markupPct: number, vatExempt: boolean) {
   const markup = subtotal * (markupPct / 100);
@@ -123,7 +134,8 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     toggleStage(`contact:${contact.id}`, () => ({
       category, contact_id: contact.id,
       description: `${contact.role ? `${contact.role} — ` : ''}${contact.name}`,
-      note: '', internal_cost: unit > 0 ? String(unit) : '', client_cost: '', qty: '1', unit_internal: unit, unit_client: 0,
+      note: '', internal_cost: unit > 0 ? String(unit) : '', client_cost: unit > 0 ? String(unit) : '',
+      qty: '1', unit_internal: unit, sync_client: true, markup_pct: '0',
     }));
   }
 
@@ -132,7 +144,8 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   // one of them saved as a Contact — a ₱0 reminder placeholder, cost filled in once quoted.
   function toggleRoleSuggestionStage(label: string, category: ProjectCategory) {
     toggleStage(`role:${label}`, () => ({
-      category, contact_id: null, description: label, note: '', internal_cost: '', client_cost: '', qty: '1', unit_internal: 0, unit_client: 0,
+      category, contact_id: null, description: label, note: '', internal_cost: '', client_cost: '',
+      qty: '1', unit_internal: 0, sync_client: true, markup_pct: '0',
     }));
   }
 
@@ -140,18 +153,18 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     if (value.startsWith('studio:')) {
       const rateKey = value.slice('studio:'.length) as keyof typeof STUDIO_RATES;
       const rate = STUDIO_RATES[rateKey];
-      toggleStage(value, () => ({ category, contact_id: null, description: rate.label, note: '', internal_cost: String(rate.price), client_cost: String(rate.price), qty: '1', unit_internal: rate.price, unit_client: rate.price }));
+      toggleStage(value, () => ({ category, contact_id: null, description: rate.label, note: '', internal_cost: String(rate.price), client_cost: String(rate.price), qty: '1', unit_internal: rate.price, sync_client: true, markup_pct: '0' }));
     } else if (value.startsWith('eq:')) {
       const eq = equipment.find(e => e.id === Number(value.slice('eq:'.length)));
       if (!eq) return;
-      toggleStage(value, () => ({ category, contact_id: null, description: eq.name, note: '', internal_cost: String(eq.daily_rate), client_cost: String(eq.daily_rate), qty: '1', unit_internal: eq.daily_rate, unit_client: eq.daily_rate }));
+      toggleStage(value, () => ({ category, contact_id: null, description: eq.name, note: '', internal_cost: String(eq.daily_rate), client_cost: String(eq.daily_rate), qty: '1', unit_internal: eq.daily_rate, sync_client: true, markup_pct: '0' }));
     } else if (value.startsWith('addon:')) {
       const addon = ADDON_ITEMS.find(a => a.id === value.slice('addon:'.length));
       if (!addon) return;
       toggleStage(value, () => ({
         category, contact_id: null, description: addon.label,
         note: 'perHour' in addon && addon.perHour ? addon.description : '',
-        internal_cost: String(addon.price), client_cost: String(addon.price), qty: '1', unit_internal: addon.price, unit_client: addon.price,
+        internal_cost: String(addon.price), client_cost: String(addon.price), qty: '1', unit_internal: addon.price, sync_client: true, markup_pct: '0',
       }));
     }
   }
@@ -160,18 +173,14 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     setStaged(prev => prev.map(s => (s.key === key ? { ...s, ...fields } : s)));
   }
 
-  // Changing quantity recalculates both cost columns off the item's per-unit rate — e.g. 3x
-  // Camera Operators or 2x LED Panels — while a direct edit to the cost fields themselves still
-  // works and simply stops tracking the per-unit rate until quantity is touched again.
-  function updateStagedQty(key: string, qty: string) {
+  // Quantity, rate, sync-to-client, and markup% all feed the same auto-compute: internal cost =
+  // rate × qty, and client cost either mirrors internal cost (default) or applies the markup% on
+  // top — matching "3 Grip @ ₱1,500" auto-totaling to ₱4,500 without retyping the total by hand.
+  function updateStagedCompute(key: string, fields: Partial<Pick<StagedItem, 'qty' | 'unit_internal' | 'sync_client' | 'markup_pct'>>) {
     setStaged(prev => prev.map(s => {
       if (s.key !== key) return s;
-      const n = Math.max(1, Number(qty) || 1);
-      return {
-        ...s, qty: String(n),
-        internal_cost: s.unit_internal > 0 ? String(s.unit_internal * n) : s.internal_cost,
-        client_cost: s.unit_client > 0 ? String(s.unit_client * n) : s.client_cost,
-      };
+      const next = { ...s, ...fields };
+      return { ...next, ...recomputeStaged(next) };
     }));
   }
 
@@ -499,14 +508,32 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
 
         {staged.length > 0 && (
           <div className="mb-3 bg-[#0f0f0f] border border-[#2a2a2a] rounded-lg p-3 space-y-2">
-            <div className="text-[10px] text-white/40 uppercase tracking-wider">Staged — review before adding ({staged.length})</div>
+            <div className="text-[10px] text-white/40 uppercase tracking-wider">Staged — Qty × Rate auto-computes cost. Client cost copies Internal unless you switch to a markup ({staged.length})</div>
             {staged.map(s => (
-              <div key={s.key} className="flex items-center gap-2">
-                <input value={s.description} onChange={e => updateStaged(s.key, { description: e.target.value })} className={ic + ' flex-1 min-w-0'} />
-                <input value={s.qty} onChange={e => updateStagedQty(s.key, e.target.value)} type="number" min="1" title="Quantity" className={ic + ' w-14'} />
-                <input value={s.internal_cost} onChange={e => updateStaged(s.key, { internal_cost: e.target.value })} type="number" placeholder="Internal ₱" className={ic + ' w-24'} />
-                <input value={s.client_cost} onChange={e => updateStaged(s.key, { client_cost: e.target.value })} type="number" placeholder="Client ₱" className={ic + ' w-24'} />
-                <button onClick={() => removeStaged(s.key)} className="text-white/30 hover:text-red-400 text-xs shrink-0">✕</button>
+              <div key={s.key} className="space-y-1 border-b border-[#2a2a2a] last:border-0 pb-2 last:pb-0">
+                <div className="flex items-center gap-2">
+                  <input value={s.description} onChange={e => updateStaged(s.key, { description: e.target.value })} className={ic + ' flex-1 min-w-0'} />
+                  <button onClick={() => removeStaged(s.key)} className="text-white/30 hover:text-red-400 text-xs shrink-0">✕</button>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap text-[10px] text-white/40">
+                  <span className="flex items-center gap-1">
+                    Qty <input value={s.qty} onChange={e => updateStagedCompute(s.key, { qty: e.target.value })} type="number" min="1" title="Quantity" className={ic + ' w-14'} />
+                  </span>
+                  <span className="flex items-center gap-1">
+                    × Rate ₱ <input value={s.unit_internal || ''} onChange={e => updateStagedCompute(s.key, { unit_internal: Number(e.target.value) || 0 })} type="number" placeholder="0" title="Rate per unit — internal cost" className={ic + ' w-24'} />
+                  </span>
+                  <span className="text-white/60">= Internal {formatPHP(Number(s.internal_cost) || 0)}</span>
+                  <button onClick={() => updateStagedCompute(s.key, { sync_client: !s.sync_client, markup_pct: '0' })}
+                    className={`px-2 py-1 rounded border ${s.sync_client ? 'border-green-500/30 text-green-400 bg-green-500/10' : 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10'}`}>
+                    {s.sync_client ? '🔗 Client = Internal' : '✏️ Custom markup'}
+                  </button>
+                  {!s.sync_client && (
+                    <span className="flex items-center gap-1">
+                      Markup <input value={s.markup_pct} onChange={e => updateStagedCompute(s.key, { markup_pct: e.target.value })} type="number" title="Markup % over internal cost" className={ic + ' w-14'} />%
+                    </span>
+                  )}
+                  <span className="text-blue-400">= Client {formatPHP(Number(s.client_cost) || 0)}</span>
+                </div>
               </div>
             ))}
             <button onClick={commitStaged} className="bg-[#E32726] text-white text-sm px-4 py-2 rounded-lg font-medium">+ Add {staged.length} Item{staged.length > 1 ? 's' : ''} to Budget</button>
