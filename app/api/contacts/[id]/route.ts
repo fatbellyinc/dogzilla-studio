@@ -20,13 +20,13 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   const db = getDb();
   const { id } = await params;
   const body = await req.json();
-  const { name, type, role, company, phone, email, default_rate, rate_unit, notes } = body;
+  const { name, type, role, company, phone, email, default_rate, default_category, rate_unit, notes } = body;
   db.prepare(`
-    UPDATE contacts SET name = ?, type = ?, role = ?, company = ?, phone = ?, email = ?, default_rate = ?, rate_unit = ?, notes = ?
+    UPDATE contacts SET name = ?, type = ?, role = ?, company = ?, phone = ?, email = ?, default_rate = ?, default_category = ?, rate_unit = ?, notes = ?
     WHERE id = ?
   `).run(
     name, type || 'crew', role || null, company || null, phone || null, email || null,
-    Number(default_rate) || 0, rate_unit || 'day', notes || null, id,
+    Number(default_rate) || 0, default_category || 'others', rate_unit || 'day', notes || null, id,
   );
   return NextResponse.json(db.prepare('SELECT * FROM contacts WHERE id = ?').get(id));
 }

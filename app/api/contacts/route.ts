@@ -13,15 +13,15 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const db = getDb();
   const body = await req.json();
-  const { name, type, role, company, phone, email, default_rate, rate_unit, notes } = body;
+  const { name, type, role, company, phone, email, default_rate, default_category, rate_unit, notes } = body;
   if (!name) return NextResponse.json({ error: 'Name is required' }, { status: 400 });
 
   const result = db.prepare(`
-    INSERT INTO contacts (name, type, role, company, phone, email, default_rate, rate_unit, notes)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO contacts (name, type, role, company, phone, email, default_rate, default_category, rate_unit, notes)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     name, type || 'crew', role || null, company || null, phone || null, email || null,
-    Number(default_rate) || 0, rate_unit || 'day', notes || null,
+    Number(default_rate) || 0, default_category || 'others', rate_unit || 'day', notes || null,
   );
   return NextResponse.json(db.prepare('SELECT * FROM contacts WHERE id = ?').get(result.lastInsertRowid), { status: 201 });
 }

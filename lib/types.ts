@@ -156,6 +156,17 @@ export const PROJECT_CATEGORY_LABELS: Record<ProjectCategory, string> = {
 export const PROJECT_STATUSES = ['draft', 'quoted', 'won', 'lost', 'in_production', 'completed'] as const;
 export type ProjectStatus = typeof PROJECT_STATUSES[number];
 
+// Which equipment-catalog categories (camera, lighting, grip, audio, ...) are relevant when a
+// project cost line item's own category is 'equipment' — and whether the Studio rate group
+// (Full Day Shoot, Event/Warehouse, etc.) applies for 'set_props_location'. Everything else
+// gets no equipment/studio picker at all, since none of that catalog is relevant there.
+export const PROJECT_CATEGORY_EQUIPMENT_CATALOG_CATS: Partial<Record<ProjectCategory, readonly string[]>> = {
+  equipment: ['camera', 'lens', 'lighting', 'lighting_old', 'grip', 'tripod', 'audio', 'monitor', 'rigging', 'misc'],
+};
+export const PROJECT_CATEGORY_SHOWS_STUDIO: Partial<Record<ProjectCategory, boolean>> = {
+  set_props_location: true,
+};
+
 export interface Project {
   id: number;
   quote_number: string | null;
@@ -198,6 +209,10 @@ export interface Contact {
   phone: string | null;
   email: string | null;
   default_rate: number;
+  /** Which project cost category this contact normally belongs under (e.g. a caterer →
+   * food_transpo) — lets the project budget builder's picker show only relevant contacts
+   * for whichever category the line item is being added to, instead of every contact. */
+  default_category: ProjectCategory;
   rate_unit: 'day' | 'hour' | 'flat' | 'project';
   notes: string | null;
   created_at: string;

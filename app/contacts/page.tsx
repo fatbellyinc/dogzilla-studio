@@ -1,9 +1,9 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { formatPHP } from '@/lib/utils';
-import { Contact, ContactType, CREW_ROLE_SUGGESTIONS, VENDOR_CATEGORY_SUGGESTIONS, RATE_UNIT_LABELS } from '@/lib/types';
+import { Contact, ContactType, CREW_ROLE_SUGGESTIONS, VENDOR_CATEGORY_SUGGESTIONS, RATE_UNIT_LABELS, PROJECT_CATEGORIES, PROJECT_CATEGORY_LABELS, ProjectCategory } from '@/lib/types';
 
-const emptyForm = { name: '', type: 'crew' as ContactType, role: '', company: '', phone: '', email: '', default_rate: '', rate_unit: 'day' as Contact['rate_unit'], notes: '' };
+const emptyForm = { name: '', type: 'crew' as ContactType, role: '', company: '', phone: '', email: '', default_rate: '', default_category: 'production_personnel' as ProjectCategory, rate_unit: 'day' as Contact['rate_unit'], notes: '' };
 
 export default function ContactsPage() {
   const [contacts, setContacts] = useState<Contact[] | null>(null);
@@ -34,7 +34,8 @@ export default function ContactsPage() {
   function startEdit(c: Contact) {
     setForm({
       name: c.name, type: c.type, role: c.role || '', company: c.company || '', phone: c.phone || '',
-      email: c.email || '', default_rate: String(c.default_rate || ''), rate_unit: c.rate_unit, notes: c.notes || '',
+      email: c.email || '', default_rate: String(c.default_rate || ''), default_category: c.default_category || 'others',
+      rate_unit: c.rate_unit, notes: c.notes || '',
     });
     setEditingId(c.id);
     setShowForm(true);
@@ -135,6 +136,13 @@ export default function ContactsPage() {
             </div>
           </div>
           <div>
+            <label className="text-xs text-white/50 block mb-1">Budget Category</label>
+            <select value={form.default_category} onChange={e => setForm(f => ({ ...f, default_category: e.target.value as ProjectCategory }))} className={ic}>
+              {PROJECT_CATEGORIES.map(c => <option key={c} value={c}>{PROJECT_CATEGORY_LABELS[c]}</option>)}
+            </select>
+            <p className="text-[10px] text-white/30 mt-1">Which project budget category this contact normally falls under — only shown in that category&apos;s picker when adding a cost line item.</p>
+          </div>
+          <div>
             <label className="text-xs text-white/50 block mb-1">Notes</label>
             <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={2} className={ic} />
           </div>
@@ -161,6 +169,7 @@ export default function ContactsPage() {
                 <div className="text-xs text-white/40 mt-0.5">
                   {c.role || 'No role set'}{c.company ? ` · ${c.company}` : ''}
                   {c.phone ? ` · ${c.phone}` : ''}{c.email ? ` · ${c.email}` : ''}
+                  {' · '}<span className="text-white/30">{PROJECT_CATEGORY_LABELS[c.default_category] || 'Others'}</span>
                 </div>
               </div>
               <div className="flex items-center gap-3 shrink-0 ml-2">

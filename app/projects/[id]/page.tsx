@@ -2,7 +2,7 @@
 import { use, useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { formatPHP } from '@/lib/utils';
-import { Project, ProjectCost, PROJECT_CATEGORIES, PROJECT_CATEGORY_LABELS, PROJECT_STATUSES, ProjectCategory, Contact, RATE_UNIT_LABELS, Equipment, STUDIO_RATES, CATEGORY_LABELS } from '@/lib/types';
+import { Project, ProjectCost, PROJECT_CATEGORIES, PROJECT_CATEGORY_LABELS, PROJECT_STATUSES, ProjectCategory, Contact, RATE_UNIT_LABELS, Equipment, STUDIO_RATES, CATEGORY_LABELS, PROJECT_CATEGORY_EQUIPMENT_CATALOG_CATS, PROJECT_CATEGORY_SHOWS_STUDIO } from '@/lib/types';
 import BackButton from '@/components/BackButton';
 
 const STATUS_LABELS: Record<string, string> = {
@@ -65,6 +65,45 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   for (const e of equipment) {
     if (!equipmentByCat.has(e.category)) equipmentByCat.set(e.category, []);
     equipmentByCat.get(e.category)!.push(e);
+  }
+
+  // Both pickers only ever show entries relevant to the line item's own category — a caterer
+  // shouldn't turn up while adding a Post Production cost, and camera gear shouldn't turn up
+  // under Food & Transportation. Grouping (Crew/Vendor, or by equipment catalog category) is
+  // preserved within whatever survives the filter.
+  function contactOptionGroups(category: ProjectCategory) {
+    const relevant = contacts.filter(c => c.default_category === category);
+    const crew = relevant.filter(c => c.type === 'crew');
+    const vendors = relevant.filter(c => c.type === 'vendor');
+    const renderGroup = (label: string, list: Contact[]) => list.length > 0 && (
+      <optgroup key={label} label={label}>
+        {list.map(c => (
+          <option key={c.id} value={c.id}>{c.name}{c.role ? ` — ${c.role}` : ''}{c.default_rate > 0 ? ` (${formatPHP(c.default_rate)}${RATE_UNIT_LABELS[c.rate_unit]})` : ''}</option>
+        ))}
+      </optgroup>
+    );
+    return <>{renderGroup('Crew & Talent', crew)}{renderGroup('Vendors & Suppliers', vendors)}</>;
+  }
+
+  function equipmentOptionGroups(category: ProjectCategory) {
+    const showStudio = !!PROJECT_CATEGORY_SHOWS_STUDIO[category];
+    const catalogCats = PROJECT_CATEGORY_EQUIPMENT_CATALOG_CATS[category] ?? [];
+    return (
+      <>
+        {showStudio && (
+          <optgroup label="Studio">
+            {(Object.entries(STUDIO_RATES) as [keyof typeof STUDIO_RATES, typeof STUDIO_RATES[keyof typeof STUDIO_RATES]][]).map(([key, rate]) => (
+              <option key={key} value={`studio:${key}`}>{rate.label} ({formatPHP(rate.price)})</option>
+            ))}
+          </optgroup>
+        )}
+        {catalogCats.filter(cat => equipmentByCat.has(cat)).map(cat => (
+          <optgroup key={cat} label={CATEGORY_LABELS[cat] || cat}>
+            {equipmentByCat.get(cat)!.map(e => <option key={e.id} value={`eq:${e.id}`}>{e.name} ({formatPHP(e.daily_rate)}/day)</option>)}
+          </optgroup>
+        ))}
+      </>
+    );
   }
 
   async function updateProject(fields: Partial<Project>) {
@@ -274,26 +313,19 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
           <select value={newItem.category} onChange={e => setNewItem(i => ({ ...i, category: e.target.value as ProjectCategory }))} className={ic}>
             {PROJECT_CATEGORIES.map(c => <option key={c} value={c}>{PROJECT_CATEGORY_LABELS[c]}</option>)}
           </select>
-          <select value={newItem.contact_id ?? ''} onChange={e => pickContact(e.target.value, 'new')} className={ic}>
-            <option value="">— Pick Personnel / Vendor (optional) —</option>
-            {contacts.map(c => (
-              <option key={c.id} value={c.id}>{c.name}{c.role ? ` — ${c.role}` : ''}{c.default_rate > 0 ? ` (${formatPHP(c.default_rate)}${RATE_UNIT_LABELS[c.rate_unit]})` : ''}</option>
-            ))}
-          </select>
+          {contacts.some(c => c.default_category === newItem.category) && (
+            <select value={newItem.contact_id ?? ''} onChange={e => pickContact(e.target.value, 'new')} className={ic}>
+              <option value="">— Pick Personnel / Vendor (optional) —</option>
+              {contactOptionGroups(newItem.category)}
+            </select>
+          )}
         </div>
-        <select defaultValue="" onChange={e => { pickCatalogItem(e.target.value, 'new'); e.target.value = ''; }} className={ic + ' w-full mb-2'}>
-          <option value="">— Pick Equipment / Studio Rate (optional) —</option>
-          <optgroup label="Studio">
-            {(Object.entries(STUDIO_RATES) as [keyof typeof STUDIO_RATES, typeof STUDIO_RATES[keyof typeof STUDIO_RATES]][]).map(([key, rate]) => (
-              <option key={key} value={`studio:${key}`}>{rate.label} ({formatPHP(rate.price)})</option>
-            ))}
-          </optgroup>
-          {[...equipmentByCat.entries()].map(([cat, items]) => (
-            <optgroup key={cat} label={CATEGORY_LABELS[cat] || cat}>
-              {items.map(e => <option key={e.id} value={`eq:${e.id}`}>{e.name} ({formatPHP(e.daily_rate)}/day)</option>)}
-            </optgroup>
-          ))}
-        </select>
+        {(PROJECT_CATEGORY_SHOWS_STUDIO[newItem.category] || (PROJECT_CATEGORY_EQUIPMENT_CATALOG_CATS[newItem.category] ?? []).some(cat => equipmentByCat.has(cat))) && (
+          <select defaultValue="" onChange={e => { pickCatalogItem(e.target.value, 'new'); e.target.value = ''; }} className={ic + ' w-full mb-2'}>
+            <option value="">— Pick Equipment / Studio Rate (optional) —</option>
+            {equipmentOptionGroups(newItem.category)}
+          </select>
+        )}
         <input value={newItem.description} onChange={e => setNewItem(i => ({ ...i, description: e.target.value }))} placeholder="Description (e.g. Director — Treb Monteras)" className={ic + ' w-full mb-2'} />
         <input value={newItem.note} onChange={e => setNewItem(i => ({ ...i, note: e.target.value }))} placeholder="Note (optional — e.g. 2x AC, 2 Cam Op, Gaffer)" className={ic + ' w-full mb-2'} />
         <div className="grid grid-cols-2 gap-2 mb-2">
@@ -330,25 +362,18 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                   {g.items.map(c => (
                     editingId === c.id ? (
                       <div key={c.id} className="px-4 py-3 space-y-1.5">
-                        <select value={editForm.contact_id ?? ''} onChange={e => pickContact(e.target.value, 'edit')} className={ic + ' w-full'}>
-                          <option value="">— Pick Personnel / Vendor (optional) —</option>
-                          {contacts.map(ct => (
-                            <option key={ct.id} value={ct.id}>{ct.name}{ct.role ? ` — ${ct.role}` : ''}{ct.default_rate > 0 ? ` (${formatPHP(ct.default_rate)}${RATE_UNIT_LABELS[ct.rate_unit]})` : ''}</option>
-                          ))}
-                        </select>
-                        <select defaultValue="" onChange={e => { pickCatalogItem(e.target.value, 'edit'); e.target.value = ''; }} className={ic + ' w-full'}>
-                          <option value="">— Pick Equipment / Studio Rate (optional) —</option>
-                          <optgroup label="Studio">
-                            {(Object.entries(STUDIO_RATES) as [keyof typeof STUDIO_RATES, typeof STUDIO_RATES[keyof typeof STUDIO_RATES]][]).map(([key, rate]) => (
-                              <option key={key} value={`studio:${key}`}>{rate.label} ({formatPHP(rate.price)})</option>
-                            ))}
-                          </optgroup>
-                          {[...equipmentByCat.entries()].map(([cat, items]) => (
-                            <optgroup key={cat} label={CATEGORY_LABELS[cat] || cat}>
-                              {items.map(e => <option key={e.id} value={`eq:${e.id}`}>{e.name} ({formatPHP(e.daily_rate)}/day)</option>)}
-                            </optgroup>
-                          ))}
-                        </select>
+                        {contacts.some(ct => ct.default_category === editForm.category) && (
+                          <select value={editForm.contact_id ?? ''} onChange={e => pickContact(e.target.value, 'edit')} className={ic + ' w-full'}>
+                            <option value="">— Pick Personnel / Vendor (optional) —</option>
+                            {contactOptionGroups(editForm.category)}
+                          </select>
+                        )}
+                        {(PROJECT_CATEGORY_SHOWS_STUDIO[editForm.category] || (PROJECT_CATEGORY_EQUIPMENT_CATALOG_CATS[editForm.category] ?? []).some(cat => equipmentByCat.has(cat))) && (
+                          <select defaultValue="" onChange={e => { pickCatalogItem(e.target.value, 'edit'); e.target.value = ''; }} className={ic + ' w-full'}>
+                            <option value="">— Pick Equipment / Studio Rate (optional) —</option>
+                            {equipmentOptionGroups(editForm.category)}
+                          </select>
+                        )}
                         <input value={editForm.description} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))} className={ic + ' w-full'} />
                         <input value={editForm.note} onChange={e => setEditForm(f => ({ ...f, note: e.target.value }))} placeholder="Note" className={ic + ' w-full'} />
                         <div className="grid grid-cols-2 gap-2">

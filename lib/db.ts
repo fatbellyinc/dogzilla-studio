@@ -185,6 +185,7 @@ function initSchema(db: Database.Database) {
       phone TEXT,
       email TEXT,
       default_rate REAL DEFAULT 0,
+      default_category TEXT NOT NULL DEFAULT 'others', -- ProjectCategory — drives the budget picker filter
       rate_unit TEXT DEFAULT 'day',       -- 'day' | 'hour' | 'flat' | 'project'
       notes TEXT,
       created_at TEXT DEFAULT (datetime('now'))
@@ -416,6 +417,7 @@ function initSchema(db: Database.Database) {
     `ALTER TABLE booking_equipment ADD COLUMN category TEXT`,
     `ALTER TABLE booking_costs ADD COLUMN day_date TEXT`,
     `ALTER TABLE project_costs ADD COLUMN contact_id INTEGER REFERENCES contacts(id)`,
+    `ALTER TABLE contacts ADD COLUMN default_category TEXT NOT NULL DEFAULT 'others'`,
   ];
   for (const sql of migrations) {
     try { db.exec(sql); } catch { /* column already exists */ }
