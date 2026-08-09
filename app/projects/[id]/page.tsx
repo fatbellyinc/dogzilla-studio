@@ -91,7 +91,6 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const trueEarnings = clientTotal - paidOut;
   const vatExempt = !!project.vat_exempt;
   const noMarkup = !!project.no_markup;
-  const withDP = calcScenario(clientTotal, noMarkup ? 0 : project.markup_pct_dp, vatExempt);
   const noDP = calcScenario(clientTotal, noMarkup ? 0 : project.markup_pct_no_dp, vatExempt);
 
   const byCategory = PROJECT_CATEGORIES.map(cat => ({
@@ -530,39 +529,34 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         </div>
       </div>
 
-      {/* Client-facing scenarios */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-        {[
-          { label: 'With 50% DP Before Shoot', pct: project.markup_pct_dp, calc: withDP, key: 'markup_pct_dp' as const },
-          { label: 'Without 50% DP', pct: project.markup_pct_no_dp, calc: noDP, key: 'markup_pct_no_dp' as const },
-        ].map(s => (
-          <div key={s.key} className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4">
-            <div className="text-xs text-white/50 mb-2 font-semibold">{s.label}</div>
-            <div className="flex items-center justify-between text-xs mb-1">
-              <span className="text-white/40">Sub Total (client cost)</span>
-              <span className="text-white">{formatPHP(clientTotal)}</span>
-            </div>
-            <div className="flex items-center justify-between text-xs mb-1">
-              <span className="text-white/40 flex items-center gap-1">
-                Markup <input type="number" value={s.pct} disabled={noMarkup} onChange={e => updateProject({ [s.key]: Number(e.target.value) } as Partial<Project>)}
-                  className="w-12 bg-[#0f0f0f] border border-[#2a2a2a] rounded px-1 py-0.5 text-white text-xs disabled:opacity-30" />%{noMarkup && <span className="text-white/30">(off)</span>}
-              </span>
-              <span className="text-white">{formatPHP(s.calc.markup)}</span>
-            </div>
-            <div className="flex items-center justify-between text-xs mb-1">
-              <span className="text-white/40">Sub Total 2</span>
-              <span className="text-white">{formatPHP(s.calc.subtotal2)}</span>
-            </div>
-            <div className="flex items-center justify-between text-xs mb-2">
-              <span className="text-white/40">{vatExempt ? 'VAT (exempt)' : '12% VAT'}</span>
-              <span className="text-white">{formatPHP(s.calc.vat)}</span>
-            </div>
-            <div className="flex items-center justify-between border-t border-[#2a2a2a] pt-2">
-              <span className="text-sm font-semibold text-white">TOTAL WITH VAT</span>
-              <span className="text-lg font-black text-[#E32726]">{formatPHP(s.calc.total)}</span>
-            </div>
+      {/* Client-facing total — one definitive billing scenario, matching the Quotation/Invoice */}
+      <div className="grid grid-cols-1 mb-4">
+        <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4">
+          <div className="text-xs text-white/50 mb-2 font-semibold">Client Total</div>
+          <div className="flex items-center justify-between text-xs mb-1">
+            <span className="text-white/40">Sub Total (client cost)</span>
+            <span className="text-white">{formatPHP(clientTotal)}</span>
           </div>
-        ))}
+          <div className="flex items-center justify-between text-xs mb-1">
+            <span className="text-white/40 flex items-center gap-1">
+              Markup <input type="number" value={project.markup_pct_no_dp} disabled={noMarkup} onChange={e => updateProject({ markup_pct_no_dp: Number(e.target.value) })}
+                className="w-12 bg-[#0f0f0f] border border-[#2a2a2a] rounded px-1 py-0.5 text-white text-xs disabled:opacity-30" />%{noMarkup && <span className="text-white/30">(off)</span>}
+            </span>
+            <span className="text-white">{formatPHP(noDP.markup)}</span>
+          </div>
+          <div className="flex items-center justify-between text-xs mb-1">
+            <span className="text-white/40">Sub Total 2</span>
+            <span className="text-white">{formatPHP(noDP.subtotal2)}</span>
+          </div>
+          <div className="flex items-center justify-between text-xs mb-2">
+            <span className="text-white/40">{vatExempt ? 'VAT (exempt)' : '12% VAT'}</span>
+            <span className="text-white">{formatPHP(noDP.vat)}</span>
+          </div>
+          <div className="flex items-center justify-between border-t border-[#2a2a2a] pt-2">
+            <span className="text-sm font-semibold text-white">TOTAL WITH VAT</span>
+            <span className="text-lg font-black text-[#E32726]">{formatPHP(noDP.total)}</span>
+          </div>
+        </div>
       </div>
 
       {/* Add line items — click cards to multi-select (like the booking picker), then commit the batch */}
