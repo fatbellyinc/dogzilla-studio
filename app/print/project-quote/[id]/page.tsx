@@ -78,6 +78,33 @@ export default function ProjectQuotePage({ params }: { params: Promise<{ id: str
     });
   }
 
+  // Word export — same MS-Word-compatible HTML blob trick used by the booking Invoice, so
+  // both documents behave the same way. The @page rule in globals.css (A4, 15mm/12mm margins)
+  // already keeps every printed/PDF'd document on a standard page size; this mirrors that with
+  // a 2cm Word margin.
+  function exportWord() {
+    const page = document.querySelector('.doc-page') as HTMLElement | null;
+    if (!page) return;
+    const html = page.innerHTML;
+    const blob = new Blob(['﻿', `
+<html xmlns:o="urn:schemas-microsoft-com:office:office"
+      xmlns:w="urn:schemas-microsoft-com:office:word"
+      xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="utf-8"/><title>${project.quote_number || 'Quotation'}</title>
+<style>
+  @page { size: A4; margin: 2cm; }
+  body { font-family: Arial, sans-serif; font-size: 11pt; color: #111; margin: 2cm; }
+  table { border-collapse: collapse; width: 100%; }
+  td, th { padding: 5px 8px; font-size: 10pt; }
+  img { width: 70pt; height: 70pt; }
+  .no-print { display: none; }
+</style>
+</head><body>${html}</body></html>`], { type: 'application/msword' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `${document.title}.doc`; a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="doc-shell" style={{ background: '#d1d5db', minHeight: '100vh', padding: '32px 16px', display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
       <BackButton fallbackHref={`/projects/${id}`} />
@@ -289,6 +316,16 @@ export default function ProjectQuotePage({ params }: { params: Promise<{ id: str
       </div>
 
       <ShareDocBar bookingId={0} docType="project" clientName={project.client_name || project.name} docNumber={project.quote_number || undefined} />
+      <div className="no-print fixed bottom-0 left-0 right-0 md:bottom-6 md:left-auto md:right-6 flex gap-2 overflow-x-auto px-2 py-2 md:p-0 md:flex-wrap md:justify-end z-50" style={{ WebkitOverflowScrolling: 'touch' }}>
+        <button onClick={exportWord}
+          className="shrink-0 bg-[#2b579a] text-white px-4 py-2.5 rounded-lg font-semibold shadow-xl hover:bg-[#1e3f6f] transition-colors text-sm">
+          📄 Word
+        </button>
+        <button onClick={() => window.print()}
+          className="shrink-0 bg-[#E32726] text-white px-5 py-2.5 rounded-lg font-semibold shadow-xl hover:bg-[#c41f1e] transition-colors text-sm">
+          🖨️ Print / PDF
+        </button>
+      </div>
     </div>
   );
 }
