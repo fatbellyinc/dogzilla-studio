@@ -159,8 +159,8 @@ export default function ProjectQuotePage({ params }: { params: Promise<{ id: str
                     <Fragment key={subCat || 'other'}>
                       {subGroups.length > 1 && (
                         <tr>
-                          <td colSpan={5} style={{ padding: '4px 12px 4px 22px', fontSize: '10px', fontWeight: 700, color: '#999', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                            {subCat ? (CATEGORY_LABELS[subCat] || subCat) : 'Other Equipment'}
+                          <td colSpan={5} style={{ padding: '6px 12px 6px 22px', fontSize: '11px', fontWeight: 900, color: '#E32726', textTransform: 'uppercase', letterSpacing: '0.75px', background: '#fdeaea', borderLeft: '4px solid #E32726', borderTop: '1px solid #f5c6c6', borderBottom: '1px solid #f5c6c6' }}>
+                            ▸ {subCat ? (CATEGORY_LABELS[subCat] || subCat) : 'Other Equipment'}
                           </td>
                         </tr>
                       )}
