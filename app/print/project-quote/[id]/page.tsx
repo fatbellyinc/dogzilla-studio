@@ -36,7 +36,7 @@ export default function ProjectQuotePage({ params }: { params: Promise<{ id: str
   const [costExclusions, setCostExclusions] = useState('');
   const [paymentTerms, setPaymentTerms] = useState(DEFAULT_PAYMENT_TERMS);
   const [signerName, setSignerName] = useState('Alberto Monteras II');
-  const [signerTitle, setSignerTitle] = useState('MANAGER');
+  const [signerTitle, setSignerTitle] = useState('PROPRIETOR');
 
   useEffect(() => {
     fetch(`/api/projects/${id}`).then(r => r.json()).then((d: Data) => {
