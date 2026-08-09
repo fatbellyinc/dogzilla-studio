@@ -151,16 +151,16 @@ export default function ProjectQuotePage({ params }: { params: Promise<{ id: str
                 : [['', g.items] as [string, ProjectCost[]]];
               return (
                 <Fragment key={g.category}>
-                  <tr style={{ background: '#f3f3f3' }}>
-                    <td colSpan={4} style={{ padding: '6px 12px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{PROJECT_CATEGORY_LABELS[g.category]}</td>
-                    <td style={{ padding: '6px 12px', textAlign: 'right', fontWeight: 700 }}>{formatPHP(catTotal)}</td>
+                  <tr style={{ background: '#111' }}>
+                    <td colSpan={4} style={{ padding: '7px 12px', fontWeight: 900, fontSize: '12px', color: 'white', textTransform: 'uppercase', letterSpacing: '0.75px' }}>{PROJECT_CATEGORY_LABELS[g.category]}</td>
+                    <td style={{ padding: '7px 12px', textAlign: 'right', fontWeight: 900, color: 'white' }}>{formatPHP(catTotal)}</td>
                   </tr>
                   {subGroups.map(([subCat, items]) => (
                     <Fragment key={subCat || 'other'}>
                       {subGroups.length > 1 && (
                         <tr>
-                          <td colSpan={5} style={{ padding: '6px 12px 6px 22px', fontSize: '11px', fontWeight: 900, color: '#E32726', textTransform: 'uppercase', letterSpacing: '0.75px', background: '#fdeaea', borderLeft: '4px solid #E32726', borderTop: '1px solid #f5c6c6', borderBottom: '1px solid #f5c6c6' }}>
-                            ▸ {subCat ? (CATEGORY_LABELS[subCat] || subCat) : 'Other Equipment'}
+                          <td colSpan={5} style={{ padding: '3px 12px 3px 22px', fontSize: '10px', fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px', background: '#f7f7f7' }}>
+                            {subCat ? (CATEGORY_LABELS[subCat] || subCat) : 'Other Equipment'}
                           </td>
                         </tr>
                       )}
