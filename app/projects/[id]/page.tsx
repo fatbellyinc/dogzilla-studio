@@ -9,6 +9,27 @@ const STATUS_LABELS: Record<string, string> = {
   draft: 'Draft', quoted: 'Quoted', won: 'Won', lost: 'Lost', in_production: 'In Production', completed: 'Completed',
 };
 
+// Common exclusions pulled from past Dogzilla quotations — clickable suggestions so a producer
+// doesn't have to remember or retype the standard list from scratch every time. Chosen here in
+// the app, not on the printed document — the quotation just displays whatever ends up saved.
+const EXCLUSION_SUGGESTIONS = [
+  'Stock footage or photos purchase, if needed',
+  'All products',
+  'Agency boards and final copy',
+  'Talent usage beyond stated period/territory',
+  'Livestreaming services, unless specified',
+  'Drone / aerial cinematography, unless specified',
+  'Government permits, fees and licenses',
+  'Client-side revisions beyond two (2) rounds',
+  'Overtime beyond the agreed call time',
+  'Music licensing beyond stock/library tracks',
+  'Import duties and customs fees for equipment',
+  'Insurance beyond standard equipment coverage',
+  'Wardrobe and styling purchases (rental only)',
+  'COVID / health testing, unless specified',
+  'Translation / subtitling beyond English',
+];
+
 type DiscountType = 'percent' | 'fixed' | null;
 type CostFlow = 'external' | 'internal';
 interface EmptyItem {
@@ -66,12 +87,14 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const [headerForm, setHeaderForm] = useState({ name: '', client_name: '', client_company: '', client_title: '', description: '' });
   const [saving, setSaving] = useState(false);
   const [paymentForm, setPaymentForm] = useState({ amount: '', type: 'deposit', method: '', reference: '' });
+  const [exclusionsText, setExclusionsText] = useState('');
 
   const load = useCallback(() => {
     fetch(`/api/projects/${id}`).then(r => r.json()).then(d => {
       setProject(d.project);
       setCosts(d.costs);
       setPayments(d.payments || []);
+      setExclusionsText(d.project.cost_exclusions || '');
     });
   }, [id]);
 
@@ -262,6 +285,20 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     await fetch(`/api/projects/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(fields) });
     await load();
     setSaving(false);
+  }
+
+  // Clicking a suggested/auto-detected exclusion toggles it in the list and saves immediately —
+  // the printed Quotation only ever displays this text, never edits it.
+  function toggleExclusionLine(line: string) {
+    const lines = exclusionsText.split('\n').map(l => l.trim()).filter(Boolean);
+    const next = lines.includes(line) ? lines.filter(l => l !== line) : [...lines, line];
+    const joined = next.join('\n');
+    setExclusionsText(joined);
+    fetch(`/api/projects/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cost_exclusions: joined }) });
+  }
+
+  async function saveExclusionsText() {
+    await fetch(`/api/projects/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cost_exclusions: exclusionsText }) });
   }
 
   async function addPayment() {
@@ -971,6 +1008,56 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
           <input value={paymentForm.reference} onChange={e => setPaymentForm(f => ({ ...f, reference: e.target.value }))} placeholder="Reference #" className={ic} />
           <button onClick={addPayment} disabled={!paymentForm.amount} className="bg-[#E32726] text-white text-sm px-4 py-2 rounded-lg font-medium disabled:opacity-40">+ Record Payment</button>
         </div>
+      </div>
+
+      {/* Cost Exclusions — picked here in the app; the printed Quotation only displays the
+          resulting text, it never hosts the editing controls. */}
+      <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4 mt-4">
+        <h2 className="text-xs text-white/40 uppercase tracking-wider mb-3">Cost Exclusions (shown on Quotation)</h2>
+        {(() => {
+          const budgetedCategories = new Set(costs.map(c => c.category));
+          const autoExclusions = PROJECT_CATEGORIES
+            .filter(cat => !budgetedCategories.has(cat))
+            .map(cat => `${PROJECT_CATEGORY_LABELS[cat]} (not included in this quote)`);
+          const activeLines = exclusionsText.split('\n').map(l => l.trim()).filter(Boolean);
+          return (
+            <>
+              {autoExclusions.length > 0 && (
+                <div className="mb-2">
+                  <div className="text-[10px] text-white/30 mb-1">Not budgeted in this project</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {autoExclusions.map(line => {
+                      const active = activeLines.includes(line);
+                      return (
+                        <button key={line} onClick={() => toggleExclusionLine(line)}
+                          className={`text-xs px-2.5 py-1.5 rounded-lg border transition-all ${active ? 'bg-[#E32726] border-[#E32726] text-white' : 'bg-[#0f0f0f] border-[#2a2a2a] text-white/70 hover:border-white/30'}`}>
+                          {line}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              <div className="mb-3">
+                <div className="text-[10px] text-white/30 mb-1">Common exclusions — click to add/remove</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {EXCLUSION_SUGGESTIONS.map(line => {
+                    const active = activeLines.includes(line);
+                    return (
+                      <button key={line} onClick={() => toggleExclusionLine(line)}
+                        className={`text-xs px-2.5 py-1.5 rounded-lg border transition-all ${active ? 'bg-[#E32726] border-[#E32726] text-white' : 'bg-[#0f0f0f] border-[#2a2a2a] text-white/70 hover:border-white/30'}`}>
+                        {line}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          );
+        })()}
+        <textarea value={exclusionsText} onChange={e => setExclusionsText(e.target.value)} onBlur={saveExclusionsText} rows={3}
+          placeholder="Nothing excluded yet — click a suggestion above, or type your own line here"
+          className={ic + ' w-full'} />
       </div>
     </div>
   );

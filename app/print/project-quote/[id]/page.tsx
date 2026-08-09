@@ -19,26 +19,6 @@ const DEFAULT_PAYMENT_TERMS = `1. This quotation is valid only for thirty (30) d
 2. Please provide us with Purchase/Job order and/or signed CE once the project is confirmed, before the pre-production meeting.
 3. 50% down payment prior to shoot and 50% balance within thirty (30) days upon receipt of billing invoice.`;
 
-// Common exclusions pulled from past Dogzilla quotations — clickable suggestions so a producer
-// doesn't have to remember or retype the standard list from scratch every time.
-const EXCLUSION_SUGGESTIONS = [
-  'Stock footage or photos purchase, if needed',
-  'All products',
-  'Agency boards and final copy',
-  'Talent usage beyond stated period/territory',
-  'Livestreaming services, unless specified',
-  'Drone / aerial cinematography, unless specified',
-  'Government permits, fees and licenses',
-  'Client-side revisions beyond two (2) rounds',
-  'Overtime beyond the agreed call time',
-  'Music licensing beyond stock/library tracks',
-  'Import duties and customs fees for equipment',
-  'Insurance beyond standard equipment coverage',
-  'Wardrobe and styling purchases (rental only)',
-  'COVID / health testing, unless specified',
-  'Translation / subtitling beyond English',
-];
-
 const CANCELLATION_POLICY = [
   'After Briefing/Storyboarding: Actual expenses + mark-up + VAT.',
   'After Feasibility: 10% of the approved Production Cost + mark-up + VAT.',
@@ -91,31 +71,10 @@ export default function ProjectQuotePage({ params }: { params: Promise<{ id: str
   const regularTotal = costs.reduce((s, c) => s + calcListPriceFromNet(c.client_cost, c.discount_type, c.discount_value), 0);
   const totalSavings = regularTotal - clientTotal;
 
-  // Auto-suggested exclusions — any budget category with zero line items is something this
-  // quote doesn't cover, so it's worth flagging explicitly (e.g. no Post Production items
-  // budgeted → "Post Production" should probably be called out as excluded).
-  const budgetedCategories = new Set(costs.map(c => c.category));
-  const autoExclusions = PROJECT_CATEGORIES
-    .filter(cat => !budgetedCategories.has(cat))
-    .map(cat => `${PROJECT_CATEGORY_LABELS[cat]} (not included in this quote)`);
-
   async function saveDoc() {
     await fetch(`/api/projects/${id}`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cost_exclusions: costExclusions, payment_terms: paymentTerms }),
-    });
-  }
-
-  function toggleExclusionLine(line: string) {
-    setCostExclusions(prev => {
-      const lines = prev.split('\n').map(l => l.trim()).filter(Boolean);
-      const next = lines.includes(line) ? lines.filter(l => l !== line) : [...lines, line];
-      const joined = next.join('\n');
-      fetch(`/api/projects/${id}`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cost_exclusions: joined, payment_terms: paymentTerms }),
-      });
-      return joined;
+      body: JSON.stringify({ payment_terms: paymentTerms }),
     });
   }
 
@@ -274,45 +233,13 @@ export default function ProjectQuotePage({ params }: { params: Promise<{ id: str
           </tbody>
         </table>
 
-        {/* Cost Exclusion — pick from suggested/auto-detected items, or edit the list directly */}
-        <div className="no-print" style={{ marginBottom: '10px' }}>
-          <div style={{ fontSize: '10px', fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>
-            Suggested exclusions — click to add/remove
+        {/* Cost Exclusion — chosen in the app (project page), just displayed here as plain text */}
+        {costExclusions.trim() && (
+          <div style={{ marginBottom: '20px' }}>
+            <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '6px' }}>COST EXCLUSION:</div>
+            <div style={{ fontSize: '12px', whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>{costExclusions}</div>
           </div>
-          {autoExclusions.length > 0 && (
-            <div style={{ marginBottom: '6px' }}>
-              <div style={{ fontSize: '10px', color: '#aaa', marginBottom: '3px' }}>Not budgeted in this project</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                {autoExclusions.map(line => {
-                  const active = costExclusions.split('\n').map(l => l.trim()).includes(line);
-                  return (
-                    <button key={line} onClick={() => toggleExclusionLine(line)} type="button"
-                      style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '6px', cursor: 'pointer', border: active ? '1px solid #E32726' : '1px solid #ddd', background: active ? '#fdeaea' : '#fafafa', color: active ? '#E32726' : '#555' }}>
-                      {line}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-            {EXCLUSION_SUGGESTIONS.map(line => {
-              const active = costExclusions.split('\n').map(l => l.trim()).includes(line);
-              return (
-                <button key={line} onClick={() => toggleExclusionLine(line)} type="button"
-                  style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '6px', cursor: 'pointer', border: active ? '1px solid #E32726' : '1px solid #ddd', background: active ? '#fdeaea' : '#fafafa', color: active ? '#E32726' : '#555' }}>
-                  {line}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div style={{ marginBottom: '20px' }}>
-          <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '6px' }}>COST EXCLUSION:</div>
-          <textarea value={costExclusions} onChange={e => setCostExclusions(e.target.value)} onBlur={saveDoc} rows={3}
-            style={{ width: '100%', border: '1px solid #eee', outline: 'none', fontSize: '12px', padding: '6px', fontFamily: 'Arial' }} />
-        </div>
+        )}
 
         {/* Terms of Payment — editable */}
         <div style={{ marginBottom: '20px' }}>
@@ -322,12 +249,17 @@ export default function ProjectQuotePage({ params }: { params: Promise<{ id: str
         </div>
 
         {/* Cancellation Policy — fixed boilerplate */}
-        <div style={{ marginBottom: '24px' }}>
-          <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '6px' }}>4. Cancellation Policy:</div>
+        <div style={{ marginBottom: '20px' }}>
+          <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '6px' }}>CANCELLATION POLICY:</div>
           <ol type="a" style={{ fontSize: '12px', paddingLeft: '20px', lineHeight: '1.6' }}>
             {CANCELLATION_POLICY.map((c, i) => <li key={i}>{c}</li>)}
           </ol>
-          <div style={{ fontSize: '12px', marginTop: '4px' }}>5. Revisions after approval and/or release of materials will be accommodated with corresponding charges.</div>
+        </div>
+
+        {/* Revisions — its own section, not a trailing line tacked onto Cancellation Policy */}
+        <div style={{ marginBottom: '24px' }}>
+          <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '6px' }}>REVISIONS:</div>
+          <div style={{ fontSize: '12px' }}>Revisions after approval and/or release of materials will be accommodated with corresponding charges.</div>
         </div>
 
         <div style={{ fontSize: '13px', marginBottom: '16px' }}>You may reach me anytime through my mobile 09399338732.</div>
