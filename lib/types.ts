@@ -205,10 +205,27 @@ export interface Project {
   vat_exempt: number;
   no_markup: number;
   cost_exclusions: string | null;
+  deliverables: string | null;
   payment_terms: string | null;
   notes: string | null;
   created_at: string;
 }
+
+// Quick-add checklist for the Deliverables section — duration x aspect-ratio combos plus
+// common content types, pulled from real Dogzilla quotations/ballpark costs.
+export const DELIVERABLE_DURATIONS = ['6s', '15s', '30s', '45s', '60s'] as const;
+export const DELIVERABLE_RATIOS = ['16:9', '9:16', '1:1', '4:5'] as const;
+export const DELIVERABLE_CONTENT_TYPES = [
+  'TVC / Commercial',
+  'Music Video',
+  'Corporate Video / Explainer',
+  'Social Media Cutdown',
+  'Documentary / Mini-Doc',
+  'Behind-the-Scenes (BTS)',
+  'Livestream Coverage',
+  'Photo Stills / Key Art',
+  'Radio / Audio Ad',
+];
 
 export interface ProjectCost {
   id: number;

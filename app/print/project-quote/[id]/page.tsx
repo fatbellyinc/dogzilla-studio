@@ -115,6 +115,18 @@ export default function ProjectQuotePage({ params }: { params: Promise<{ id: str
           {project.description && <div style={{ marginTop: '8px', whiteSpace: 'pre-wrap' }}>{project.description}</div>}
         </div>
 
+        {/* Project title + Deliverables — set from the app, not editable here */}
+        <div style={{ marginBottom: '20px' }}>
+          <div style={{ fontSize: '10px', fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '2px' }}>Project Title</div>
+          <div style={{ fontWeight: 700, fontSize: '15px', marginBottom: project.deliverables?.trim() ? '10px' : 0 }}>{project.name}</div>
+          {project.deliverables?.trim() && (
+            <>
+              <div style={{ fontSize: '10px', fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '2px' }}>Deliverables</div>
+              <div style={{ fontSize: '12px', whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>{project.deliverables}</div>
+            </>
+          )}
+        </div>
+
         {/* Headline totals, styled like the standard Dogzilla quotation letter — the numbers a
             client reads first, before the line-item breakdown further down */}
         <div style={{ marginBottom: '24px', fontSize: '13px', lineHeight: '1.7' }}>

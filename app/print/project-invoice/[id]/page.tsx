@@ -96,12 +96,20 @@ export default function ProjectInvoicePage({ params }: { params: Promise<{ id: s
         </div>
 
         {/* Billed To */}
-        <div style={{ marginBottom: '20px' }}>
-          <div style={{ fontSize: '10px', fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '4px' }}>Billed To</div>
-          <div style={{ fontWeight: 700, fontSize: '15px' }}>{project.client_name || 'Client'}</div>
-          {project.client_company && <div style={{ color: '#333', fontWeight: 600 }}>{project.client_company}</div>}
-          {project.client_title && <div style={{ color: '#555' }}>{project.client_title}</div>}
-          <div style={{ color: '#555', marginTop: '4px' }}>Project: <strong>{project.name}</strong></div>
+        <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', gap: '20px' }}>
+          <div>
+            <div style={{ fontSize: '10px', fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '4px' }}>Billed To</div>
+            <div style={{ fontWeight: 700, fontSize: '15px' }}>{project.client_name || 'Client'}</div>
+            {project.client_company && <div style={{ color: '#333', fontWeight: 600 }}>{project.client_company}</div>}
+            {project.client_title && <div style={{ color: '#555' }}>{project.client_title}</div>}
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: '10px', fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '4px' }}>Project Title</div>
+            <div style={{ fontWeight: 700, fontSize: '15px' }}>{project.name}</div>
+            {project.deliverables?.trim() && (
+              <div style={{ fontSize: '11px', color: '#555', whiteSpace: 'pre-wrap', marginTop: '4px' }}>{project.deliverables}</div>
+            )}
+          </div>
         </div>
 
         {/* Line items */}

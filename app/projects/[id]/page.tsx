@@ -2,7 +2,7 @@
 import { use, useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { formatPHP, calcDiscountAmount, calcListPriceFromNet } from '@/lib/utils';
-import { Project, ProjectCost, ProjectPayment, PROJECT_CATEGORIES, PROJECT_CATEGORY_LABELS, PROJECT_STATUSES, ProjectCategory, Contact, RATE_UNIT_LABELS, Equipment, STUDIO_RATES, CATEGORY_LABELS, PROJECT_CATEGORY_EQUIPMENT_CATALOG_CATS, PROJECT_CATEGORY_SHOWS_STUDIO, PROJECT_CATEGORY_ROLE_SUGGESTIONS, ADDON_ITEMS } from '@/lib/types';
+import { Project, ProjectCost, ProjectPayment, PROJECT_CATEGORIES, PROJECT_CATEGORY_LABELS, PROJECT_STATUSES, ProjectCategory, Contact, RATE_UNIT_LABELS, Equipment, STUDIO_RATES, CATEGORY_LABELS, PROJECT_CATEGORY_EQUIPMENT_CATALOG_CATS, PROJECT_CATEGORY_SHOWS_STUDIO, PROJECT_CATEGORY_ROLE_SUGGESTIONS, ADDON_ITEMS, DELIVERABLE_DURATIONS, DELIVERABLE_RATIOS, DELIVERABLE_CONTENT_TYPES } from '@/lib/types';
 import BackButton from '@/components/BackButton';
 
 const STATUS_LABELS: Record<string, string> = {
@@ -88,6 +88,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const [saving, setSaving] = useState(false);
   const [paymentForm, setPaymentForm] = useState({ amount: '', type: 'deposit', method: '', reference: '' });
   const [exclusionsText, setExclusionsText] = useState('');
+  const [deliverablesText, setDeliverablesText] = useState('');
 
   const load = useCallback(() => {
     fetch(`/api/projects/${id}`).then(r => r.json()).then(d => {
@@ -95,6 +96,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       setCosts(d.costs);
       setPayments(d.payments || []);
       setExclusionsText(d.project.cost_exclusions || '');
+      setDeliverablesText(d.project.deliverables || '');
     });
   }, [id]);
 
@@ -288,17 +290,37 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   }
 
   // Clicking a suggested/auto-detected exclusion toggles it in the list and saves immediately —
-  // the printed Quotation only ever displays this text, never edits it.
+  // the printed Quotation only ever displays this text, never edits it. Computed via the
+  // functional setState form so rapid successive clicks each build on the latest state instead
+  // of racing against a stale closure snapshot (which was silently dropping earlier clicks).
   function toggleExclusionLine(line: string) {
-    const lines = exclusionsText.split('\n').map(l => l.trim()).filter(Boolean);
-    const next = lines.includes(line) ? lines.filter(l => l !== line) : [...lines, line];
-    const joined = next.join('\n');
-    setExclusionsText(joined);
-    fetch(`/api/projects/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cost_exclusions: joined }) });
+    setExclusionsText(prev => {
+      const lines = prev.split('\n').map(l => l.trim()).filter(Boolean);
+      const next = lines.includes(line) ? lines.filter(l => l !== line) : [...lines, line];
+      const joined = next.join('\n');
+      fetch(`/api/projects/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cost_exclusions: joined }) });
+      return joined;
+    });
   }
 
   async function saveExclusionsText() {
     await fetch(`/api/projects/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cost_exclusions: exclusionsText }) });
+  }
+
+  // Same click-to-toggle pattern as Cost Exclusions — pick from duration x aspect-ratio combos
+  // and common content types instead of retyping "30s 16:9, 30s 9:16..." from scratch.
+  function toggleDeliverableLine(line: string) {
+    setDeliverablesText(prev => {
+      const lines = prev.split('\n').map(l => l.trim()).filter(Boolean);
+      const next = lines.includes(line) ? lines.filter(l => l !== line) : [...lines, line];
+      const joined = next.join('\n');
+      fetch(`/api/projects/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ deliverables: joined }) });
+      return joined;
+    });
+  }
+
+  async function saveDeliverablesText() {
+    await fetch(`/api/projects/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ deliverables: deliverablesText }) });
   }
 
   async function addPayment() {
@@ -1008,6 +1030,45 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
           <input value={paymentForm.reference} onChange={e => setPaymentForm(f => ({ ...f, reference: e.target.value }))} placeholder="Reference #" className={ic} />
           <button onClick={addPayment} disabled={!paymentForm.amount} className="bg-[#E32726] text-white text-sm px-4 py-2 rounded-lg font-medium disabled:opacity-40">+ Record Payment</button>
         </div>
+      </div>
+
+      {/* Deliverables — picked here in the app; shown as its own section on the Quotation and
+          Invoice, right under the project title. */}
+      <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4 mt-4">
+        <h2 className="text-xs text-white/40 uppercase tracking-wider mb-3">Deliverables (shown on Quotation &amp; Invoice)</h2>
+        {(() => {
+          const activeLines = deliverablesText.split('\n').map(l => l.trim()).filter(Boolean);
+          const chip = (line: string) => {
+            const active = activeLines.includes(line);
+            return (
+              <button key={line} onClick={() => toggleDeliverableLine(line)}
+                className={`text-xs px-2.5 py-1.5 rounded-lg border transition-all ${active ? 'bg-[#E32726] border-[#E32726] text-white' : 'bg-[#0f0f0f] border-[#2a2a2a] text-white/70 hover:border-white/30'}`}>
+                {line}
+              </button>
+            );
+          };
+          return (
+            <>
+              <div className="mb-3">
+                <div className="text-[10px] text-white/30 mb-1">Duration × Aspect Ratio — click to add/remove</div>
+                {DELIVERABLE_DURATIONS.map(dur => (
+                  <div key={dur} className="flex flex-wrap gap-1.5 mb-1.5">
+                    {DELIVERABLE_RATIOS.map(ratio => chip(`${dur} ${ratio}`))}
+                  </div>
+                ))}
+              </div>
+              <div className="mb-3">
+                <div className="text-[10px] text-white/30 mb-1">Content type</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {DELIVERABLE_CONTENT_TYPES.map(chip)}
+                </div>
+              </div>
+            </>
+          );
+        })()}
+        <textarea value={deliverablesText} onChange={e => setDeliverablesText(e.target.value)} onBlur={saveDeliverablesText} rows={3}
+          placeholder="Nothing set yet — click a suggestion above, or type your own line here (e.g. 3x15s, 9:16 or 4:5, Digital only)"
+          className={ic + ' w-full'} />
       </div>
 
       {/* Cost Exclusions — picked here in the app; the printed Quotation only displays the

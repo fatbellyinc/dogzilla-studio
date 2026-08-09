@@ -168,6 +168,7 @@ function initSchema(db: Database.Database) {
       vat_exempt INTEGER DEFAULT 0,
       no_markup INTEGER DEFAULT 0,
       cost_exclusions TEXT,
+      deliverables TEXT,
       payment_terms TEXT,
       notes TEXT,
       created_at TEXT DEFAULT (datetime('now'))
@@ -451,6 +452,7 @@ function initSchema(db: Database.Database) {
     `ALTER TABLE contacts ADD COLUMN default_category TEXT NOT NULL DEFAULT 'others'`,
     `ALTER TABLE project_costs ADD COLUMN qty INTEGER NOT NULL DEFAULT 1`,
     `ALTER TABLE projects ADD COLUMN no_markup INTEGER DEFAULT 0`,
+    `ALTER TABLE projects ADD COLUMN deliverables TEXT`,
     `ALTER TABLE project_costs ADD COLUMN discount_type TEXT DEFAULT NULL`,
     `ALTER TABLE project_costs ADD COLUMN discount_value REAL DEFAULT 0`,
     `ALTER TABLE project_costs ADD COLUMN cost_flow TEXT NOT NULL DEFAULT 'external'`,
