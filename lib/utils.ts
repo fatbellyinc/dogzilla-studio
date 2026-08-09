@@ -95,6 +95,26 @@ export function calcListPriceFromNet(net: number, type: 'percent' | 'fixed' | nu
   return net + value;
 }
 
+// Groups a project's Deliverables lines by duration, longest first (e.g. "60s 16:9" before
+// "30s 9:16"), so the list reads in the order a client expects a spec sheet to be laid out.
+// Lines with no leading duration (content types like "Music Video") sort after every duration
+// line, keeping their original relative order.
+export function sortDeliverables(lines: string[]): string[] {
+  const durationOf = (line: string) => {
+    const m = line.trim().match(/^(\d+)s\b/);
+    return m ? Number(m[1]) : null;
+  };
+  return [...lines]
+    .map((line, i) => ({ line, i, dur: durationOf(line) }))
+    .sort((a, b) => {
+      if (a.dur === null && b.dur === null) return a.i - b.i;
+      if (a.dur === null) return 1;
+      if (b.dur === null) return -1;
+      return b.dur - a.dur || a.i - b.i;
+    })
+    .map(x => x.line);
+}
+
 // VAT-inclusive total from a VAT-exclusive subtotal, using the shared VAT_RATE from lib/types
 // (TRAIN Law, RA 10963). VAT-exempt bookings owe no VAT.
 export function calcVAT(subtotalExVAT: number, vatExempt: boolean, vatRate: number): { vatAmount: number; totalIncVAT: number } {

@@ -1,6 +1,6 @@
 'use client';
 import { Fragment, use, useEffect, useState, useCallback } from 'react';
-import { formatPHP, formatDate, calcListPriceFromNet } from '@/lib/utils';
+import { formatPHP, formatDate, calcListPriceFromNet, sortDeliverables } from '@/lib/utils';
 import { Project, ProjectCost, ProjectPayment, ProjectInvoice, PROJECT_CATEGORIES, PROJECT_CATEGORY_LABELS, PAYMENT_ACCOUNTS, Equipment, CATEGORY_LABELS } from '@/lib/types';
 import ShareDocBar from '@/components/ShareDocBar';
 import BackButton from '@/components/BackButton';
@@ -107,7 +107,7 @@ export default function ProjectInvoicePage({ params }: { params: Promise<{ id: s
             <div style={{ fontSize: '10px', fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '4px' }}>Project Title</div>
             <div style={{ fontWeight: 700, fontSize: '15px' }}>{project.name}</div>
             {project.deliverables?.trim() && (
-              <div style={{ fontSize: '11px', color: '#555', whiteSpace: 'pre-wrap', marginTop: '4px' }}>{project.deliverables}</div>
+              <div style={{ fontSize: '11px', color: '#555', whiteSpace: 'pre-wrap', marginTop: '4px' }}>{sortDeliverables(project.deliverables.split('\n')).join('\n')}</div>
             )}
           </div>
         </div>

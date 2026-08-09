@@ -1,6 +1,6 @@
 'use client';
 import { Fragment, use, useEffect, useState } from 'react';
-import { formatPHP, calcListPriceFromNet } from '@/lib/utils';
+import { formatPHP, calcListPriceFromNet, sortDeliverables } from '@/lib/utils';
 import { Project, ProjectCost, PROJECT_CATEGORIES, PROJECT_CATEGORY_LABELS, Equipment, CATEGORY_LABELS } from '@/lib/types';
 import ShareDocBar from '@/components/ShareDocBar';
 import BackButton from '@/components/BackButton';
@@ -122,7 +122,7 @@ export default function ProjectQuotePage({ params }: { params: Promise<{ id: str
           {project.deliverables?.trim() && (
             <>
               <div style={{ fontSize: '10px', fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '2px' }}>Deliverables</div>
-              <div style={{ fontSize: '12px', whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>{project.deliverables}</div>
+              <div style={{ fontSize: '12px', whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>{sortDeliverables(project.deliverables.split('\n')).join('\n')}</div>
             </>
           )}
         </div>

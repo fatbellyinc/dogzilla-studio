@@ -1,7 +1,7 @@
 'use client';
 import { use, useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { formatPHP, calcDiscountAmount, calcListPriceFromNet } from '@/lib/utils';
+import { formatPHP, calcDiscountAmount, calcListPriceFromNet, sortDeliverables } from '@/lib/utils';
 import { Project, ProjectCost, ProjectPayment, PROJECT_CATEGORIES, PROJECT_CATEGORY_LABELS, PROJECT_STATUSES, ProjectCategory, Contact, RATE_UNIT_LABELS, Equipment, STUDIO_RATES, CATEGORY_LABELS, PROJECT_CATEGORY_EQUIPMENT_CATALOG_CATS, PROJECT_CATEGORY_SHOWS_STUDIO, PROJECT_CATEGORY_ROLE_SUGGESTIONS, ADDON_ITEMS, DELIVERABLE_DURATIONS, DELIVERABLE_RATIOS, DELIVERABLE_CONTENT_TYPES } from '@/lib/types';
 import BackButton from '@/components/BackButton';
 
@@ -313,7 +313,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     setDeliverablesText(prev => {
       const lines = prev.split('\n').map(l => l.trim()).filter(Boolean);
       const next = lines.includes(line) ? lines.filter(l => l !== line) : [...lines, line];
-      const joined = next.join('\n');
+      const joined = sortDeliverables(next).join('\n');
       fetch(`/api/projects/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ deliverables: joined }) });
       return joined;
     });
