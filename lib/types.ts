@@ -224,6 +224,7 @@ export interface ProjectCost {
   discount_type: 'percent' | 'fixed' | null;
   discount_value: number;
   cost_flow: 'external' | 'internal';
+  days: number;
 }
 
 export interface ProjectPayment {

@@ -1,7 +1,7 @@
 'use client';
-import { use, useEffect, useState, useCallback } from 'react';
-import { formatPHP, formatDate } from '@/lib/utils';
-import { Project, ProjectCost, ProjectPayment, ProjectInvoice, PROJECT_CATEGORIES, PROJECT_CATEGORY_LABELS, PAYMENT_ACCOUNTS } from '@/lib/types';
+import { Fragment, use, useEffect, useState, useCallback } from 'react';
+import { formatPHP, formatDate, calcListPriceFromNet } from '@/lib/utils';
+import { Project, ProjectCost, ProjectPayment, ProjectInvoice, PROJECT_CATEGORIES, PROJECT_CATEGORY_LABELS, PAYMENT_ACCOUNTS, Equipment, CATEGORY_LABELS } from '@/lib/types';
 import ShareDocBar from '@/components/ShareDocBar';
 import BackButton from '@/components/BackButton';
 
@@ -18,12 +18,14 @@ function calcScenario(subtotal: number, markupPct: number, vatExempt: boolean) {
 export default function ProjectInvoicePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const [data, setData] = useState<Data | null>(null);
+  const [equipment, setEquipment] = useState<Equipment[]>([]);
 
   const load = useCallback(() => {
     fetch(`/api/projects/${id}`).then(r => r.json()).then(setData);
   }, [id]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { fetch('/api/equipment').then(r => r.json()).then(setEquipment); }, []);
 
   useEffect(() => {
     if (!data) return;
@@ -43,6 +45,7 @@ export default function ProjectInvoicePage({ params }: { params: Promise<{ id: s
   if (!data) return <div className="p-8 text-gray-400">Loading...</div>;
   const { project, costs, payments, invoices } = data;
 
+  const equipmentCatByName = new Map(equipment.map(e => [e.name, e.category]));
   const byCategory = PROJECT_CATEGORIES
     .map(cat => ({ category: cat, items: costs.filter(c => c.category === cat) }))
     .filter(g => g.items.length > 0);
@@ -52,6 +55,8 @@ export default function ProjectInvoicePage({ params }: { params: Promise<{ id: s
   // An Invoice bills one definitive amount — the standard (no down-payment) markup rate is
   // used as the agreed billing basis, unlike the Quotation which shows both DP scenarios.
   const calc = calcScenario(clientTotal, noMarkup ? 0 : project.markup_pct_no_dp, vatExempt);
+  const regularTotal = costs.reduce((s, c) => s + calcListPriceFromNet(c.client_cost, c.discount_type, c.discount_value), 0);
+  const totalSavings = regularTotal - clientTotal;
   const totalPaid = payments.reduce((s, p) => s + p.amount, 0);
   const balance = calc.total - totalPaid;
   const invoiceNumber = invoices[invoices.length - 1]?.invoice_number || (project.quote_number ? project.quote_number.replace('DZCE', 'DZPI') : `DZPI-${String(project.id).padStart(4, '0')}`);
@@ -104,40 +109,105 @@ export default function ProjectInvoicePage({ params }: { params: Promise<{ id: s
           <thead>
             <tr>
               <th style={{ background: '#111', color: 'white', textAlign: 'left', padding: '10px 12px', fontSize: '12px' }}>PARTICULAR</th>
+              <th style={{ background: '#111', color: 'white', textAlign: 'center', padding: '10px 12px', fontSize: '12px', width: '36px' }}>QTY</th>
+              <th style={{ background: '#111', color: 'white', textAlign: 'center', padding: '10px 12px', fontSize: '12px', width: '48px' }}>DAYS</th>
+              <th style={{ background: '#111', color: 'white', textAlign: 'right', padding: '10px 12px', fontSize: '12px', width: '90px' }}>UNIT PRICE</th>
               <th style={{ background: '#111', color: 'white', textAlign: 'right', padding: '10px 12px', fontSize: '12px' }}>AMOUNT</th>
             </tr>
           </thead>
           <tbody>
             {byCategory.map(g => {
               const catTotal = g.items.reduce((s, c) => s + c.client_cost, 0);
+              const subGroups = g.category === 'equipment'
+                ? (() => {
+                    const map = new Map<string, ProjectCost[]>();
+                    for (const c of g.items) {
+                      const key = equipmentCatByName.get(c.description) || '';
+                      if (!map.has(key)) map.set(key, []);
+                      map.get(key)!.push(c);
+                    }
+                    return [...map.entries()].sort((a, b) => (a[0] ? 0 : 1) - (b[0] ? 0 : 1));
+                  })()
+                : [['', g.items] as [string, ProjectCost[]]];
               return (
-                <tr key={g.category} style={{ borderBottom: '1px solid #eee' }}>
-                  <td style={{ padding: '8px 12px', fontWeight: 700 }}>{PROJECT_CATEGORY_LABELS[g.category].toUpperCase()}</td>
-                  <td style={{ padding: '8px 12px', textAlign: 'right' }}>{formatPHP(catTotal)}</td>
-                </tr>
+                <Fragment key={g.category}>
+                  <tr style={{ background: '#f3f3f3' }}>
+                    <td colSpan={4} style={{ padding: '6px 12px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{PROJECT_CATEGORY_LABELS[g.category]}</td>
+                    <td style={{ padding: '6px 12px', textAlign: 'right', fontWeight: 700 }}>{formatPHP(catTotal)}</td>
+                  </tr>
+                  {subGroups.map(([subCat, items]) => (
+                    <Fragment key={subCat || 'other'}>
+                      {subGroups.length > 1 && (
+                        <tr>
+                          <td colSpan={5} style={{ padding: '4px 12px 4px 22px', fontSize: '10px', fontWeight: 700, color: '#999', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                            {subCat ? (CATEGORY_LABELS[subCat] || subCat) : 'Other Equipment'}
+                          </td>
+                        </tr>
+                      )}
+                      {items.map(c => {
+                        const listPrice = calcListPriceFromNet(c.client_cost, c.discount_type, c.discount_value);
+                        const discounted = c.discount_type && c.discount_value > 0;
+                        return (
+                          <tr key={c.id} style={{ borderBottom: '1px solid #eee' }}>
+                            <td style={{ padding: '6px 12px 6px 22px' }}>
+                              {c.description}
+                              {c.note && <div style={{ fontSize: '11px', color: '#888' }}>{c.note}</div>}
+                            </td>
+                            <td style={{ padding: '6px 12px', textAlign: 'center', color: '#888' }}>{c.qty}</td>
+                            <td style={{ padding: '6px 12px', textAlign: 'center', color: '#888' }}>{c.days}</td>
+                            <td style={{ padding: '6px 12px', textAlign: 'right', color: '#888' }}>{formatPHP(c.client_cost / c.qty / c.days)}</td>
+                            <td style={{ padding: '6px 12px', textAlign: 'right' }}>
+                              {discounted && (
+                                <div style={{ fontSize: '11px', color: '#aaa', textDecoration: 'line-through' }}>{formatPHP(listPrice)}</div>
+                              )}
+                              {formatPHP(c.client_cost)}
+                              {discounted && (
+                                <div style={{ fontSize: '10px', color: '#16a34a', fontWeight: 700 }}>
+                                  −{c.discount_type === 'percent' ? `${c.discount_value}%` : formatPHP(c.discount_value)} off
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </Fragment>
+                  ))}
+                </Fragment>
               );
             })}
-            <tr><td colSpan={2} style={{ padding: '4px' }}></td></tr>
+            <tr><td colSpan={5} style={{ padding: '4px' }}></td></tr>
+            {totalSavings > 0 && (
+              <>
+                <tr>
+                  <td colSpan={4} style={{ padding: '4px 12px', color: '#888', textAlign: 'right' }}>Regular Price</td>
+                  <td style={{ padding: '4px 12px', textAlign: 'right', color: '#888', textDecoration: 'line-through' }}>{formatPHP(regularTotal)}</td>
+                </tr>
+                <tr style={{ background: '#f0fdf4' }}>
+                  <td colSpan={4} style={{ padding: '4px 12px', color: '#166534', fontWeight: 700, textAlign: 'right' }}>You Save</td>
+                  <td style={{ padding: '4px 12px', textAlign: 'right', color: '#166534', fontWeight: 700 }}>−{formatPHP(totalSavings)}</td>
+                </tr>
+              </>
+            )}
             <tr style={{ background: '#111' }}>
-              <td style={{ padding: '8px 12px', color: 'white', fontWeight: 700, textAlign: 'right' }}>SUB TOTAL</td>
+              <td colSpan={4} style={{ padding: '8px 12px', color: 'white', fontWeight: 700, textAlign: 'right' }}>SUB TOTAL</td>
               <td style={{ padding: '8px 12px', color: 'white', fontWeight: 700, textAlign: 'right' }}>{formatPHP(clientTotal)}</td>
             </tr>
             {!noMarkup && (
               <tr style={{ borderBottom: '1px solid #eee' }}>
-                <td style={{ padding: '8px 12px', textAlign: 'right' }}>MARK-UP ({project.markup_pct_no_dp}%)</td>
+                <td colSpan={4} style={{ padding: '8px 12px', textAlign: 'right' }}>MARK-UP ({project.markup_pct_no_dp}%)</td>
                 <td style={{ padding: '8px 12px', textAlign: 'right' }}>{formatPHP(calc.markup)}</td>
               </tr>
             )}
             <tr style={{ borderBottom: '1px solid #eee' }}>
-              <td style={{ padding: '8px 12px', textAlign: 'right' }}>SUB TOTAL 2</td>
+              <td colSpan={4} style={{ padding: '8px 12px', textAlign: 'right' }}>SUB TOTAL 2</td>
               <td style={{ padding: '8px 12px', textAlign: 'right' }}>{formatPHP(calc.subtotal2)}</td>
             </tr>
             <tr style={{ borderBottom: '1px solid #eee' }}>
-              <td style={{ padding: '8px 12px', textAlign: 'right' }}>{vatExempt ? 'VAT (exempt)' : '12% VAT'}</td>
+              <td colSpan={4} style={{ padding: '8px 12px', textAlign: 'right' }}>{vatExempt ? 'VAT (exempt)' : '12% VAT'}</td>
               <td style={{ padding: '8px 12px', textAlign: 'right' }}>{formatPHP(calc.vat)}</td>
             </tr>
             <tr>
-              <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 900, color: '#E32726' }}>TOTAL AMOUNT DUE</td>
+              <td colSpan={4} style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 900, color: '#E32726' }}>TOTAL AMOUNT DUE</td>
               <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 900, color: '#E32726', fontSize: '15px' }}>{formatPHP(calc.total)}</td>
             </tr>
           </tbody>

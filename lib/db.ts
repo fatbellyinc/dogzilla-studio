@@ -208,7 +208,8 @@ function initSchema(db: Database.Database) {
       -- 'external': internal_cost actually leaves the business (paid to a vendor/contractor).
       -- 'internal': Dogzilla owns the resource (own studio/equipment/crew) so the "cost" is
       -- really revenue captured in-house, not real cash going out — drives the earnings summary.
-      cost_flow TEXT NOT NULL DEFAULT 'external'
+      cost_flow TEXT NOT NULL DEFAULT 'external',
+      days INTEGER NOT NULL DEFAULT 1
     );
 
     -- One row per payment received against a project, mirroring the booking payments table.
@@ -453,6 +454,7 @@ function initSchema(db: Database.Database) {
     `ALTER TABLE project_costs ADD COLUMN discount_type TEXT DEFAULT NULL`,
     `ALTER TABLE project_costs ADD COLUMN discount_value REAL DEFAULT 0`,
     `ALTER TABLE project_costs ADD COLUMN cost_flow TEXT NOT NULL DEFAULT 'external'`,
+    `ALTER TABLE project_costs ADD COLUMN days INTEGER NOT NULL DEFAULT 1`,
   ];
   for (const sql of migrations) {
     try { db.exec(sql); } catch { /* column already exists */ }
@@ -556,6 +558,8 @@ function initSchema(db: Database.Database) {
     ['MON-013', 'Sony 32" TV', 'monitor', 750, 1, '', 100],
     ['MON-014', 'Yokohama 32" TV', 'monitor', 500, 1, '', 100],
     ['GRP-030', '20x20 Green/Blue Screen — Back to Back', 'grip', 6000, 1, '', 0],
+    ['MON-015', 'Acsoon M7 Pro 7" Monitor', 'monitor', 4000, 1, '', 10],
+    ['TRP-007', 'Baby Tripod', 'tripod', 600, 1, '', 0],
   ];
   for (const [code, name, category, daily_rate, quantity, description, wattage] of equipmentUpserts) {
     try {
@@ -836,6 +840,7 @@ function seedEquipment(db: Database.Database) {
     ['TRP-004', 'E-image Tripod', 'tripod', 600, 2, '', 0],
     ['TRP-005', 'Benro Tripod', 'tripod', 300, 1, '', 0],
     ['TRP-006', 'Hi-Hat', 'tripod', 500, 1, '', 0],
+    ['TRP-007', 'Baby Tripod', 'tripod', 600, 1, '', 0],
 
     // AUDIO
     ['AUD-001', 'Zoom L-Trak 12-Track Recorder', 'audio', 3000, 1, '', 15],
@@ -863,6 +868,7 @@ function seedEquipment(db: Database.Database) {
     ['MON-012', 'Sony 42" TV', 'monitor', 1000, 1, '', 150],
     ['MON-013', 'Sony 32" TV', 'monitor', 750, 1, '', 100],
     ['MON-014', 'Yokohama 32" TV', 'monitor', 500, 1, '', 100],
+    ['MON-015', 'Acsoon M7 Pro 7" Monitor', 'monitor', 4000, 1, '', 10],
 
     // CAMERA / RIGGING ACCESSORIES
     ['RIG-001', 'Mofage Talos Damping Magic Arm', 'rigging', 500, 1, '', 0],

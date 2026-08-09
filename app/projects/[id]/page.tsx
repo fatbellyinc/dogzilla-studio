@@ -13,11 +13,11 @@ type DiscountType = 'percent' | 'fixed' | null;
 type CostFlow = 'external' | 'internal';
 interface EmptyItem {
   category: ProjectCategory; description: string; note: string; internal_cost: string; client_cost: string;
-  contact_id: number | null; qty: string; discount_type: DiscountType; discount_value: string; cost_flow: CostFlow;
+  contact_id: number | null; qty: string; discount_type: DiscountType; discount_value: string; cost_flow: CostFlow; days: string;
 }
 const emptyItem = (category: ProjectCategory): EmptyItem => ({
   category, description: '', note: '', internal_cost: '', client_cost: '', contact_id: null, qty: '1',
-  discount_type: null, discount_value: '', cost_flow: 'external',
+  discount_type: null, discount_value: '', cost_flow: 'external', days: '1',
 });
 const CLIENT_MODES = ['sync', 'markup', 'custom'] as const;
 type ClientMode = typeof CLIENT_MODES[number];
@@ -29,9 +29,10 @@ interface StagedItem extends EmptyItem {
   client_mode: ClientMode; // 'sync': client cost auto-copies internal (default); 'markup': internal × (1 + markup_pct); 'custom': a flat client price typed in directly
   markup_pct: string;
 }
-function recomputeStaged(s: Pick<StagedItem, 'qty' | 'unit_internal' | 'client_mode' | 'markup_pct' | 'internal_cost' | 'client_cost' | 'discount_type' | 'discount_value'>) {
+function recomputeStaged(s: Pick<StagedItem, 'qty' | 'days' | 'unit_internal' | 'client_mode' | 'markup_pct' | 'internal_cost' | 'client_cost' | 'discount_type' | 'discount_value'>) {
   const qty = Math.max(1, Number(s.qty) || 1);
-  const internal = s.unit_internal > 0 ? s.unit_internal * qty : Number(s.internal_cost) || 0;
+  const days = Math.max(1, Number(s.days) || 1);
+  const internal = s.unit_internal > 0 ? s.unit_internal * qty * days : Number(s.internal_cost) || 0;
   // Discount only applies on top of Sync/Markup — Custom mode already lets the price be typed
   // in directly, so discounting it further would be redundant and confusing.
   if (s.client_mode === 'custom') {
@@ -164,7 +165,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     toggleStage(`contact:${contact.id}`, () => ({
       category, contact_id: contact.id, description,
       note: '', internal_cost: unit > 0 ? String(unit) : '', client_cost: unit > 0 ? String(unit) : '',
-      qty: '1', unit_internal: unit, client_mode: 'sync', markup_pct: '0', discount_type: null, discount_value: '', cost_flow: 'external',
+      qty: '1', unit_internal: unit, client_mode: 'sync', markup_pct: '0', discount_type: null, discount_value: '', cost_flow: 'external', days: '1',
     }));
   }
 
@@ -176,7 +177,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     if (existing) { bumpExistingQty(existing); return; }
     toggleStage(`role:${label}`, () => ({
       category, contact_id: null, description: label, note: '', internal_cost: '', client_cost: '',
-      qty: '1', unit_internal: 0, client_mode: 'sync', markup_pct: '0', discount_type: null, discount_value: '', cost_flow: 'external',
+      qty: '1', unit_internal: 0, client_mode: 'sync', markup_pct: '0', discount_type: null, discount_value: '', cost_flow: 'external', days: '1',
     }));
   }
 
@@ -187,13 +188,13 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       const rate = STUDIO_RATES[rateKey];
       const existing = !alreadyStaged && findExistingCost(category, rate.label);
       if (existing) { bumpExistingQty(existing); return; }
-      toggleStage(value, () => ({ category, contact_id: null, description: rate.label, note: '', internal_cost: String(rate.price), client_cost: String(rate.price), qty: '1', unit_internal: rate.price, client_mode: 'sync', markup_pct: '0', discount_type: null, discount_value: '', cost_flow: 'internal' }));
+      toggleStage(value, () => ({ category, contact_id: null, description: rate.label, note: '', internal_cost: String(rate.price), client_cost: String(rate.price), qty: '1', unit_internal: rate.price, client_mode: 'sync', markup_pct: '0', discount_type: null, discount_value: '', cost_flow: 'internal', days: '1' }));
     } else if (value.startsWith('eq:')) {
       const eq = equipment.find(e => e.id === Number(value.slice('eq:'.length)));
       if (!eq) return;
       const existing = !alreadyStaged && findExistingCost(category, eq.name);
       if (existing) { bumpExistingQty(existing); return; }
-      toggleStage(value, () => ({ category, contact_id: null, description: eq.name, note: '', internal_cost: String(eq.daily_rate), client_cost: String(eq.daily_rate), qty: '1', unit_internal: eq.daily_rate, client_mode: 'sync', markup_pct: '0', discount_type: null, discount_value: '', cost_flow: 'internal' }));
+      toggleStage(value, () => ({ category, contact_id: null, description: eq.name, note: '', internal_cost: String(eq.daily_rate), client_cost: String(eq.daily_rate), qty: '1', unit_internal: eq.daily_rate, client_mode: 'sync', markup_pct: '0', discount_type: null, discount_value: '', cost_flow: 'internal', days: '1' }));
     } else if (value.startsWith('addon:')) {
       const addon = ADDON_ITEMS.find(a => a.id === value.slice('addon:'.length));
       if (!addon) return;
@@ -202,7 +203,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       toggleStage(value, () => ({
         category, contact_id: null, description: addon.label,
         note: 'perHour' in addon && addon.perHour ? addon.description : '',
-        internal_cost: String(addon.price), client_cost: String(addon.price), qty: '1', unit_internal: addon.price, client_mode: 'sync', markup_pct: '0', discount_type: null, discount_value: '', cost_flow: 'internal',
+        internal_cost: String(addon.price), client_cost: String(addon.price), qty: '1', unit_internal: addon.price, client_mode: 'sync', markup_pct: '0', discount_type: null, discount_value: '', cost_flow: 'internal', days: '1',
       }));
     }
   }
@@ -215,7 +216,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   // auto-compute: internal cost = rate × qty, and client cost either mirrors internal cost
   // (default), applies a markup% on top, or is a flat price typed in directly — matching
   // "3 Grip @ ₱1,500" auto-totaling to ₱4,500 without retyping the total by hand.
-  function updateStagedCompute(key: string, fields: Partial<Pick<StagedItem, 'qty' | 'unit_internal' | 'client_mode' | 'markup_pct' | 'client_cost' | 'discount_type' | 'discount_value'>>) {
+  function updateStagedCompute(key: string, fields: Partial<Pick<StagedItem, 'qty' | 'days' | 'unit_internal' | 'client_mode' | 'markup_pct' | 'client_cost' | 'discount_type' | 'discount_value'>>) {
     setStaged(prev => prev.map(s => {
       if (s.key !== key) return s;
       const next = { ...s, ...fields };
@@ -250,7 +251,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     if (!items.length) return;
     await Promise.all(items.map(item => fetch('/api/project-costs', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ project_id: Number(id), category: item.category, description: item.description, note: item.note, internal_cost: item.internal_cost, client_cost: item.client_cost, contact_id: item.contact_id, qty: item.qty, discount_type: item.client_mode === 'custom' ? null : item.discount_type, discount_value: item.client_mode === 'custom' ? 0 : item.discount_value, cost_flow: item.cost_flow }),
+      body: JSON.stringify({ project_id: Number(id), category: item.category, description: item.description, note: item.note, internal_cost: item.internal_cost, client_cost: item.client_cost, contact_id: item.contact_id, qty: item.qty, days: item.days, discount_type: item.client_mode === 'custom' ? null : item.discount_type, discount_value: item.client_mode === 'custom' ? 0 : item.discount_value, cost_flow: item.cost_flow }),
     })));
     setStaged([]);
     load();
@@ -295,7 +296,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         category: c.category, description: c.description, note: c.note, internal_cost: Math.round(newInternal * 100) / 100,
-        client_cost: Math.round(newClient * 100) / 100, contact_id: c.contact_id, qty: newQty, discount_type: c.discount_type,
+        client_cost: Math.round(newClient * 100) / 100, contact_id: c.contact_id, qty: newQty, days: c.days, discount_type: c.discount_type,
         discount_value: c.discount_value, cost_flow: c.cost_flow,
       }),
     });
@@ -310,7 +311,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         category: c.category, description: c.description, note: c.note, internal_cost: c.internal_cost,
-        client_cost: c.client_cost, contact_id: c.contact_id, qty: c.qty, discount_type: c.discount_type,
+        client_cost: c.client_cost, contact_id: c.contact_id, qty: c.qty, days: c.days, discount_type: c.discount_type,
         discount_value: c.discount_value, cost_flow: flow,
       }),
     });
@@ -326,7 +327,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         category: c.category, description: c.description, note: c.note, internal_cost: c.internal_cost,
-        client_cost: c.client_cost, contact_id: c.contact_id, qty: c.qty, discount_type: c.discount_type,
+        client_cost: c.client_cost, contact_id: c.contact_id, qty: c.qty, days: c.days, discount_type: c.discount_type,
         discount_value: c.discount_value, cost_flow: flow,
       }),
     })));
@@ -390,7 +391,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       category: c.category, description: c.description, note: c.note || '', internal_cost: String(c.internal_cost),
       client_cost: String(Math.round(listClient * 100) / 100), contact_id: c.contact_id, qty: String(c.qty || 1),
       discount_type: c.discount_type, discount_value: c.discount_value > 0 ? String(c.discount_value) : '',
-      cost_flow: c.cost_flow || 'external',
+      cost_flow: c.cost_flow || 'external', days: String(c.days || 1),
     });
   }
 
@@ -685,6 +686,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                     Qty <input value={s.qty} onChange={e => updateStagedCompute(s.key, { qty: e.target.value })} type="number" min="1" title="Quantity" className={ic + ' w-14'} />
                   </span>
                   <span className="flex items-center gap-1">
+                    × Days <input value={s.days} onChange={e => updateStagedCompute(s.key, { days: e.target.value })} type="number" min="1" title="Days booked" className={ic + ' w-14'} />
+                  </span>
+                  <span className="flex items-center gap-1">
                     × Rate ₱ <input value={s.unit_internal || ''} onChange={e => updateStagedCompute(s.key, { unit_internal: Number(e.target.value) || 0 })} type="number" placeholder="0" title="Rate per unit — internal cost" className={ic + ' w-24'} />
                   </span>
                   <span className="text-white/60">= Internal {formatPHP(Number(s.internal_cost) || 0)}</span>
@@ -735,10 +739,14 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
           <summary className="text-white/40 cursor-pointer select-none mb-2">✏️ Custom / one-off item</summary>
           <input value={newItem.description} onChange={e => setNewItem(i => ({ ...i, description: e.target.value }))} placeholder="Description (e.g. Director — Treb Monteras)" className={ic + ' w-full mb-2'} />
           <input value={newItem.note} onChange={e => setNewItem(i => ({ ...i, note: e.target.value }))} placeholder="Note (optional — e.g. 2x AC, 2 Cam Op, Gaffer)" className={ic + ' w-full mb-2'} />
-          <div className="grid grid-cols-3 gap-2 mb-2">
+          <div className="grid grid-cols-4 gap-2 mb-2">
             <div>
               <label className="text-[10px] text-white/40 block mb-1">Qty</label>
               <input value={newItem.qty} onChange={e => setNewItem(i => ({ ...i, qty: e.target.value }))} type="number" min="1" className={ic + ' w-full'} />
+            </div>
+            <div>
+              <label className="text-[10px] text-white/40 block mb-1">Days booked</label>
+              <input value={newItem.days} onChange={e => setNewItem(i => ({ ...i, days: e.target.value }))} type="number" min="1" className={ic + ' w-full'} />
             </div>
             <div>
               <label className="text-[10px] text-white/40 block mb-1">Internal Cost (₱) — actual cost to Dogzilla</label>
@@ -823,8 +831,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                         )}
                         <input value={editForm.description} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))} className={ic + ' w-full'} />
                         <input value={editForm.note} onChange={e => setEditForm(f => ({ ...f, note: e.target.value }))} placeholder="Note" className={ic + ' w-full'} />
-                        <div className="grid grid-cols-3 gap-2">
+                        <div className="grid grid-cols-4 gap-2">
                           <input value={editForm.qty} onChange={e => setEditForm(f => ({ ...f, qty: e.target.value }))} type="number" min="1" className={ic} placeholder="Qty" />
+                          <input value={editForm.days} onChange={e => setEditForm(f => ({ ...f, days: e.target.value }))} type="number" min="1" className={ic} placeholder="Days" />
                           <input value={editForm.internal_cost} onChange={e => setEditForm(f => ({ ...f, internal_cost: e.target.value }))} type="number" className={ic} placeholder="Internal cost" />
                           <input value={editForm.client_cost} onChange={e => setEditForm(f => ({ ...f, client_cost: e.target.value }))} type="number" className={ic} placeholder="Client cost (list price)" />
                         </div>
@@ -877,6 +886,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                             {c.qty > 1 && (
                               <span className="text-[9px] bg-white/10 text-white/50 px-1.5 py-0.5 rounded shrink-0">× {c.qty}</span>
                             )}
+                            {c.days > 1 && (
+                              <span className="text-[9px] bg-white/10 text-white/50 px-1.5 py-0.5 rounded shrink-0">📅 {c.days} days</span>
+                            )}
                             {c.discount_type && c.discount_value > 0 && (
                               <span className="text-[9px] bg-orange-500/20 text-orange-400 px-1.5 py-0.5 rounded shrink-0">
                                 🏷️ -{c.discount_type === 'percent' ? `${c.discount_value}%` : formatPHP(c.discount_value)}
@@ -893,8 +905,8 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                             )}
                           </div>
                           {c.note && <div className="text-[11px] text-white/30 truncate">{c.note}</div>}
-                          {c.qty > 1 && (
-                            <div className="text-[10px] text-white/25">@ {formatPHP(c.internal_cost / c.qty)}/unit</div>
+                          {(c.qty > 1 || c.days > 1) && (
+                            <div className="text-[10px] text-white/25">@ {formatPHP(c.internal_cost / c.qty / c.days)}/unit{c.days > 1 ? '/day' : ''}</div>
                           )}
                         </div>
                         <div className="flex items-center gap-3 shrink-0 ml-2">
