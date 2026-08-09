@@ -173,9 +173,12 @@ export const PROJECT_CATEGORY_SHOWS_STUDIO: Partial<Record<ProjectCategory, bool
 export const PROJECT_CATEGORY_ROLE_SUGGESTIONS: Partial<Record<ProjectCategory, readonly string[]>> = {
   pre_production: ['Workshop / Casting', 'Communications', 'Storyboard Artist', 'Recce / Location Scout'],
   production_personnel: [
-    'Director & DOP', 'Director', 'Cinematographer', 'Executive Producer', 'Line Producer',
-    'Assistant Director', 'Production Designer', 'Casting Director', 'Hair & Make-Up Artist',
-    'Stylist', 'Gaffer', 'Grip', 'Production Assistant', 'Utility',
+    'Director & DOP', 'Director', 'Cinematographer', 'Executive Producer', 'Line Producer', 'Production Manager',
+    'Assistant Director', '2nd Assistant Director', 'Production Designer', 'Art Director', 'Propsman',
+    'Camera Operator', 'Assistant Camera (AC)', '2nd Assistant Camera (2nd AC)', 'DIT (Digital Imaging Technician)',
+    'Focus Puller', 'Gaffer', 'Best Boy Electric', 'Grip', 'Best Boy Grip', 'Sound Engineer', 'Boom Operator',
+    'Casting Director', 'Hair & Make-Up Artist', 'Stylist', 'Wardrobe Assistant', 'Production Assistant',
+    'Runner', 'Utility', 'Set Medic', 'Security',
   ],
   raw_stock: ['Hard Drive (Shoot & Master Copy)', 'Memory Cards'],
   equipment: ['Camera & Lighting Rental Package', 'Livestream, VTR & PA System'],

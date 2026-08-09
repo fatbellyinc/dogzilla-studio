@@ -22,6 +22,7 @@ const emptyItem = (category: ProjectCategory): EmptyItem => ({
 const CLIENT_MODES = ['sync', 'markup', 'custom'] as const;
 type ClientMode = typeof CLIENT_MODES[number];
 const DISCOUNT_TYPES: DiscountType[] = [null, 'percent', 'fixed'];
+const DISCOUNT_PRESETS = [5, 10, 15, 20, 25, 30, 50];
 interface StagedItem extends EmptyItem {
   key: string;
   unit_internal: number; // per-unit rate — qty × this = internal cost, recomputed automatically
@@ -158,9 +159,11 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
 
   function toggleContactStage(contact: Contact, category: ProjectCategory) {
     const unit = contact.default_rate > 0 ? contact.default_rate : 0;
+    const description = `${contact.role ? `${contact.role} — ` : ''}${contact.name}`;
+    const existing = !staged.some(s => s.key === `contact:${contact.id}`) && findExistingCost(category, description);
+    if (existing) { bumpExistingQty(existing); return; }
     toggleStage(`contact:${contact.id}`, () => ({
-      category, contact_id: contact.id,
-      description: `${contact.role ? `${contact.role} — ` : ''}${contact.name}`,
+      category, contact_id: contact.id, description,
       note: '', internal_cost: unit > 0 ? String(unit) : '', client_cost: unit > 0 ? String(unit) : '',
       qty: '1', unit_internal: unit, client_mode: 'sync', markup_pct: '0', discount_type: null, discount_value: '', cost_flow: 'external',
     }));
@@ -170,6 +173,8 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   // click through the roles/items a shoot of this type usually needs without first having every
   // one of them saved as a Contact — a ₱0 reminder placeholder, cost filled in once quoted.
   function toggleRoleSuggestionStage(label: string, category: ProjectCategory) {
+    const existing = !staged.some(s => s.key === `role:${label}`) && findExistingCost(category, label);
+    if (existing) { bumpExistingQty(existing); return; }
     toggleStage(`role:${label}`, () => ({
       category, contact_id: null, description: label, note: '', internal_cost: '', client_cost: '',
       qty: '1', unit_internal: 0, client_mode: 'sync', markup_pct: '0', discount_type: null, discount_value: '', cost_flow: 'external',
@@ -177,17 +182,24 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   }
 
   function toggleCatalogStage(value: string, category: ProjectCategory) {
+    const alreadyStaged = staged.some(s => s.key === value);
     if (value.startsWith('studio:')) {
       const rateKey = value.slice('studio:'.length) as keyof typeof STUDIO_RATES;
       const rate = STUDIO_RATES[rateKey];
+      const existing = !alreadyStaged && findExistingCost(category, rate.label);
+      if (existing) { bumpExistingQty(existing); return; }
       toggleStage(value, () => ({ category, contact_id: null, description: rate.label, note: '', internal_cost: String(rate.price), client_cost: String(rate.price), qty: '1', unit_internal: rate.price, client_mode: 'sync', markup_pct: '0', discount_type: null, discount_value: '', cost_flow: 'internal' }));
     } else if (value.startsWith('eq:')) {
       const eq = equipment.find(e => e.id === Number(value.slice('eq:'.length)));
       if (!eq) return;
+      const existing = !alreadyStaged && findExistingCost(category, eq.name);
+      if (existing) { bumpExistingQty(existing); return; }
       toggleStage(value, () => ({ category, contact_id: null, description: eq.name, note: '', internal_cost: String(eq.daily_rate), client_cost: String(eq.daily_rate), qty: '1', unit_internal: eq.daily_rate, client_mode: 'sync', markup_pct: '0', discount_type: null, discount_value: '', cost_flow: 'internal' }));
     } else if (value.startsWith('addon:')) {
       const addon = ADDON_ITEMS.find(a => a.id === value.slice('addon:'.length));
       if (!addon) return;
+      const existing = !alreadyStaged && findExistingCost(category, addon.label);
+      if (existing) { bumpExistingQty(existing); return; }
       toggleStage(value, () => ({
         category, contact_id: null, description: addon.label,
         note: 'perHour' in addon && addon.perHour ? addon.description : '',
@@ -265,6 +277,29 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   async function deletePayment(paymentId: number) {
     if (!confirm('Delete this payment record?')) return;
     await fetch(`/api/project-payments/${paymentId}`, { method: 'DELETE' });
+    load();
+  }
+
+  // Clicking a card for something already in the budget used to add a second, duplicate row.
+  // Now it bumps the existing row's quantity by 1 instead — same total math, no duplicate line.
+  function findExistingCost(category: ProjectCategory, description: string) {
+    return costs.find(c => c.category === category && c.description === description);
+  }
+
+  async function bumpExistingQty(c: ProjectCost) {
+    const newQty = (c.qty || 1) + 1;
+    const unitInternal = c.internal_cost / (c.qty || 1);
+    const listClient = calcListPriceFromNet(c.client_cost, c.discount_type, c.discount_value) / (c.qty || 1) * newQty;
+    const newInternal = unitInternal * newQty;
+    const newClient = listClient - calcDiscountAmount(listClient, c.discount_type, c.discount_value);
+    await fetch(`/api/project-costs/${c.id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        category: c.category, description: c.description, note: c.note, internal_cost: Math.round(newInternal * 100) / 100,
+        client_cost: Math.round(newClient * 100) / 100, contact_id: c.contact_id, qty: newQty, discount_type: c.discount_type,
+        discount_value: c.discount_value, cost_flow: c.cost_flow,
+      }),
+    });
     load();
   }
 
@@ -543,10 +578,11 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             <div className="flex flex-wrap gap-1.5">
               {PROJECT_CATEGORY_ROLE_SUGGESTIONS[newItem.category]!.map(label => {
                 const active = staged.some(s => s.key === `role:${label}`);
+                const existing = findExistingCost(newItem.category, label);
                 return (
-                  <button key={label} onClick={() => toggleRoleSuggestionStage(label, newItem.category)}
-                    className={`text-xs px-2.5 py-1.5 rounded-lg border transition-all ${active ? 'bg-[#E32726] border-[#E32726] text-white' : 'bg-[#0f0f0f] border-[#2a2a2a] text-white/70 hover:border-white/30'}`}>
-                    {label}
+                  <button key={label} onClick={() => toggleRoleSuggestionStage(label, newItem.category)} title={existing ? 'Already in the budget — click to add another' : undefined}
+                    className={`text-xs px-2.5 py-1.5 rounded-lg border transition-all ${active ? 'bg-[#E32726] border-[#E32726] text-white' : existing ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-[#0f0f0f] border-[#2a2a2a] text-white/70 hover:border-white/30'}`}>
+                    {existing && !active ? '✓ ' : ''}{label}{existing && !active ? ` ×${existing.qty}` : ''}
                   </button>
                 );
               })}
@@ -566,10 +602,11 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                   <div className="flex flex-wrap gap-1.5">
                     {list.map(c => {
                       const active = staged.some(s => s.key === `contact:${c.id}`);
+                      const existing = findExistingCost(newItem.category, `${c.role ? `${c.role} — ` : ''}${c.name}`);
                       return (
-                        <button key={c.id} onClick={() => toggleContactStage(c, newItem.category)}
-                          className={`text-xs px-2.5 py-1.5 rounded-lg border transition-all ${active ? 'bg-[#E32726] border-[#E32726] text-white' : 'bg-[#0f0f0f] border-[#2a2a2a] text-white/70 hover:border-white/30'}`}>
-                          {c.name}{c.role ? ` — ${c.role}` : ''}{c.default_rate > 0 ? ` (${formatPHP(c.default_rate)}${RATE_UNIT_LABELS[c.rate_unit]})` : ''}
+                        <button key={c.id} onClick={() => toggleContactStage(c, newItem.category)} title={existing ? 'Already in the budget — click to add another' : undefined}
+                          className={`text-xs px-2.5 py-1.5 rounded-lg border transition-all ${active ? 'bg-[#E32726] border-[#E32726] text-white' : existing ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-[#0f0f0f] border-[#2a2a2a] text-white/70 hover:border-white/30'}`}>
+                          {existing && !active ? '✓ ' : ''}{c.name}{c.role ? ` — ${c.role}` : ''}{c.default_rate > 0 ? ` (${formatPHP(c.default_rate)}${RATE_UNIT_LABELS[c.rate_unit]})` : ''}{existing && !active ? ` ×${existing.qty}` : ''}
                         </button>
                       );
                     })}
@@ -590,10 +627,11 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                   {(Object.entries(STUDIO_RATES) as [keyof typeof STUDIO_RATES, typeof STUDIO_RATES[keyof typeof STUDIO_RATES]][]).map(([key, rate]) => {
                     const value = `studio:${key}`;
                     const active = staged.some(s => s.key === value);
+                    const existing = findExistingCost(newItem.category, rate.label);
                     return (
-                      <button key={key} onClick={() => toggleCatalogStage(value, newItem.category)}
-                        className={`text-xs px-2.5 py-1.5 rounded-lg border transition-all ${active ? 'bg-[#E32726] border-[#E32726] text-white' : 'bg-[#0f0f0f] border-[#2a2a2a] text-white/70 hover:border-white/30'}`}>
-                        {rate.label} ({formatPHP(rate.price)})
+                      <button key={key} onClick={() => toggleCatalogStage(value, newItem.category)} title={existing ? 'Already in the budget — click to add another' : undefined}
+                        className={`text-xs px-2.5 py-1.5 rounded-lg border transition-all ${active ? 'bg-[#E32726] border-[#E32726] text-white' : existing ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-[#0f0f0f] border-[#2a2a2a] text-white/70 hover:border-white/30'}`}>
+                        {existing && !active ? '✓ ' : ''}{rate.label} ({formatPHP(rate.price)}){existing && !active ? ` ×${existing.qty}` : ''}
                       </button>
                     );
                   })}
@@ -607,10 +645,11 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                   {equipmentByCat.get(cat)!.map(e => {
                     const value = `eq:${e.id}`;
                     const active = staged.some(s => s.key === value);
+                    const existing = findExistingCost(newItem.category, e.name);
                     return (
-                      <button key={e.id} onClick={() => toggleCatalogStage(value, newItem.category)}
-                        className={`text-xs px-2.5 py-1.5 rounded-lg border transition-all ${active ? 'bg-[#E32726] border-[#E32726] text-white' : 'bg-[#0f0f0f] border-[#2a2a2a] text-white/70 hover:border-white/30'}`}>
-                        {e.name} ({formatPHP(e.daily_rate)}/day)
+                      <button key={e.id} onClick={() => toggleCatalogStage(value, newItem.category)} title={existing ? 'Already in the budget — click to add another' : undefined}
+                        className={`text-xs px-2.5 py-1.5 rounded-lg border transition-all ${active ? 'bg-[#E32726] border-[#E32726] text-white' : existing ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-[#0f0f0f] border-[#2a2a2a] text-white/70 hover:border-white/30'}`}>
+                        {existing && !active ? '✓ ' : ''}{e.name} ({formatPHP(e.daily_rate)}/day){existing && !active ? ` ×${existing.qty}` : ''}
                       </button>
                     );
                   })}
@@ -624,10 +663,11 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                   {ADDON_ITEMS.map(a => {
                     const value = `addon:${a.id}`;
                     const active = staged.some(s => s.key === value);
+                    const existing = findExistingCost(newItem.category, a.label);
                     return (
-                      <button key={a.id} onClick={() => toggleCatalogStage(value, newItem.category)} title={a.description}
-                        className={`text-xs px-2.5 py-1.5 rounded-lg border transition-all ${active ? 'bg-[#E32726] border-[#E32726] text-white' : 'bg-[#0f0f0f] border-[#2a2a2a] text-white/70 hover:border-white/30'}`}>
-                        {a.label}{a.price > 0 ? ` (${formatPHP(a.price)}${'perHour' in a && a.perHour ? '/hr' : ''})` : ' (custom quote)'}
+                      <button key={a.id} onClick={() => toggleCatalogStage(value, newItem.category)} title={existing ? 'Already in the budget — click to add another' : a.description}
+                        className={`text-xs px-2.5 py-1.5 rounded-lg border transition-all ${active ? 'bg-[#E32726] border-[#E32726] text-white' : existing ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-[#0f0f0f] border-[#2a2a2a] text-white/70 hover:border-white/30'}`}>
+                        {existing && !active ? '✓ ' : ''}{a.label}{a.price > 0 ? ` (${formatPHP(a.price)}${'perHour' in a && a.perHour ? '/hr' : ''})` : ' (custom quote)'}{existing && !active ? ` ×${existing.qty}` : ''}
                       </button>
                     );
                   })}
@@ -677,6 +717,16 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                         <input value={s.discount_value} onChange={e => updateStagedCompute(s.key, { discount_value: e.target.value })} type="number" min="0"
                           title={s.discount_type === 'percent' ? 'Discount %' : 'Discount ₱'} className={ic + ' w-16'} />
                       )}
+                      {s.discount_type === 'percent' && (
+                        <span className="flex gap-1">
+                          {DISCOUNT_PRESETS.map(p => (
+                            <button key={p} onClick={() => updateStagedCompute(s.key, { discount_value: String(p) })}
+                              className={`px-1.5 py-0.5 rounded border text-[10px] ${Number(s.discount_value) === p ? 'border-orange-500/50 bg-orange-500/20 text-orange-300' : 'border-[#2a2a2a] text-white/40 hover:border-white/30'}`}>
+                              {p}%
+                            </button>
+                          ))}
+                        </span>
+                      )}
                       <span className="text-blue-400">= Client {formatPHP(Number(s.client_cost) || 0)}</span>
                     </>
                   )}
@@ -713,6 +763,16 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             {newItem.discount_type && (
               <input value={newItem.discount_value} onChange={e => setNewItem(i => ({ ...i, discount_value: e.target.value }))} type="number" min="0"
                 title={newItem.discount_type === 'percent' ? 'Discount %' : 'Discount ₱'} className={ic + ' w-16'} />
+            )}
+            {newItem.discount_type === 'percent' && (
+              <span className="flex gap-1">
+                {DISCOUNT_PRESETS.map(p => (
+                  <button key={p} onClick={() => setNewItem(i => ({ ...i, discount_value: String(p) }))}
+                    className={`px-1.5 py-0.5 rounded border text-[10px] ${Number(newItem.discount_value) === p ? 'border-orange-500/50 bg-orange-500/20 text-orange-300' : 'border-[#2a2a2a] text-white/40 hover:border-white/30'}`}>
+                    {p}%
+                  </button>
+                ))}
+              </span>
             )}
             {newItem.discount_type && (
               <span className="text-blue-400">
@@ -783,6 +843,16 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                             <input value={editForm.discount_value} onChange={e => setEditForm(f => ({ ...f, discount_value: e.target.value }))} type="number" min="0"
                               title={editForm.discount_type === 'percent' ? 'Discount %' : 'Discount ₱'} className={ic + ' w-16'} />
                           )}
+                          {editForm.discount_type === 'percent' && (
+                            <span className="flex gap-1">
+                              {DISCOUNT_PRESETS.map(p => (
+                                <button key={p} onClick={() => setEditForm(f => ({ ...f, discount_value: String(p) }))}
+                                  className={`px-1.5 py-0.5 rounded border text-[10px] ${Number(editForm.discount_value) === p ? 'border-orange-500/50 bg-orange-500/20 text-orange-300' : 'border-[#2a2a2a] text-white/40 hover:border-white/30'}`}>
+                                  {p}%
+                                </button>
+                              ))}
+                            </span>
+                          )}
                           {editForm.discount_type && (
                             <span className="text-blue-400">
                               = Net {formatPHP((Number(editForm.client_cost) || 0) - calcDiscountAmount(Number(editForm.client_cost) || 0, editForm.discount_type, Number(editForm.discount_value) || 0))}
@@ -829,6 +899,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                             )}
                           </div>
                           {c.note && <div className="text-[11px] text-white/30 truncate">{c.note}</div>}
+                          {c.qty > 1 && (
+                            <div className="text-[10px] text-white/25">@ {formatPHP(c.internal_cost / c.qty)}/unit</div>
+                          )}
                         </div>
                         <div className="flex items-center gap-3 shrink-0 ml-2">
                           <div className="text-right">

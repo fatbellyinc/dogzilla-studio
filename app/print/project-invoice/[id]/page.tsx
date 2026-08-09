@@ -210,7 +210,7 @@ export default function ProjectInvoicePage({ params }: { params: Promise<{ id: s
           <div style={{ fontSize: '13px', marginBottom: '4px' }}>Regards,</div>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/signature.jpg" alt="Signature" style={{ height: '40px', objectFit: 'contain', display: 'block', marginBottom: '4px' }} />
-          <div style={{ fontWeight: 700, fontSize: '13px' }}>Thenielle Monteras</div>
+          <div style={{ fontWeight: 700, fontSize: '13px' }}>Alberto Monteras II</div>
           <div style={{ fontSize: '11px', color: '#555', textTransform: 'uppercase' }}>Manager</div>
         </div>
       </div>
