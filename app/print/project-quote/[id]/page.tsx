@@ -19,6 +19,26 @@ const DEFAULT_PAYMENT_TERMS = `1. This quotation is valid only for thirty (30) d
 2. Please provide us with Purchase/Job order and/or signed CE once the project is confirmed, before the pre-production meeting.
 3. 50% down payment prior to shoot and 50% balance within thirty (30) days upon receipt of billing invoice.`;
 
+// Common exclusions pulled from past Dogzilla quotations — clickable suggestions so a producer
+// doesn't have to remember or retype the standard list from scratch every time.
+const EXCLUSION_SUGGESTIONS = [
+  'Stock footage or photos purchase, if needed',
+  'All products',
+  'Agency boards and final copy',
+  'Talent usage beyond stated period/territory',
+  'Livestreaming services, unless specified',
+  'Drone / aerial cinematography, unless specified',
+  'Government permits, fees and licenses',
+  'Client-side revisions beyond two (2) rounds',
+  'Overtime beyond the agreed call time',
+  'Music licensing beyond stock/library tracks',
+  'Import duties and customs fees for equipment',
+  'Insurance beyond standard equipment coverage',
+  'Wardrobe and styling purchases (rental only)',
+  'COVID / health testing, unless specified',
+  'Translation / subtitling beyond English',
+];
+
 const CANCELLATION_POLICY = [
   'After Briefing/Storyboarding: Actual expenses + mark-up + VAT.',
   'After Feasibility: 10% of the approved Production Cost + mark-up + VAT.',
@@ -71,10 +91,31 @@ export default function ProjectQuotePage({ params }: { params: Promise<{ id: str
   const regularTotal = costs.reduce((s, c) => s + calcListPriceFromNet(c.client_cost, c.discount_type, c.discount_value), 0);
   const totalSavings = regularTotal - clientTotal;
 
+  // Auto-suggested exclusions — any budget category with zero line items is something this
+  // quote doesn't cover, so it's worth flagging explicitly (e.g. no Post Production items
+  // budgeted → "Post Production" should probably be called out as excluded).
+  const budgetedCategories = new Set(costs.map(c => c.category));
+  const autoExclusions = PROJECT_CATEGORIES
+    .filter(cat => !budgetedCategories.has(cat))
+    .map(cat => `${PROJECT_CATEGORY_LABELS[cat]} (not included in this quote)`);
+
   async function saveDoc() {
     await fetch(`/api/projects/${id}`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ cost_exclusions: costExclusions, payment_terms: paymentTerms }),
+    });
+  }
+
+  function toggleExclusionLine(line: string) {
+    setCostExclusions(prev => {
+      const lines = prev.split('\n').map(l => l.trim()).filter(Boolean);
+      const next = lines.includes(line) ? lines.filter(l => l !== line) : [...lines, line];
+      const joined = next.join('\n');
+      fetch(`/api/projects/${id}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cost_exclusions: joined, payment_terms: paymentTerms }),
+      });
+      return joined;
     });
   }
 
@@ -125,11 +166,11 @@ export default function ProjectQuotePage({ params }: { params: Promise<{ id: str
         <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '24px', fontSize: '13px' }}>
           <thead>
             <tr>
-              <th style={{ background: '#111', color: 'white', textAlign: 'left', padding: '10px 12px', fontSize: '12px' }}>PARTICULAR</th>
-              <th style={{ background: '#111', color: 'white', textAlign: 'center', padding: '10px 12px', fontSize: '12px', width: '36px' }}>QTY</th>
-              <th style={{ background: '#111', color: 'white', textAlign: 'center', padding: '10px 12px', fontSize: '12px', width: '48px' }}>DAYS</th>
-              <th style={{ background: '#111', color: 'white', textAlign: 'right', padding: '10px 12px', fontSize: '12px', width: '90px' }}>UNIT PRICE</th>
-              <th style={{ background: '#111', color: 'white', textAlign: 'right', padding: '10px 12px', fontSize: '12px' }}>CE COST NET</th>
+              <th style={{ background: '#555', color: 'white', textAlign: 'left', padding: '10px 12px', fontSize: '12px' }}>PARTICULAR</th>
+              <th style={{ background: '#555', color: 'white', textAlign: 'center', padding: '10px 12px', fontSize: '12px', width: '36px' }}>QTY</th>
+              <th style={{ background: '#555', color: 'white', textAlign: 'center', padding: '10px 12px', fontSize: '12px', width: '48px' }}>DAYS</th>
+              <th style={{ background: '#555', color: 'white', textAlign: 'right', padding: '10px 12px', fontSize: '12px', width: '90px' }}>UNIT PRICE</th>
+              <th style={{ background: '#555', color: 'white', textAlign: 'right', padding: '10px 12px', fontSize: '12px' }}>CE COST NET</th>
             </tr>
           </thead>
           <tbody>
@@ -151,7 +192,7 @@ export default function ProjectQuotePage({ params }: { params: Promise<{ id: str
                 : [['', g.items] as [string, ProjectCost[]]];
               return (
                 <Fragment key={g.category}>
-                  <tr style={{ background: '#111' }}>
+                  <tr style={{ background: '#E32726' }}>
                     <td colSpan={4} style={{ padding: '7px 12px', fontWeight: 900, fontSize: '12px', color: 'white', textTransform: 'uppercase', letterSpacing: '0.75px' }}>{PROJECT_CATEGORY_LABELS[g.category]}</td>
                     <td style={{ padding: '7px 12px', textAlign: 'right', fontWeight: 900, color: 'white' }}>{formatPHP(catTotal)}</td>
                   </tr>
@@ -159,7 +200,7 @@ export default function ProjectQuotePage({ params }: { params: Promise<{ id: str
                     <Fragment key={subCat || 'other'}>
                       {subGroups.length > 1 && (
                         <tr>
-                          <td colSpan={5} style={{ padding: '3px 12px 3px 22px', fontSize: '10px', fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px', background: '#f7f7f7' }}>
+                          <td colSpan={5} style={{ padding: '5px 12px 5px 22px', fontSize: '11px', fontWeight: 800, color: '#333', textTransform: 'uppercase', letterSpacing: '0.5px', background: '#ddd', borderBottom: '1px solid #ccc' }}>
                             {subCat ? (CATEGORY_LABELS[subCat] || subCat) : 'Other Equipment'}
                           </td>
                         </tr>
@@ -182,7 +223,7 @@ export default function ProjectQuotePage({ params }: { params: Promise<{ id: str
                               )}
                               {formatPHP(c.client_cost)}
                               {discounted && (
-                                <div style={{ fontSize: '10px', color: '#16a34a', fontWeight: 700 }}>
+                                <div style={{ fontSize: '10px', color: '#E32726', fontWeight: 700 }}>
                                   −{c.discount_type === 'percent' ? `${c.discount_value}%` : formatPHP(c.discount_value)} off
                                 </div>
                               )}
@@ -202,9 +243,9 @@ export default function ProjectQuotePage({ params }: { params: Promise<{ id: str
                   <td colSpan={4} style={{ padding: '4px 12px', color: '#888', textAlign: 'right' }}>Regular Price</td>
                   <td style={{ padding: '4px 12px', textAlign: 'right', color: '#888', textDecoration: 'line-through' }}>{formatPHP(regularTotal)}</td>
                 </tr>
-                <tr style={{ background: '#f0fdf4' }}>
-                  <td colSpan={4} style={{ padding: '4px 12px', color: '#166534', fontWeight: 700, textAlign: 'right' }}>Total Discount</td>
-                  <td style={{ padding: '4px 12px', textAlign: 'right', color: '#166534', fontWeight: 700 }}>−{formatPHP(totalSavings)}</td>
+                <tr style={{ background: '#fdeaea' }}>
+                  <td colSpan={4} style={{ padding: '4px 12px', color: '#E32726', fontWeight: 700, textAlign: 'right' }}>Total Discount</td>
+                  <td style={{ padding: '4px 12px', textAlign: 'right', color: '#E32726', fontWeight: 700 }}>−{formatPHP(totalSavings)}</td>
                 </tr>
               </>
             )}
@@ -233,7 +274,40 @@ export default function ProjectQuotePage({ params }: { params: Promise<{ id: str
           </tbody>
         </table>
 
-        {/* Cost Exclusion — editable */}
+        {/* Cost Exclusion — pick from suggested/auto-detected items, or edit the list directly */}
+        <div className="no-print" style={{ marginBottom: '10px' }}>
+          <div style={{ fontSize: '10px', fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>
+            Suggested exclusions — click to add/remove
+          </div>
+          {autoExclusions.length > 0 && (
+            <div style={{ marginBottom: '6px' }}>
+              <div style={{ fontSize: '10px', color: '#aaa', marginBottom: '3px' }}>Not budgeted in this project</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                {autoExclusions.map(line => {
+                  const active = costExclusions.split('\n').map(l => l.trim()).includes(line);
+                  return (
+                    <button key={line} onClick={() => toggleExclusionLine(line)} type="button"
+                      style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '6px', cursor: 'pointer', border: active ? '1px solid #E32726' : '1px solid #ddd', background: active ? '#fdeaea' : '#fafafa', color: active ? '#E32726' : '#555' }}>
+                      {line}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+            {EXCLUSION_SUGGESTIONS.map(line => {
+              const active = costExclusions.split('\n').map(l => l.trim()).includes(line);
+              return (
+                <button key={line} onClick={() => toggleExclusionLine(line)} type="button"
+                  style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '6px', cursor: 'pointer', border: active ? '1px solid #E32726' : '1px solid #ddd', background: active ? '#fdeaea' : '#fafafa', color: active ? '#E32726' : '#555' }}>
+                  {line}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         <div style={{ marginBottom: '20px' }}>
           <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '6px' }}>COST EXCLUSION:</div>
           <textarea value={costExclusions} onChange={e => setCostExclusions(e.target.value)} onBlur={saveDoc} rows={3}

@@ -108,11 +108,11 @@ export default function ProjectInvoicePage({ params }: { params: Promise<{ id: s
         <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '16px', fontSize: '13px' }}>
           <thead>
             <tr>
-              <th style={{ background: '#111', color: 'white', textAlign: 'left', padding: '10px 12px', fontSize: '12px' }}>PARTICULAR</th>
-              <th style={{ background: '#111', color: 'white', textAlign: 'center', padding: '10px 12px', fontSize: '12px', width: '36px' }}>QTY</th>
-              <th style={{ background: '#111', color: 'white', textAlign: 'center', padding: '10px 12px', fontSize: '12px', width: '48px' }}>DAYS</th>
-              <th style={{ background: '#111', color: 'white', textAlign: 'right', padding: '10px 12px', fontSize: '12px', width: '90px' }}>UNIT PRICE</th>
-              <th style={{ background: '#111', color: 'white', textAlign: 'right', padding: '10px 12px', fontSize: '12px' }}>AMOUNT</th>
+              <th style={{ background: '#555', color: 'white', textAlign: 'left', padding: '10px 12px', fontSize: '12px' }}>PARTICULAR</th>
+              <th style={{ background: '#555', color: 'white', textAlign: 'center', padding: '10px 12px', fontSize: '12px', width: '36px' }}>QTY</th>
+              <th style={{ background: '#555', color: 'white', textAlign: 'center', padding: '10px 12px', fontSize: '12px', width: '48px' }}>DAYS</th>
+              <th style={{ background: '#555', color: 'white', textAlign: 'right', padding: '10px 12px', fontSize: '12px', width: '90px' }}>UNIT PRICE</th>
+              <th style={{ background: '#555', color: 'white', textAlign: 'right', padding: '10px 12px', fontSize: '12px' }}>AMOUNT</th>
             </tr>
           </thead>
           <tbody>
@@ -131,7 +131,7 @@ export default function ProjectInvoicePage({ params }: { params: Promise<{ id: s
                 : [['', g.items] as [string, ProjectCost[]]];
               return (
                 <Fragment key={g.category}>
-                  <tr style={{ background: '#111' }}>
+                  <tr style={{ background: '#E32726' }}>
                     <td colSpan={4} style={{ padding: '7px 12px', fontWeight: 900, fontSize: '12px', color: 'white', textTransform: 'uppercase', letterSpacing: '0.75px' }}>{PROJECT_CATEGORY_LABELS[g.category]}</td>
                     <td style={{ padding: '7px 12px', textAlign: 'right', fontWeight: 900, color: 'white' }}>{formatPHP(catTotal)}</td>
                   </tr>
@@ -139,7 +139,7 @@ export default function ProjectInvoicePage({ params }: { params: Promise<{ id: s
                     <Fragment key={subCat || 'other'}>
                       {subGroups.length > 1 && (
                         <tr>
-                          <td colSpan={5} style={{ padding: '3px 12px 3px 22px', fontSize: '10px', fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px', background: '#f7f7f7' }}>
+                          <td colSpan={5} style={{ padding: '5px 12px 5px 22px', fontSize: '11px', fontWeight: 800, color: '#333', textTransform: 'uppercase', letterSpacing: '0.5px', background: '#ddd', borderBottom: '1px solid #ccc' }}>
                             {subCat ? (CATEGORY_LABELS[subCat] || subCat) : 'Other Equipment'}
                           </td>
                         </tr>
@@ -162,7 +162,7 @@ export default function ProjectInvoicePage({ params }: { params: Promise<{ id: s
                               )}
                               {formatPHP(c.client_cost)}
                               {discounted && (
-                                <div style={{ fontSize: '10px', color: '#16a34a', fontWeight: 700 }}>
+                                <div style={{ fontSize: '10px', color: '#E32726', fontWeight: 700 }}>
                                   −{c.discount_type === 'percent' ? `${c.discount_value}%` : formatPHP(c.discount_value)} off
                                 </div>
                               )}
@@ -182,9 +182,9 @@ export default function ProjectInvoicePage({ params }: { params: Promise<{ id: s
                   <td colSpan={4} style={{ padding: '4px 12px', color: '#888', textAlign: 'right' }}>Regular Price</td>
                   <td style={{ padding: '4px 12px', textAlign: 'right', color: '#888', textDecoration: 'line-through' }}>{formatPHP(regularTotal)}</td>
                 </tr>
-                <tr style={{ background: '#f0fdf4' }}>
-                  <td colSpan={4} style={{ padding: '4px 12px', color: '#166534', fontWeight: 700, textAlign: 'right' }}>Total Discount</td>
-                  <td style={{ padding: '4px 12px', textAlign: 'right', color: '#166534', fontWeight: 700 }}>−{formatPHP(totalSavings)}</td>
+                <tr style={{ background: '#fdeaea' }}>
+                  <td colSpan={4} style={{ padding: '4px 12px', color: '#E32726', fontWeight: 700, textAlign: 'right' }}>Total Discount</td>
+                  <td style={{ padding: '4px 12px', textAlign: 'right', color: '#E32726', fontWeight: 700 }}>−{formatPHP(totalSavings)}</td>
                 </tr>
               </>
             )}
@@ -241,13 +241,13 @@ export default function ProjectInvoicePage({ params }: { params: Promise<{ id: s
                 ))}
                 <tr style={{ borderTop: '2px solid #ccc' }}>
                   <td colSpan={4} style={{ padding: '6px 6px', fontWeight: 700 }}>Total Paid</td>
-                  <td style={{ padding: '6px 6px', textAlign: 'right', fontWeight: 700, color: '#166534' }}>{formatPHP(totalPaid)}</td>
+                  <td style={{ padding: '6px 6px', textAlign: 'right', fontWeight: 700, color: '#333' }}>{formatPHP(totalPaid)}</td>
                 </tr>
                 <tr>
                   <td colSpan={4} style={{ padding: '4px 6px', fontWeight: 700, fontSize: '14px' }}>
                     {balance <= 0 ? '✅ PAID IN FULL' : 'Balance Due'}
                   </td>
-                  <td style={{ padding: '4px 6px', textAlign: 'right', fontWeight: 900, fontSize: '14px', color: balance <= 0 ? '#166534' : '#E32726' }}>
+                  <td style={{ padding: '4px 6px', textAlign: 'right', fontWeight: 900, fontSize: '14px', color: balance <= 0 ? '#333' : '#E32726' }}>
                     {balance <= 0 ? '—' : formatPHP(balance)}
                   </td>
                 </tr>
