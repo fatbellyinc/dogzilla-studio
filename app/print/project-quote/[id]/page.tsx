@@ -203,7 +203,7 @@ export default function ProjectQuotePage({ params }: { params: Promise<{ id: str
                   <td style={{ padding: '4px 12px', textAlign: 'right', color: '#888', textDecoration: 'line-through' }}>{formatPHP(regularTotal)}</td>
                 </tr>
                 <tr style={{ background: '#f0fdf4' }}>
-                  <td colSpan={4} style={{ padding: '4px 12px', color: '#166534', fontWeight: 700, textAlign: 'right' }}>You Save</td>
+                  <td colSpan={4} style={{ padding: '4px 12px', color: '#166534', fontWeight: 700, textAlign: 'right' }}>Total Discount</td>
                   <td style={{ padding: '4px 12px', textAlign: 'right', color: '#166534', fontWeight: 700 }}>−{formatPHP(totalSavings)}</td>
                 </tr>
               </>
