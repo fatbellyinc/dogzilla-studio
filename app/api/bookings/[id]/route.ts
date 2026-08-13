@@ -29,7 +29,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   const db = getDb();
   const { id } = await params;
   const body = await req.json();
-  const { status, notes, deposit_paid, fully_paid, discount_type, discount_value, is_pencil, vat_exempt, no_deposit, call_time, wrap_time, overtime_hours, overtime_amount, client_id, project_name, shoot_type, production_house, date_tbd } = body;
+  const { status, notes, not_included, deposit_paid, fully_paid, discount_type, discount_value, is_pencil, vat_exempt, no_deposit, call_time, wrap_time, overtime_hours, overtime_amount, client_id, project_name, shoot_type, production_house, date_tbd } = body;
 
   // Revert a booking back to "no confirmed date yet" — clears all committed days and resets
   // to the sentinel date, mirroring how a date-TBD booking is created in the first place.
@@ -52,6 +52,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
   if (status !== undefined) { db.prepare('UPDATE bookings SET status = ? WHERE id = ?').run(status, id); logActivity(Number(id), ACTIONS.STATUS_CHANGED, `Status changed to ${status}`); }
   if (notes !== undefined) db.prepare('UPDATE bookings SET notes = ? WHERE id = ?').run(notes, id);
+  if (not_included !== undefined) db.prepare('UPDATE bookings SET not_included = ? WHERE id = ?').run(not_included || null, id);
   if (deposit_paid !== undefined) db.prepare('UPDATE bookings SET deposit_paid = ? WHERE id = ?').run(deposit_paid ? 1 : 0, id);
   if (body.deposit_amount !== undefined) { db.prepare('UPDATE bookings SET deposit_amount = ? WHERE id = ?').run(Number(body.deposit_amount) || 0, id); logActivity(Number(id), ACTIONS.ITEMS_EDITED, `Deposit amount set to ₱${(Number(body.deposit_amount) || 0).toLocaleString()}`); }
   if (body.wrap_date !== undefined) db.prepare('UPDATE bookings SET wrap_date = ? WHERE id = ?').run(body.wrap_date || null, id);

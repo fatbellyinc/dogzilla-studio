@@ -19,7 +19,7 @@ export function recomputeBookingTotals(db: Database.Database, bookingId: number)
   const days = db.prepare('SELECT * FROM booking_days WHERE booking_id = ? ORDER BY date').all(bookingId) as
     { date: string; day_type: string; studio_rate: string; hours: number; subtotal: number; call_time: string | null; wrap_time: string | null }[];
   const equipment = db.prepare('SELECT * FROM booking_equipment WHERE booking_id = ?').all(bookingId) as
-    { rate: number; quantity: number; is_complimentary: number; discount_pct: number; category: string | null; day_date: string | null }[];
+    { rate: number; quantity: number; is_complimentary: number; is_tbd: number; discount_pct: number; category: string | null; day_date: string | null }[];
 
   // A day that has an event package's own Venue line (evt_venue category) already has its
   // venue charge covered by that ₱55,000 line — its own default studio-rate subtotal (e.g.
@@ -35,7 +35,7 @@ export function recomputeBookingTotals(db: Database.Database, bookingId: number)
   const studioSubtotal = days.length
     ? days.reduce((s, d) => s + (eventVenueDates.has(d.date) ? 0 : d.subtotal), 0)
     : booking.subtotal;
-  const eqTotal = equipment.reduce((s, e) => s + (e.is_complimentary ? 0 : e.rate * e.quantity * (1 - (e.discount_pct || 0) / 100)), 0);
+  const eqTotal = equipment.reduce((s, e) => s + ((e.is_complimentary || e.is_tbd) ? 0 : e.rate * e.quantity * (1 - (e.discount_pct || 0) / 100)), 0);
 
   // Overtime: per-day when there's more than one day (each day can run different hours),
   // otherwise fall back to the single booking-level call/wrap time fields.

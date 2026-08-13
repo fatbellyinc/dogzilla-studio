@@ -87,6 +87,7 @@ function initSchema(db: Database.Database) {
       deposit_paid INTEGER NOT NULL DEFAULT 0,
       status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','confirmed','completed','cancelled')),
       notes TEXT,
+      not_included TEXT,
       created_at TEXT DEFAULT (datetime('now'))
     );
 
@@ -97,7 +98,8 @@ function initSchema(db: Database.Database) {
       quantity INTEGER NOT NULL DEFAULT 1,
       rate REAL NOT NULL,
       name TEXT NOT NULL,
-      item_type TEXT DEFAULT 'individual'
+      item_type TEXT DEFAULT 'individual',
+      is_tbd INTEGER NOT NULL DEFAULT 0
     );
 
     CREATE TABLE IF NOT EXISTS equipment (
@@ -457,6 +459,8 @@ function initSchema(db: Database.Database) {
     `ALTER TABLE project_costs ADD COLUMN discount_value REAL DEFAULT 0`,
     `ALTER TABLE project_costs ADD COLUMN cost_flow TEXT NOT NULL DEFAULT 'external'`,
     `ALTER TABLE project_costs ADD COLUMN days INTEGER NOT NULL DEFAULT 1`,
+    `ALTER TABLE booking_equipment ADD COLUMN is_tbd INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE bookings ADD COLUMN not_included TEXT`,
   ];
   for (const sql of migrations) {
     try { db.exec(sql); } catch { /* column already exists */ }

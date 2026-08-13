@@ -68,6 +68,8 @@ export interface Booking {
   discount_amount: number;
   status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
   notes: string | null;
+  /** Freeform "not included" lines shown on the booking's Quotation/Invoice — customized per booking in the app. */
+  not_included: string | null;
   created_at: string;
   equipment?: BookingEquipment[];
   /** Exact dates this booking occupies the studio (excludes equipment-only days/bookings). Set by GET /api/bookings. */
@@ -102,6 +104,8 @@ export interface BookingEquipment {
   name: string;
   item_type?: string;
   is_complimentary?: number;
+  /** Price to be determined — treated as ₱0 in totals and rendered as "TBD" on documents, matching is_complimentary. */
+  is_tbd?: number;
   discount_pct?: number;
   /** If set, this line item (e.g. an add-on like Electricity) applies to a specific shoot day rather than the whole booking. */
   day_date?: string | null;

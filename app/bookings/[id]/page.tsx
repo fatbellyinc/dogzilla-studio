@@ -20,6 +20,21 @@ import BookingEditor from '@/components/BookingEditor';
 import MultiDayPicker, { DayConfig } from '@/components/MultiDayPicker';
 import CalendarPicker from '@/components/CalendarPicker';
 
+// Common "not included" lines for studio rentals — clickable suggestions, saved as plain text
+// on the booking (not edited on the printed document itself, mirroring Cost Exclusions on Projects).
+const NOT_INCLUDED_SUGGESTIONS = [
+  'Talent / models',
+  'Makeup and styling',
+  'Props and set decor',
+  'Food and catering',
+  'Transportation for cast/crew',
+  'Overtime beyond the agreed call time',
+  'Additional crew beyond studio staff',
+  'Post-production / editing services',
+  'Printing and physical deliverables',
+  'Parking fees',
+];
+
 interface BookingDetail {
   booking: Booking;
   equipment: BookingEquipment[];
@@ -415,6 +430,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
   const [allClients, setAllClients] = useState<{ id: number; name: string; company?: string }[]>([]);
   const [editingProject, setEditingProject] = useState(false);
   const [projectForm, setProjectForm] = useState({ project_name: '', production_house: '', shoot_type: '' });
+  const [notIncludedText, setNotIncludedText] = useState('');
   const [editingDates, setEditingDates] = useState(false);
   const [editDays, setEditDays] = useState<DayConfig[]>([]);
   const [savingDates, setSavingDates] = useState(false);
@@ -439,7 +455,25 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
       production_house: d.booking.production_house || '',
       shoot_type: d.booking.shoot_type || '',
     });
+    setNotIncludedText(d.booking.not_included || '');
   });
+
+  // Clicking a suggested "not included" line toggles it and saves immediately — functional
+  // setState form so rapid successive clicks each build on the latest state instead of racing
+  // against a stale closure snapshot.
+  function toggleNotIncludedLine(line: string) {
+    setNotIncludedText(prev => {
+      const lines = prev.split('\n').map(l => l.trim()).filter(Boolean);
+      const next = lines.includes(line) ? lines.filter(l => l !== line) : [...lines, line];
+      const joined = next.join('\n');
+      fetch(`/api/bookings/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ not_included: joined }) });
+      return joined;
+    });
+  }
+
+  async function saveNotIncludedText() {
+    await fetch(`/api/bookings/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ not_included: notIncludedText }) });
+  }
 
   useEffect(() => { load(); loadCrew(); }, [id, loadCrew]);
 
@@ -1209,6 +1243,34 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
               <p className="text-sm text-white/70">{booking.notes}</p>
             </div>
           )}
+
+          {/* Not Included — picked here in the app; the printed Quotation/Invoice only display
+              the resulting text, they never host the editing controls. */}
+          <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4">
+            <h2 className="text-xs text-white/40 uppercase tracking-wider mb-3">Not Included (shown on Quotation/Invoice)</h2>
+            {(() => {
+              const activeLines = notIncludedText.split('\n').map(l => l.trim()).filter(Boolean);
+              return (
+                <div className="mb-3">
+                  <div className="text-[10px] text-white/30 mb-1">Common exclusions — click to add/remove</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {NOT_INCLUDED_SUGGESTIONS.map(line => {
+                      const active = activeLines.includes(line);
+                      return (
+                        <button key={line} onClick={() => toggleNotIncludedLine(line)}
+                          className={`text-xs px-2.5 py-1.5 rounded-lg border transition-all ${active ? 'bg-[#E32726] border-[#E32726] text-white' : 'bg-[#0f0f0f] border-[#2a2a2a] text-white/70 hover:border-white/30'}`}>
+                          {line}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+            <textarea value={notIncludedText} onChange={e => setNotIncludedText(e.target.value)} onBlur={saveNotIncludedText} rows={3}
+              placeholder="Nothing set yet — click a suggestion above, or type your own line here"
+              className={ic + ' w-full'} />
+          </div>
 
           <OverheadPanel bookingId={Number(id)} totalRevenue={booking.total} hours={booking.studio_rate === 'hourly' ? booking.hours : 10} callTime={callTime} wrapTime={wrapTime} days={(bookingDays || []).filter(d => d.date !== NO_DATE_SENTINEL).map(d => d.date)} />
 

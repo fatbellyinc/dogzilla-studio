@@ -57,7 +57,7 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
   const studioRate = STUDIO_RATES[booking.studio_rate];
   const isMultiDay = bookingDays && bookingDays.length > 1;
 
-  type Line = { desc: string; qty: number; unit: number; total: number; bold?: boolean; indent?: boolean; comp?: boolean; disc?: number; isCategoryLabel?: boolean; category?: string | null };
+  type Line = { desc: string; qty: number; unit: number; total: number; bold?: boolean; indent?: boolean; comp?: boolean; tbd?: boolean; disc?: number; isCategoryLabel?: boolean; category?: string | null };
   const lines: Line[] = [];
 
   // Event-package inclusions are informational, not billable — collected here instead of
@@ -110,9 +110,10 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
       }
       catGroup.items.forEach(e => {
         const comp = !!e.is_complimentary;
+        const tbd = !comp && !!e.is_tbd;
         const discPct = e.discount_pct || 0;
-        const lineTotal = comp ? 0 : e.rate * e.quantity * (1 - discPct / 100);
-        lines.push({ desc: e.name, qty: e.quantity, unit: e.rate, total: lineTotal, indent: true, comp, disc: discPct > 0 ? discPct : undefined, category: e.category });
+        const lineTotal = (comp || tbd) ? 0 : e.rate * e.quantity * (1 - discPct / 100);
+        lines.push({ desc: e.name, qty: e.quantity, unit: e.rate, total: lineTotal, indent: true, comp, tbd, disc: discPct > 0 ? discPct : undefined, category: e.category });
       });
     });
   }
@@ -218,7 +219,7 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
       [`Shoot Date: ${formatDate(booking.booking_date)}`, '', '', '', ''],
       ['', '', '', '', ''],
       ['Description', 'Qty', 'Unit Price', 'Disc.', 'Amount'],
-      ...lines.map(l => l.isCategoryLabel ? [`— ${l.desc} —`, '', '', '', ''] : [l.desc, l.qty, l.comp ? 0 : l.unit, l.comp ? '100%' : l.disc ? `${l.disc}%` : '', l.comp ? 0 : l.total]),
+      ...lines.map(l => l.isCategoryLabel ? [`— ${l.desc} —`, '', '', '', ''] : [l.desc + (l.tbd ? ' (TBD)' : ''), l.qty, l.comp || l.tbd ? 0 : l.unit, l.comp ? '100%' : l.disc ? `${l.disc}%` : '', l.comp || l.tbd ? 0 : l.total]),
       ['', '', '', '', ''],
       ['Regular Price', '', '', '', regularPrice],
       totalSavings > 0 ? ['Total Discount', '', '', '', -totalSavings] : null,
@@ -366,14 +367,15 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
               <td style={{ padding: '8px 10px', paddingLeft: line.indent ? '22px' : '10px' }}>
                 <div style={{ fontWeight: line.bold ? 700 : 400 }}>{line.desc}</div>
                 {line.comp && <span style={{ fontSize: '10px', background: '#dcfce7', color: '#166534', padding: '1px 5px', borderRadius: '3px', fontWeight: 700 }}>{line.category?.startsWith('evt_') || line.category === 'package_item' ? 'INCLUDED IN PACKAGE' : 'COMPLIMENTARY'}</span>}
+                {line.tbd && <span style={{ fontSize: '10px', background: '#dbeafe', color: '#1d4ed8', padding: '1px 5px', borderRadius: '3px', fontWeight: 700 }}>TBD</span>}
               </td>
               <td style={{ padding: '8px 10px', textAlign: 'center' }}>{line.qty}</td>
-              <td style={{ padding: '8px 10px', textAlign: 'right' }}>{line.comp ? '—' : formatPHP(line.unit)}</td>
+              <td style={{ padding: '8px 10px', textAlign: 'right' }}>{line.comp || line.tbd ? '—' : formatPHP(line.unit)}</td>
               <td style={{ padding: '8px 10px', textAlign: 'right', color: '#e07b00' }}>
                 {line.comp ? '100%' : line.disc ? `${line.disc}%` : '—'}
               </td>
               <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: line.bold ? 700 : 600 }}>
-                {line.comp ? <span style={{ color: '#166534' }}>₱0</span> : formatPHP(line.total)}
+                {line.comp ? <span style={{ color: '#166534' }}>₱0</span> : line.tbd ? <span style={{ color: '#1d4ed8' }}>TBD</span> : formatPHP(line.total)}
               </td>
             </tr>
             )
@@ -507,6 +509,18 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
           Please make cheque/s payable to <strong>ALBERTO C. MONTERAS II</strong>.
         </div>
       </div>
+
+      {/* Not Included — customized per booking in the app; this document only displays it */}
+      {booking.not_included && (
+        <div style={{ marginBottom: '16px', padding: '12px 14px', background: '#f5f5f5', border: '1px solid #e5e5e5', borderRadius: '6px' }}>
+          <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: '#888', marginBottom: '6px' }}>Not Included</div>
+          <ul style={{ margin: 0, paddingLeft: '18px' }}>
+            {booking.not_included.split('\n').map(l => l.trim()).filter(Boolean).map((l, i) => (
+              <li key={i} style={{ fontSize: '11px', color: '#555', padding: '1px 0' }}>{l}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Terms */}
       <div style={{ fontSize: '10px', color: '#aaa', marginBottom: '16px', lineHeight: '1.6' }}>

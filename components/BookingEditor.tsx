@@ -12,6 +12,7 @@ interface EditItem {
   quantity: number;
   equipment_id?: number;
   is_complimentary: boolean;
+  is_tbd?: boolean;
   discount_pct: number;
   item_type: string;
   /** If set, this add-on (e.g. Electricity) applies to a specific shoot day rather than the whole booking. */
@@ -65,6 +66,7 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
         quantity: e.quantity,
         equipment_id: e.equipment_id || undefined,
         is_complimentary: !!e.is_complimentary,
+        is_tbd: !!e.is_tbd,
         discount_pct: e.discount_pct || 0,
         item_type: e.item_type || 'individual',
         day_date: e.day_date || undefined,
@@ -123,7 +125,7 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
     fetch('/api/equipment').then(r => r.json()).then(setEquipment);
   }, []);
 
-  const eqTotal = items.reduce((s, e) => s + (e.is_complimentary ? 0 : e.rate * e.quantity * (1 - e.discount_pct / 100)), 0);
+  const eqTotal = items.reduce((s, e) => s + ((e.is_complimentary || e.is_tbd) ? 0 : e.rate * e.quantity * (1 - e.discount_pct / 100)), 0);
   const newTotal = studioSubtotal + eqTotal;
 
   function addPackage(pkg: (typeof EQUIPMENT_PACKAGES)[PackageCat][number]) {
@@ -277,6 +279,7 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
   }
   function updateQty(key: string, qty: number) { setItems(prev => prev.map(i => i.key === key ? { ...i, quantity: Math.max(1, qty) } : i)); }
   function toggleComp(key: string) { setItems(prev => prev.map(i => i.key === key ? { ...i, is_complimentary: !i.is_complimentary, discount_pct: 0 } : i)); }
+  function toggleTbd(key: string) { setItems(prev => prev.map(i => i.key === key ? { ...i, is_tbd: !i.is_tbd } : i)); }
   function setDisc(key: string, pct: number) { setItems(prev => prev.map(i => i.key === key ? { ...i, discount_pct: i.discount_pct === pct ? 0 : pct, is_complimentary: false } : i)); }
 
   async function save() {
@@ -288,6 +291,7 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
       quantity: i.quantity,
       item_type: i.item_type,
       is_complimentary: i.is_complimentary,
+      is_tbd: i.is_tbd,
       discount_pct: i.discount_pct,
       day_date: i.day_date || null,
       category: i.category || null,
@@ -354,7 +358,7 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
                     )}
                     {catGroup.items.map(item => {
               const idx = items.findIndex(i => i.key === item.key);
-              const lineTotal = item.is_complimentary ? 0 : item.rate * item.quantity * (1 - item.discount_pct / 100);
+              const lineTotal = (item.is_complimentary || item.is_tbd) ? 0 : item.rate * item.quantity * (1 - item.discount_pct / 100);
               const elec = isElecItem(item);
               const itemElecHours = elecHoursFromItem(item);
               const moveButtons = (
@@ -397,6 +401,10 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
                         className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${item.is_complimentary ? 'bg-green-500/20 text-green-400 border-green-500/30' : 'text-white/20 border-white/10 hover:text-green-400'}`}>
                         🎁 Comp
                       </button>
+                      <button type="button" onClick={() => toggleTbd(item.key)}
+                        className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${item.is_tbd ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' : 'text-white/20 border-white/10 hover:text-blue-400'}`}>
+                        ❔ TBD
+                      </button>
                     </div>
                   </div>
                 );
@@ -434,6 +442,8 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
                     <div className="text-xs text-white/60 w-16 text-right shrink-0">
                       {item.is_complimentary
                         ? <span className="text-green-400">{item.category?.startsWith('evt_') || item.category === 'package_item' ? 'Included' : 'COMP'}</span>
+                        : item.is_tbd
+                        ? <span className="text-blue-400">TBD</span>
                         : formatPHP(lineTotal)}
                     </div>
                     <button onClick={() => removeItem(item.key)} className="text-white/20 hover:text-red-400 text-xs">✕</button>
@@ -464,6 +474,10 @@ export default function BookingEditor({ bookingId, currentEquipment, currentSubt
                     <button type="button" onClick={() => toggleComp(item.key)}
                       className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${item.is_complimentary ? 'bg-green-500/20 text-green-400 border-green-500/30' : 'text-white/20 border-white/10 hover:text-green-400'}`}>
                       🎁 Comp
+                    </button>
+                    <button type="button" onClick={() => toggleTbd(item.key)}
+                      className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${item.is_tbd ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' : 'text-white/20 border-white/10 hover:text-blue-400'}`}>
+                      ❔ TBD
                     </button>
                   </div>
                 </div>

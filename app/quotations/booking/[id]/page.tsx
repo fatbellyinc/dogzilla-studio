@@ -47,7 +47,7 @@ function DocView({ bookingId }: { bookingId: string }) {
   const vatExempt = !!booking.vat_exempt;
   const isMultiDay = bookingDays && bookingDays.length > 1;
 
-  type Line = { code: string; desc: string; qty: number; unit: number; total: number; bold?: boolean; indent?: boolean; comp?: boolean; disc?: number; isCategoryLabel?: boolean; inclusions?: readonly string[]; category?: string | null };
+  type Line = { code: string; desc: string; qty: number; unit: number; total: number; bold?: boolean; indent?: boolean; comp?: boolean; tbd?: boolean; disc?: number; isCategoryLabel?: boolean; inclusions?: readonly string[]; category?: string | null };
   const lines: Line[] = [];
 
   // Event-package inclusions (audio/lighting/crew/generator equipment, etc.) are informational,
@@ -109,8 +109,9 @@ function DocView({ bookingId }: { bookingId: string }) {
       }
       catGroup.items.forEach(e => {
         const comp = !!e.is_complimentary;
+        const tbd = !comp && !!e.is_tbd;
         const disc = e.discount_pct || 0;
-        const lineTotal = comp ? 0 : e.rate * e.quantity * (1 - disc / 100);
+        const lineTotal = (comp || tbd) ? 0 : e.rate * e.quantity * (1 - disc / 100);
         lines.push({
           code: '',
           desc: e.name,
@@ -119,6 +120,7 @@ function DocView({ bookingId }: { bookingId: string }) {
           total: lineTotal,
           indent: true,
           comp,
+          tbd,
           disc: disc > 0 ? disc : undefined,
           inclusions: PACKAGE_INCLUSIONS_BY_NAME[e.name],
           category: e.category,
@@ -248,7 +250,7 @@ function DocView({ bookingId }: { bookingId: string }) {
       [`Shoot Date: ${formatDate(booking.booking_date)}`, '', '', '', ''],
       ['', '', '', '', ''],
       ['Description', 'Qty', 'Unit Price', 'Disc.', 'Amount'],
-      ...lines.map(l => l.isCategoryLabel ? [`— ${l.desc} —`, '', '', '', ''] : [l.desc, l.qty, l.comp ? 0 : l.unit, l.comp ? '100%' : l.disc ? `${l.disc}%` : '', l.comp ? 0 : l.total]),
+      ...lines.map(l => l.isCategoryLabel ? [`— ${l.desc} —`, '', '', '', ''] : [l.desc + (l.tbd ? ' (TBD)' : ''), l.qty, l.comp || l.tbd ? 0 : l.unit, l.comp ? '100%' : l.disc ? `${l.disc}%` : '', l.comp || l.tbd ? 0 : l.total]),
       ['', '', '', '', ''],
       ['Regular Price', '', '', '', regularPrice],
       totalSavings > 0 ? ['Total Discount', '', '', '', -totalSavings] : null,
@@ -383,6 +385,9 @@ function DocView({ bookingId }: { bookingId: string }) {
                     {line.category?.startsWith('evt_') || line.category === 'package_item' ? 'INCLUDED IN PACKAGE' : 'COMPLIMENTARY'}
                   </span>
                 )}
+                {line.tbd && (
+                  <span style={{ fontSize: '10px', background: '#dbeafe', color: '#1d4ed8', padding: '1px 5px', borderRadius: '3px', fontWeight: 700 }}>TBD</span>
+                )}
                 {line.inclusions && line.inclusions.length > 0 && (
                   <ul style={{ margin: '3px 0 0', padding: 0, listStyle: 'none', fontSize: '10px', color: '#777' }}>
                     {line.inclusions.map((inc, ii) => <li key={ii}>· {inc}</li>)}
@@ -391,13 +396,13 @@ function DocView({ bookingId }: { bookingId: string }) {
               </td>
               <td style={{ padding: '8px 10px', textAlign: 'center' }}>{line.qty}</td>
               <td style={{ padding: '8px 10px', textAlign: 'right' }}>
-                {line.comp ? '—' : formatPHP(line.unit)}
+                {line.comp || line.tbd ? '—' : formatPHP(line.unit)}
               </td>
               <td style={{ padding: '8px 10px', textAlign: 'right', color: '#e07b00' }}>
                 {line.comp ? '100%' : line.disc ? `${line.disc}%` : '—'}
               </td>
               <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: line.bold ? 700 : 600, color: line.total < 0 ? '#166534' : '#111' }}>
-                {line.comp ? <span style={{ color: '#166534' }}>₱0</span> : formatPHP(line.total)}
+                {line.comp ? <span style={{ color: '#166534' }}>₱0</span> : line.tbd ? <span style={{ color: '#1d4ed8' }}>TBD</span> : formatPHP(line.total)}
               </td>
             </tr>
             )
@@ -522,6 +527,18 @@ function DocView({ bookingId }: { bookingId: string }) {
           Please make cheque/s payable to <strong>ALBERTO C. MONTERAS II</strong>.
         </div>
       </div>
+
+      {/* Not Included — customized per booking in the app; this document only displays it */}
+      {booking.not_included && (
+        <div style={{ marginBottom: '16px', padding: '12px 14px', background: '#fafafa', border: '1px solid #eee', borderRadius: '6px' }}>
+          <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: '#888', marginBottom: '6px' }}>Not Included</div>
+          <ul style={{ margin: 0, paddingLeft: '18px' }}>
+            {booking.not_included.split('\n').map(l => l.trim()).filter(Boolean).map((l, i) => (
+              <li key={i} style={{ fontSize: '11px', color: '#555', padding: '1px 0' }}>{l}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Terms */}
       <div style={{ background: '#f9f9f9', borderRadius: '8px', padding: '14px', marginBottom: '20px' }}>
