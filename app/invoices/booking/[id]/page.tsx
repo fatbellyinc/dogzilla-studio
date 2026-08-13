@@ -522,6 +522,18 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
         </div>
       )}
 
+      {/* Notes — customized per booking in the app; this document only displays it */}
+      {booking.notes && (
+        <div style={{ marginBottom: '16px', padding: '12px 14px', background: '#f5f5f5', border: '1px solid #e5e5e5', borderRadius: '6px' }}>
+          <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: '#888', marginBottom: '6px' }}>Notes</div>
+          <ul style={{ margin: 0, paddingLeft: '18px' }}>
+            {booking.notes.split('\n').map(l => l.trim()).filter(Boolean).map((l, i) => (
+              <li key={i} style={{ fontSize: '11px', color: '#555', padding: '1px 0' }}>{l}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* Terms */}
       <div style={{ fontSize: '10px', color: '#aaa', marginBottom: '16px', lineHeight: '1.6' }}>
         50% non-refundable deposit required to confirm. Balance due on shoot day before session begins. Client is responsible for any damage to facility or equipment. Late payment charged at 50% daily rate per additional day. All rates VAT-exclusive; VAT 12% per TRAIN Law, RA 10963.

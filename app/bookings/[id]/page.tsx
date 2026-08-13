@@ -35,6 +35,21 @@ const NOT_INCLUDED_SUGGESTIONS = [
   'Parking fees',
 ];
 
+// Freeform booking notes — clickable suggestions for common rental terms/reminders, saved as
+// plain text on the booking and shown on the Quotation/Invoice (not edited on the document itself).
+const BOOKING_NOTES_SUGGESTIONS = [
+  'Rental hours maximum of 14 hours only, from call time',
+  'Studio must be vacated by the agreed wrap time; late egress billed as studio time',
+  'Client is responsible for restoring the set/space to its original condition before leaving',
+  'Additional hours beyond the agreed call time are billed at the overtime rate',
+  'No smoking or open flame allowed inside studio premises',
+  'Pets on set allowed only with prior approval',
+  'Loud or live audio requires prior notice due to shared building space',
+  'Parking is limited and available on a first-come, first-served basis',
+  'Final crew headcount must be confirmed at least 24 hours before the shoot',
+  'Rescheduling the shoot date/time is subject to studio availability',
+];
+
 interface BookingDetail {
   booking: Booking;
   equipment: BookingEquipment[];
@@ -431,6 +446,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
   const [editingProject, setEditingProject] = useState(false);
   const [projectForm, setProjectForm] = useState({ project_name: '', production_house: '', shoot_type: '' });
   const [notIncludedText, setNotIncludedText] = useState('');
+  const [notesText, setNotesText] = useState('');
   const [editingDates, setEditingDates] = useState(false);
   const [editDays, setEditDays] = useState<DayConfig[]>([]);
   const [savingDates, setSavingDates] = useState(false);
@@ -456,6 +472,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
       shoot_type: d.booking.shoot_type || '',
     });
     setNotIncludedText(d.booking.not_included || '');
+    setNotesText(d.booking.notes || '');
   });
 
   // Clicking a suggested "not included" line toggles it and saves immediately — functional
@@ -473,6 +490,20 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
 
   async function saveNotIncludedText() {
     await fetch(`/api/bookings/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ not_included: notIncludedText }) });
+  }
+
+  function toggleNotesLine(line: string) {
+    setNotesText(prev => {
+      const lines = prev.split('\n').map(l => l.trim()).filter(Boolean);
+      const next = lines.includes(line) ? lines.filter(l => l !== line) : [...lines, line];
+      const joined = next.join('\n');
+      fetch(`/api/bookings/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ notes: joined }) });
+      return joined;
+    });
+  }
+
+  async function saveNotesText() {
+    await fetch(`/api/bookings/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ notes: notesText }) });
   }
 
   useEffect(() => { load(); loadCrew(); }, [id, loadCrew]);
@@ -1237,12 +1268,32 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
             )}
           </div>
 
-          {booking.notes && (
-            <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4">
-              <h2 className="text-xs text-white/40 uppercase tracking-wider mb-2">Notes</h2>
-              <p className="text-sm text-white/70">{booking.notes}</p>
-            </div>
-          )}
+          {/* Notes — customized here in the app; shown on Quotation/Invoice when set. */}
+          <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4">
+            <h2 className="text-xs text-white/40 uppercase tracking-wider mb-3">Notes (shown on Quotation/Invoice)</h2>
+            {(() => {
+              const activeLines = notesText.split('\n').map(l => l.trim()).filter(Boolean);
+              return (
+                <div className="mb-3">
+                  <div className="text-[10px] text-white/30 mb-1">Common notes — click to add/remove</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {BOOKING_NOTES_SUGGESTIONS.map(line => {
+                      const active = activeLines.includes(line);
+                      return (
+                        <button key={line} onClick={() => toggleNotesLine(line)}
+                          className={`text-xs px-2.5 py-1.5 rounded-lg border transition-all ${active ? 'bg-[#E32726] border-[#E32726] text-white' : 'bg-[#0f0f0f] border-[#2a2a2a] text-white/70 hover:border-white/30'}`}>
+                          {line}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+            <textarea value={notesText} onChange={e => setNotesText(e.target.value)} onBlur={saveNotesText} rows={3}
+              placeholder="Nothing set yet — click a suggestion above, or type your own note here"
+              className={ic + ' w-full'} />
+          </div>
 
           {/* Not Included — picked here in the app; the printed Quotation/Invoice only display
               the resulting text, they never host the editing controls. */}

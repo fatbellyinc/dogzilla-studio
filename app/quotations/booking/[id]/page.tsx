@@ -540,6 +540,18 @@ function DocView({ bookingId }: { bookingId: string }) {
         </div>
       )}
 
+      {/* Notes — customized per booking in the app; this document only displays it */}
+      {booking.notes && (
+        <div style={{ marginBottom: '16px', padding: '12px 14px', background: '#fafafa', border: '1px solid #eee', borderRadius: '6px' }}>
+          <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: '#888', marginBottom: '6px' }}>Notes</div>
+          <ul style={{ margin: 0, paddingLeft: '18px' }}>
+            {booking.notes.split('\n').map(l => l.trim()).filter(Boolean).map((l, i) => (
+              <li key={i} style={{ fontSize: '11px', color: '#555', padding: '1px 0' }}>{l}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* Terms */}
       <div style={{ background: '#f9f9f9', borderRadius: '8px', padding: '14px', marginBottom: '20px' }}>
         <div style={{ fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1px', color: '#888', marginBottom: '8px' }}>Terms & Conditions</div>
