@@ -562,6 +562,8 @@ function initSchema(db: Database.Database) {
     ['GRP-030', '20x20 Green/Blue Screen — Back to Back', 'grip', 6000, 1, '', 0],
     ['MON-015', 'Acsoon M7 Pro 7" Monitor', 'monitor', 4000, 1, '', 10],
     ['TRP-007', 'Baby Tripod', 'tripod', 600, 1, '', 0],
+    ['CRR-001', 'Full Car Turntable', 'car_rigging', 80000, 1, 'Package', 0],
+    ['CRR-002', 'Motorcycle Turntable', 'car_rigging', 60000, 1, 'Package', 0],
   ];
   for (const [code, name, category, daily_rate, quantity, description, wattage] of equipmentUpserts) {
     try {
@@ -875,6 +877,10 @@ function seedEquipment(db: Database.Database) {
     // CAMERA / RIGGING ACCESSORIES
     ['RIG-001', 'Mofage Talos Damping Magic Arm', 'rigging', 500, 1, '', 0],
     ['RIG-002', 'iFootage Spider Crab Magic Arm with QR', 'rigging', 300, 1, '', 0],
+
+    // CAR RIGGING
+    ['CRR-001', 'Full Car Turntable', 'car_rigging', 80000, 1, 'Package', 0],
+    ['CRR-002', 'Motorcycle Turntable', 'car_rigging', 60000, 1, 'Package', 0],
 
     // CAPTURE / POST & COMM
     ['CAP-001', 'Blackmagic ATEM Mini Pro', 'monitor', 3500, 1, 'Live switcher / capture card', 12],
