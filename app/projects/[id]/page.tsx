@@ -613,7 +613,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             <span className="text-white">{formatPHP(noDP.vat)}</span>
           </div>
           <div className="flex items-center justify-between border-t border-[#2a2a2a] pt-2">
-            <span className="text-sm font-semibold text-white">TOTAL WITH VAT</span>
+            <span className="text-sm font-semibold text-white">{vatExempt ? 'TOTAL (VAT-EXEMPT)' : 'TOTAL WITH VAT'}</span>
             <span className="text-lg font-black text-[#E32726]">{formatPHP(noDP.total)}</span>
           </div>
         </div>

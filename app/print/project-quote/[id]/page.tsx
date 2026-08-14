@@ -157,7 +157,7 @@ export default function ProjectQuotePage({ params }: { params: Promise<{ id: str
         {/* Headline totals, styled like the standard Dogzilla quotation letter — the numbers a
             client reads first, before the line-item breakdown further down */}
         <div style={{ marginBottom: '24px', fontSize: '13px', lineHeight: '1.7' }}>
-          <div>Basic Production Cost VAT Inc. <strong style={{ color: '#E32726' }}>{formatPHP(calc.total)}</strong></div>
+          <div>Basic Production Cost {vatExempt ? '(VAT-Exempt)' : 'VAT Inc.'} <strong style={{ color: '#E32726' }}>{formatPHP(calc.total)}</strong></div>
           <div>Net Cost <strong>{formatPHP(calc.subtotal2)}</strong></div>
         </div>
 
@@ -266,7 +266,7 @@ export default function ProjectQuotePage({ params }: { params: Promise<{ id: str
               <td style={{ padding: '8px 12px', textAlign: 'right' }}>{formatPHP(calc.vat)}</td>
             </tr>
             <tr>
-              <td colSpan={4} style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 900, color: '#E32726' }}>TOTAL WITH VAT</td>
+              <td colSpan={4} style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 900, color: '#E32726' }}>{vatExempt ? 'TOTAL (VAT-EXEMPT)' : 'TOTAL WITH VAT'}</td>
               <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 900, color: '#E32726', fontSize: '15px' }}>{formatPHP(calc.total)}</td>
             </tr>
           </tbody>
