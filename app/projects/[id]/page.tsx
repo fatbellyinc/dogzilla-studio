@@ -557,7 +557,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
           <div className="text-xs text-white/40 mt-1">Margin (before markup/VAT)</div>
         </div>
         <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4">
-          <div className="text-lg font-black text-yellow-400">{noMarkup ? 'At Cost' : vatExempt ? 'VAT-Exempt' : '12% VAT'}</div>
+          <div className="text-lg font-black text-yellow-400">{noMarkup ? 'At Cost' : vatExempt ? 'NON-VAT' : '12% VAT'}</div>
           <div className="text-xs text-white/40 mt-1 flex flex-col gap-1">
             <label className="flex items-center gap-1 cursor-pointer">
               <input type="checkbox" checked={vatExempt} onChange={e => updateProject({ vat_exempt: e.target.checked ? 1 : 0 })} />
@@ -609,11 +609,11 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             <span className="text-white">{formatPHP(noDP.subtotal2)}</span>
           </div>
           <div className="flex items-center justify-between text-xs mb-2">
-            <span className="text-white/40">{vatExempt ? 'VAT (exempt)' : '12% VAT'}</span>
+            <span className="text-white/40">{vatExempt ? 'NON-VAT' : '12% VAT'}</span>
             <span className="text-white">{formatPHP(noDP.vat)}</span>
           </div>
           <div className="flex items-center justify-between border-t border-[#2a2a2a] pt-2">
-            <span className="text-sm font-semibold text-white">{vatExempt ? 'TOTAL (VAT-EXEMPT)' : 'TOTAL WITH VAT'}</span>
+            <span className="text-sm font-semibold text-white">{vatExempt ? 'GRAND TOTAL' : 'TOTAL WITH VAT'}</span>
             <span className="text-lg font-black text-[#E32726]">{formatPHP(noDP.total)}</span>
           </div>
         </div>

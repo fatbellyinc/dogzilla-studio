@@ -237,7 +237,7 @@ export default function ProjectInvoicePage({ params }: { params: Promise<{ id: s
               <td style={{ padding: '8px 12px', textAlign: 'right' }}>{formatPHP(calc.subtotal2)}</td>
             </tr>
             <tr style={{ borderBottom: '1px solid #eee' }}>
-              <td colSpan={4} style={{ padding: '8px 12px', textAlign: 'right' }}>{vatExempt ? 'VAT (exempt)' : '12% VAT'}</td>
+              <td colSpan={4} style={{ padding: '8px 12px', textAlign: 'right' }}>{vatExempt ? 'NON-VAT' : '12% VAT'}</td>
               <td style={{ padding: '8px 12px', textAlign: 'right' }}>{formatPHP(calc.vat)}</td>
             </tr>
             <tr>
