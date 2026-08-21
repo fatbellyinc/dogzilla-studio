@@ -89,6 +89,10 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const [paymentForm, setPaymentForm] = useState({ amount: '', type: 'deposit', method: '', reference: '' });
   const [exclusionsText, setExclusionsText] = useState('');
   const [deliverablesText, setDeliverablesText] = useState('');
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState('');
+  const [mealCalcOpen, setMealCalcOpen] = useState(false);
+  const [mealCalc, setMealCalc] = useState({ breakfast: '0', amSnack: '0', lunch: '0', pmSnack: '0', midnight: '0', pax: '', rate: '150' });
 
   const load = useCallback(() => {
     fetch(`/api/projects/${id}`).then(r => r.json()).then(d => {
@@ -287,6 +291,19 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     await fetch(`/api/projects/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(fields) });
     await load();
     setSaving(false);
+  }
+
+  // Manually (re)sync the linked studio booking — auto-fires on any project save once the
+  // project is Won and has a shoot date, but this button lets a producer pull in cost-line
+  // changes (new equipment, a different studio package) without touching an unrelated field.
+  async function syncBooking() {
+    setSyncing(true);
+    setSyncMsg('');
+    const res = await fetch(`/api/projects/${id}/sync-booking`, { method: 'POST' });
+    const result = await res.json();
+    setSyncMsg(res.ok ? '✓ Studio booking synced' : `✗ ${result.error}`);
+    await load();
+    setSyncing(false);
   }
 
   // Clicking a suggested/auto-detected exclusion toggles it in the list and saves immediately —
@@ -542,6 +559,43 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         )}
       </div>
 
+      {/* Shoot Date + Studio Booking — a confirmed date on a Won project keeps a linked
+          booking in sync automatically (studio rate + equipment lines mirrored from the
+          budget), so the studio calendar and equipment inventory reflect what's confirmed. */}
+      <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4 mb-4">
+        <h2 className="text-xs text-white/40 uppercase tracking-wider mb-3">Shoot Date &amp; Studio Booking</h2>
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="text-xs text-white/50">
+            <div className="mb-1">Shoot Date</div>
+            <input type="date" value={project.shoot_date || ''} onChange={e => updateProject({ shoot_date: e.target.value })} className={ic} />
+          </label>
+          <label className="text-xs text-white/50">
+            <div className="mb-1">End Date (multi-day, optional)</div>
+            <input type="date" value={project.shoot_end_date || ''} onChange={e => updateProject({ shoot_end_date: e.target.value })} className={ic} />
+          </label>
+          <div className="flex-1 min-w-[200px]">
+            {project.status !== 'won' ? (
+              <div className="text-xs text-white/30">Mark this project Won to enable studio booking sync.</div>
+            ) : !project.shoot_date ? (
+              <div className="text-xs text-white/30">Set a shoot date above to book the studio.</div>
+            ) : project.booking_id ? (
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs text-green-400">🔗 Linked to Studio Booking #{project.booking_id}</span>
+                <Link href={`/bookings/${project.booking_id}`} target="_blank" className="text-xs text-[#E32726] hover:underline">View Booking</Link>
+                <button onClick={syncBooking} disabled={syncing} className="text-xs bg-[#0f0f0f] border border-[#2a2a2a] text-white/70 px-2.5 py-1 rounded hover:border-white/30 disabled:opacity-50">
+                  {syncing ? 'Syncing…' : '🔄 Re-sync Now'}
+                </button>
+              </div>
+            ) : (
+              <button onClick={syncBooking} disabled={syncing} className="text-xs bg-[#E32726] text-white px-3 py-1.5 rounded-lg font-medium disabled:opacity-50">
+                {syncing ? 'Booking…' : '📅 Book Studio Now'}
+              </button>
+            )}
+            {syncMsg && <div className="text-xs text-white/50 mt-1">{syncMsg}</div>}
+          </div>
+        </div>
+      </div>
+
       {/* Summary */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
         <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4">
@@ -793,6 +847,60 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             <button onClick={commitStaged} className="bg-[#E32726] text-white text-sm px-4 py-2 rounded-lg font-medium">+ Add {staged.length} Item{staged.length > 1 ? 's' : ''} to Budget</button>
           </div>
         )}
+
+        {newItem.category === 'food_transpo' && (() => {
+          const mealCount = ['breakfast', 'amSnack', 'lunch', 'pmSnack', 'midnight']
+            .reduce((s, k) => s + (Number(mealCalc[k as keyof typeof mealCalc]) || 0), 0);
+          const pax = Number(mealCalc.pax) || 0;
+          const rate = Number(mealCalc.rate) || 0;
+          const mealTotal = mealCount * pax * rate;
+          return (
+            <div className="mb-3 bg-[#0f0f0f] border border-[#2a2a2a] rounded-lg p-3">
+              <button type="button" onClick={() => setMealCalcOpen(o => !o)} className="text-xs text-white/40 flex items-center gap-1">
+                🍽️ Meal Calculator {mealCalcOpen ? '▲' : '▼'}
+              </button>
+              {mealCalcOpen && (
+                <div className="mt-2 space-y-2">
+                  <div className="text-[10px] text-white/30">Number of meal servings, by type — e.g. 2 if breakfast is served both shoot days</div>
+                  <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
+                    {([['breakfast', 'Breakfast'], ['amSnack', 'Snack AM'], ['lunch', 'Lunch'], ['pmSnack', 'Snack PM'], ['midnight', 'Midnight Snack']] as const).map(([key, label]) => (
+                      <div key={key}>
+                        <label className="text-[10px] text-white/40 block mb-1">{label}</label>
+                        <input value={mealCalc[key]} onChange={e => setMealCalc(m => ({ ...m, [key]: e.target.value }))} type="number" min="0" className={ic + ' w-full'} />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] text-white/40 block mb-1">Pax (headcount)</label>
+                      <input value={mealCalc.pax} onChange={e => setMealCalc(m => ({ ...m, pax: e.target.value }))} type="number" min="0" placeholder="e.g. 25" className={ic + ' w-full'} />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-white/40 block mb-1">Rate per meal (₱)</label>
+                      <input value={mealCalc.rate} onChange={e => setMealCalc(m => ({ ...m, rate: e.target.value }))} type="number" min="0" className={ic + ' w-full'} />
+                    </div>
+                  </div>
+                  <div className="text-xs text-white/60">
+                    {mealCount} meal serving{mealCount === 1 ? '' : 's'} × {pax} pax × {formatPHP(rate)} = <span className="text-blue-400 font-semibold">{formatPHP(mealTotal)}</span>
+                  </div>
+                  <button type="button" onClick={() => {
+                    const breakdown = ([['breakfast', 'Breakfast'], ['amSnack', 'Snack AM'], ['lunch', 'Lunch'], ['pmSnack', 'Snack PM'], ['midnight', 'Midnight Snack']] as const)
+                      .filter(([key]) => Number(mealCalc[key]) > 0).map(([key, label]) => `${label} x${mealCalc[key]}`).join(', ');
+                    setNewItem(i => ({
+                      ...i,
+                      description: i.description || 'Meals / Catering',
+                      note: breakdown ? `${breakdown} · ${pax} pax · ${formatPHP(rate)}/meal` : i.note,
+                      internal_cost: String(mealTotal),
+                      client_cost: String(mealTotal),
+                    }));
+                  }} className="text-xs bg-[#E32726] text-white px-3 py-1.5 rounded-lg font-medium">
+                    Apply to Cost Fields Below
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         <details className="text-xs">
           <summary className="text-white/40 cursor-pointer select-none mb-2">✏️ Custom / one-off item</summary>

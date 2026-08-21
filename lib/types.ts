@@ -212,6 +212,11 @@ export interface Project {
   deliverables: string | null;
   payment_terms: string | null;
   notes: string | null;
+  /** Confirmed shoot date(s) — set on the project, synced into the linked studio booking. */
+  shoot_date: string | null;
+  shoot_end_date: string | null;
+  /** Studio booking created/kept in sync from this project's shoot date + equipment/studio cost lines, once status is Won and shoot_date is set. */
+  booking_id: number | null;
   created_at: string;
 }
 

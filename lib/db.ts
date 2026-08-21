@@ -173,6 +173,9 @@ function initSchema(db: Database.Database) {
       deliverables TEXT,
       payment_terms TEXT,
       notes TEXT,
+      shoot_date TEXT,
+      shoot_end_date TEXT,
+      booking_id INTEGER REFERENCES bookings(id) ON DELETE SET NULL,
       created_at TEXT DEFAULT (datetime('now'))
     );
 
@@ -461,6 +464,9 @@ function initSchema(db: Database.Database) {
     `ALTER TABLE project_costs ADD COLUMN days INTEGER NOT NULL DEFAULT 1`,
     `ALTER TABLE booking_equipment ADD COLUMN is_tbd INTEGER NOT NULL DEFAULT 0`,
     `ALTER TABLE bookings ADD COLUMN not_included TEXT`,
+    `ALTER TABLE projects ADD COLUMN shoot_date TEXT`,
+    `ALTER TABLE projects ADD COLUMN shoot_end_date TEXT`,
+    `ALTER TABLE projects ADD COLUMN booking_id INTEGER REFERENCES bookings(id) ON DELETE SET NULL`,
   ];
   for (const sql of migrations) {
     try { db.exec(sql); } catch { /* column already exists */ }
