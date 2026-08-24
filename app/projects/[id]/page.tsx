@@ -1,7 +1,7 @@
 'use client';
 import { use, useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { formatPHP, calcDiscountAmount, calcListPriceFromNet, sortDeliverables } from '@/lib/utils';
+import { formatPHP, formatDateShort, calcDiscountAmount, calcListPriceFromNet, sortDeliverables } from '@/lib/utils';
 import { Project, ProjectCost, ProjectPayment, PROJECT_CATEGORIES, PROJECT_CATEGORY_LABELS, PROJECT_STATUSES, ProjectCategory, Contact, RATE_UNIT_LABELS, Equipment, STUDIO_RATES, CATEGORY_LABELS, PROJECT_CATEGORY_EQUIPMENT_CATALOG_CATS, PROJECT_CATEGORY_SHOWS_STUDIO, PROJECT_CATEGORY_ROLE_SUGGESTIONS, ADDON_ITEMS, DELIVERABLE_DURATIONS, DELIVERABLE_RATIOS, DELIVERABLE_CONTENT_TYPES } from '@/lib/types';
 import BackButton from '@/components/BackButton';
 
@@ -92,12 +92,14 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState('');
   const [mealCalcOpen, setMealCalcOpen] = useState(false);
-  const MEAL_TYPES = [['breakfast', 'Breakfast'], ['amSnack', 'Snack AM'], ['lunch', 'Lunch'], ['pmSnack', 'Snack PM'], ['midnight', 'Midnight Snack']] as const;
-  const emptyMealRow = { count: '0', pax: '' };
-  const [mealCalc, setMealCalc] = useState<Record<string, { count: string; pax: string }>>({
-    breakfast: { ...emptyMealRow }, amSnack: { ...emptyMealRow }, lunch: { ...emptyMealRow }, pmSnack: { ...emptyMealRow }, midnight: { ...emptyMealRow },
-  });
-  const [mealRate, setMealRate] = useState('150');
+  const MEAL_TYPES = [
+    ['breakfast', 'Breakfast', '150'], ['amSnack', 'Snack AM', '100'], ['lunch', 'Lunch', '200'],
+    ['pmSnack', 'Snack PM', '100'], ['dinner', 'Dinner', '200'], ['midnight', 'Midnight Snack', '120'],
+  ] as const;
+  const emptyMealCalc = Object.fromEntries(MEAL_TYPES.map(([key, , defaultRate]) => [key, { count: '0', pax: '', rate: defaultRate }])) as
+    Record<typeof MEAL_TYPES[number][0], { count: string; pax: string; rate: string }>;
+  const [mealCalc, setMealCalc] = useState(emptyMealCalc);
+  const [mealDate, setMealDate] = useState('');
 
   const load = useCallback(() => {
     fetch(`/api/projects/${id}`).then(r => r.json()).then(d => {
@@ -854,12 +856,29 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         )}
 
         {newItem.category === 'food_transpo' && (() => {
-          const rate = Number(mealRate) || 0;
+          // Every date between the project's shoot date and end date — lets a multi-day shoot
+          // add one meal-cost line per date instead of one lump sum for the whole project.
+          const shootDates: string[] = [];
+          if (project.shoot_date) {
+            // Pure UTC date math — parsing "YYYY-MM-DD" with `new Date()` uses local time, and
+            // toISOString() converts back to UTC, which silently shifts the whole range back a
+            // day in any timezone behind UTC. Staying in UTC end-to-end avoids that entirely.
+            const [sy, sm, sd] = project.shoot_date.split('-').map(Number);
+            const endStr = project.shoot_end_date || project.shoot_date;
+            const [ey, em, ed] = endStr.split('-').map(Number);
+            const startUTC = Date.UTC(sy, sm - 1, sd);
+            const endUTC = Date.UTC(ey, em - 1, ed);
+            for (let t = startUTC; t <= endUTC; t += 86400000) {
+              const dt = new Date(t);
+              shootDates.push(`${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, '0')}-${String(dt.getUTCDate()).padStart(2, '0')}`);
+            }
+          }
           const rowTotals = MEAL_TYPES.map(([key]) => {
             const row = mealCalc[key];
             const count = Number(row.count) || 0;
             const pax = Number(row.pax) || 0;
-            return { key, count, pax, total: count * pax * rate };
+            const rate = Number(row.rate) || 0;
+            return { key, count, pax, rate, total: count * pax * rate };
           });
           const totalMeals = rowTotals.reduce((s, r) => s + r.count * r.pax, 0);
           const mealTotal = rowTotals.reduce((s, r) => s + r.total, 0);
@@ -870,44 +889,56 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
               </button>
               {mealCalcOpen && (
                 <div className="mt-2 space-y-2">
-                  <div className="text-[10px] text-white/30">Servings and pax per meal type — pax can differ per meal (e.g. fewer people for breakfast than dinner)</div>
+                  {shootDates.length > 1 ? (
+                    <div>
+                      <label className="text-[10px] text-white/40 block mb-1">Shoot Date (multi-day — pick which day this is for)</label>
+                      <select value={mealDate} onChange={e => setMealDate(e.target.value)} className={ic}>
+                        <option value="">No specific date</option>
+                        {shootDates.map(d => <option key={d} value={d}>{formatDateShort(d)}</option>)}
+                      </select>
+                    </div>
+                  ) : project.shoot_date ? (
+                    <div className="text-[10px] text-white/30">For {formatDateShort(project.shoot_date)}</div>
+                  ) : null}
+                  <div className="text-[10px] text-white/30">Servings, pax, and rate per meal type — each can differ (fewer people at breakfast, dinner priced higher, etc.)</div>
                   <div className="space-y-1.5">
                     {MEAL_TYPES.map(([key, label]) => {
                       const row = mealCalc[key];
                       const rowTotal = rowTotals.find(r => r.key === key)!.total;
                       return (
-                        <div key={key} className="grid grid-cols-[1fr_auto_auto_auto] items-end gap-2">
+                        <div key={key} className="grid grid-cols-[1fr_auto_auto_auto_auto] items-end gap-2">
                           <div>
                             <label className="text-[10px] text-white/40 block mb-1">{label}</label>
                           </div>
                           <div>
                             <label className="text-[10px] text-white/30 block mb-1">Servings</label>
-                            <input value={row.count} onChange={e => setMealCalc(m => ({ ...m, [key]: { ...m[key], count: e.target.value } }))} type="number" min="0" className={ic + ' w-16'} />
+                            <input value={row.count} onChange={e => setMealCalc(m => ({ ...m, [key]: { ...m[key], count: e.target.value } }))} type="number" min="0" className={ic + ' w-14'} />
                           </div>
                           <div>
                             <label className="text-[10px] text-white/30 block mb-1">Pax</label>
-                            <input value={row.pax} onChange={e => setMealCalc(m => ({ ...m, [key]: { ...m[key], pax: e.target.value } }))} type="number" min="0" placeholder="0" className={ic + ' w-16'} />
+                            <input value={row.pax} onChange={e => setMealCalc(m => ({ ...m, [key]: { ...m[key], pax: e.target.value } }))} type="number" min="0" placeholder="0" className={ic + ' w-14'} />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-white/30 block mb-1">₱/meal</label>
+                            <input value={row.rate} onChange={e => setMealCalc(m => ({ ...m, [key]: { ...m[key], rate: e.target.value } }))} type="number" min="0" className={ic + ' w-16'} />
                           </div>
                           <div className="text-xs text-white/40 pb-1.5 w-20 text-right">{rowTotal > 0 ? formatPHP(rowTotal) : ''}</div>
                         </div>
                       );
                     })}
                   </div>
-                  <div>
-                    <label className="text-[10px] text-white/40 block mb-1">Rate per meal (₱)</label>
-                    <input value={mealRate} onChange={e => setMealRate(e.target.value)} type="number" min="0" className={ic + ' w-24'} />
-                  </div>
                   <div className="text-xs text-white/60">
-                    {totalMeals} total meal{totalMeals === 1 ? '' : 's'} × {formatPHP(rate)} = <span className="text-blue-400 font-semibold">{formatPHP(mealTotal)}</span>
+                    {totalMeals} total meal{totalMeals === 1 ? '' : 's'} = <span className="text-blue-400 font-semibold">{formatPHP(mealTotal)}</span>
                   </div>
                   <button type="button" onClick={() => {
                     const breakdown = MEAL_TYPES
                       .filter(([key]) => Number(mealCalc[key].count) > 0 && Number(mealCalc[key].pax) > 0)
-                      .map(([key, label]) => `${label} x${mealCalc[key].count} (${mealCalc[key].pax} pax)`).join(', ');
+                      .map(([key, label]) => `${label} x${mealCalc[key].count} (${mealCalc[key].pax} pax @ ${formatPHP(Number(mealCalc[key].rate) || 0)})`).join(', ');
+                    const dateLabel = mealDate ? formatDateShort(mealDate) : (shootDates.length <= 1 && project.shoot_date ? formatDateShort(project.shoot_date) : '');
                     setNewItem(i => ({
                       ...i,
-                      description: i.description || 'Meals / Catering',
-                      note: breakdown ? `${breakdown} · ${formatPHP(rate)}/meal` : i.note,
+                      description: `Meals / Catering${dateLabel ? ` — ${dateLabel}` : ''}`,
+                      note: breakdown || i.note,
                       internal_cost: String(mealTotal),
                       client_cost: String(mealTotal),
                     }));
