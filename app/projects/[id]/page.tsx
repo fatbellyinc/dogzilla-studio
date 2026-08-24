@@ -92,7 +92,12 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState('');
   const [mealCalcOpen, setMealCalcOpen] = useState(false);
-  const [mealCalc, setMealCalc] = useState({ breakfast: '0', amSnack: '0', lunch: '0', pmSnack: '0', midnight: '0', pax: '', rate: '150' });
+  const MEAL_TYPES = [['breakfast', 'Breakfast'], ['amSnack', 'Snack AM'], ['lunch', 'Lunch'], ['pmSnack', 'Snack PM'], ['midnight', 'Midnight Snack']] as const;
+  const emptyMealRow = { count: '0', pax: '' };
+  const [mealCalc, setMealCalc] = useState<Record<string, { count: string; pax: string }>>({
+    breakfast: { ...emptyMealRow }, amSnack: { ...emptyMealRow }, lunch: { ...emptyMealRow }, pmSnack: { ...emptyMealRow }, midnight: { ...emptyMealRow },
+  });
+  const [mealRate, setMealRate] = useState('150');
 
   const load = useCallback(() => {
     fetch(`/api/projects/${id}`).then(r => r.json()).then(d => {
@@ -849,11 +854,15 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         )}
 
         {newItem.category === 'food_transpo' && (() => {
-          const mealCount = ['breakfast', 'amSnack', 'lunch', 'pmSnack', 'midnight']
-            .reduce((s, k) => s + (Number(mealCalc[k as keyof typeof mealCalc]) || 0), 0);
-          const pax = Number(mealCalc.pax) || 0;
-          const rate = Number(mealCalc.rate) || 0;
-          const mealTotal = mealCount * pax * rate;
+          const rate = Number(mealRate) || 0;
+          const rowTotals = MEAL_TYPES.map(([key]) => {
+            const row = mealCalc[key];
+            const count = Number(row.count) || 0;
+            const pax = Number(row.pax) || 0;
+            return { key, count, pax, total: count * pax * rate };
+          });
+          const totalMeals = rowTotals.reduce((s, r) => s + r.count * r.pax, 0);
+          const mealTotal = rowTotals.reduce((s, r) => s + r.total, 0);
           return (
             <div className="mb-3 bg-[#0f0f0f] border border-[#2a2a2a] rounded-lg p-3">
               <button type="button" onClick={() => setMealCalcOpen(o => !o)} className="text-xs text-white/40 flex items-center gap-1">
@@ -861,35 +870,44 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
               </button>
               {mealCalcOpen && (
                 <div className="mt-2 space-y-2">
-                  <div className="text-[10px] text-white/30">Number of meal servings, by type — e.g. 2 if breakfast is served both shoot days</div>
-                  <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
-                    {([['breakfast', 'Breakfast'], ['amSnack', 'Snack AM'], ['lunch', 'Lunch'], ['pmSnack', 'Snack PM'], ['midnight', 'Midnight Snack']] as const).map(([key, label]) => (
-                      <div key={key}>
-                        <label className="text-[10px] text-white/40 block mb-1">{label}</label>
-                        <input value={mealCalc[key]} onChange={e => setMealCalc(m => ({ ...m, [key]: e.target.value }))} type="number" min="0" className={ic + ' w-full'} />
-                      </div>
-                    ))}
+                  <div className="text-[10px] text-white/30">Servings and pax per meal type — pax can differ per meal (e.g. fewer people for breakfast than dinner)</div>
+                  <div className="space-y-1.5">
+                    {MEAL_TYPES.map(([key, label]) => {
+                      const row = mealCalc[key];
+                      const rowTotal = rowTotals.find(r => r.key === key)!.total;
+                      return (
+                        <div key={key} className="grid grid-cols-[1fr_auto_auto_auto] items-end gap-2">
+                          <div>
+                            <label className="text-[10px] text-white/40 block mb-1">{label}</label>
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-white/30 block mb-1">Servings</label>
+                            <input value={row.count} onChange={e => setMealCalc(m => ({ ...m, [key]: { ...m[key], count: e.target.value } }))} type="number" min="0" className={ic + ' w-16'} />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-white/30 block mb-1">Pax</label>
+                            <input value={row.pax} onChange={e => setMealCalc(m => ({ ...m, [key]: { ...m[key], pax: e.target.value } }))} type="number" min="0" placeholder="0" className={ic + ' w-16'} />
+                          </div>
+                          <div className="text-xs text-white/40 pb-1.5 w-20 text-right">{rowTotal > 0 ? formatPHP(rowTotal) : ''}</div>
+                        </div>
+                      );
+                    })}
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="text-[10px] text-white/40 block mb-1">Pax (headcount)</label>
-                      <input value={mealCalc.pax} onChange={e => setMealCalc(m => ({ ...m, pax: e.target.value }))} type="number" min="0" placeholder="e.g. 25" className={ic + ' w-full'} />
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-white/40 block mb-1">Rate per meal (₱)</label>
-                      <input value={mealCalc.rate} onChange={e => setMealCalc(m => ({ ...m, rate: e.target.value }))} type="number" min="0" className={ic + ' w-full'} />
-                    </div>
+                  <div>
+                    <label className="text-[10px] text-white/40 block mb-1">Rate per meal (₱)</label>
+                    <input value={mealRate} onChange={e => setMealRate(e.target.value)} type="number" min="0" className={ic + ' w-24'} />
                   </div>
                   <div className="text-xs text-white/60">
-                    {mealCount} meal serving{mealCount === 1 ? '' : 's'} × {pax} pax × {formatPHP(rate)} = <span className="text-blue-400 font-semibold">{formatPHP(mealTotal)}</span>
+                    {totalMeals} total meal{totalMeals === 1 ? '' : 's'} × {formatPHP(rate)} = <span className="text-blue-400 font-semibold">{formatPHP(mealTotal)}</span>
                   </div>
                   <button type="button" onClick={() => {
-                    const breakdown = ([['breakfast', 'Breakfast'], ['amSnack', 'Snack AM'], ['lunch', 'Lunch'], ['pmSnack', 'Snack PM'], ['midnight', 'Midnight Snack']] as const)
-                      .filter(([key]) => Number(mealCalc[key]) > 0).map(([key, label]) => `${label} x${mealCalc[key]}`).join(', ');
+                    const breakdown = MEAL_TYPES
+                      .filter(([key]) => Number(mealCalc[key].count) > 0 && Number(mealCalc[key].pax) > 0)
+                      .map(([key, label]) => `${label} x${mealCalc[key].count} (${mealCalc[key].pax} pax)`).join(', ');
                     setNewItem(i => ({
                       ...i,
                       description: i.description || 'Meals / Catering',
-                      note: breakdown ? `${breakdown} · ${pax} pax · ${formatPHP(rate)}/meal` : i.note,
+                      note: breakdown ? `${breakdown} · ${formatPHP(rate)}/meal` : i.note,
                       internal_cost: String(mealTotal),
                       client_cost: String(mealTotal),
                     }));
