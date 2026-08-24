@@ -100,6 +100,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     Record<typeof MEAL_TYPES[number][0], { count: string; pax: string; rate: string }>;
   const [mealCalc, setMealCalc] = useState(emptyMealCalc);
   const [mealDate, setMealDate] = useState('');
+  const [customItemOpen, setCustomItemOpen] = useState(false);
 
   const load = useCallback(() => {
     fetch(`/api/projects/${id}`).then(r => r.json()).then(d => {
@@ -930,7 +931,10 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                   <div className="text-xs text-white/60">
                     {totalMeals} total meal{totalMeals === 1 ? '' : 's'} = <span className="text-blue-400 font-semibold">{formatPHP(mealTotal)}</span>
                   </div>
-                  <button type="button" onClick={() => {
+                  <button type="button" disabled={mealTotal <= 0} onClick={() => {
+                    // Only meal types the producer actually filled in (servings AND pax both
+                    // set) show up — a project only needing Lunch shouldn't require touching
+                    // the other four fields, and leaving them at 0 must not block applying.
                     const breakdown = MEAL_TYPES
                       .filter(([key]) => Number(mealCalc[key].count) > 0 && Number(mealCalc[key].pax) > 0)
                       .map(([key, label]) => `${label} x${mealCalc[key].count} (${mealCalc[key].pax} pax @ ${formatPHP(Number(mealCalc[key].rate) || 0)})`).join(', ');
@@ -942,16 +946,21 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                       internal_cost: String(mealTotal),
                       client_cost: String(mealTotal),
                     }));
-                  }} className="text-xs bg-[#E32726] text-white px-3 py-1.5 rounded-lg font-medium">
-                    Apply to Cost Fields Below
+                    // The computed values land in the "Custom / one-off item" fields just below —
+                    // force that section open so applying actually shows something happened,
+                    // instead of silently updating state behind a collapsed disclosure.
+                    setCustomItemOpen(true);
+                  }} className="text-xs bg-[#E32726] text-white px-3 py-1.5 rounded-lg font-medium disabled:opacity-40">
+                    Apply to Cost Fields Below ↓
                   </button>
+                  {mealTotal <= 0 && <div className="text-[10px] text-white/30">Enter servings and pax for at least one meal type above.</div>}
                 </div>
               )}
             </div>
           );
         })()}
 
-        <details className="text-xs">
+        <details className="text-xs" open={customItemOpen} onToggle={e => setCustomItemOpen(e.currentTarget.open)}>
           <summary className="text-white/40 cursor-pointer select-none mb-2">✏️ Custom / one-off item</summary>
           <input value={newItem.description} onChange={e => setNewItem(i => ({ ...i, description: e.target.value }))} placeholder="Description (e.g. Director — Treb Monteras)" className={ic + ' w-full mb-2'} />
           <input value={newItem.note} onChange={e => setNewItem(i => ({ ...i, note: e.target.value }))} placeholder="Note (optional — e.g. 2x AC, 2 Cam Op, Gaffer)" className={ic + ' w-full mb-2'} />
