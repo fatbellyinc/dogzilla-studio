@@ -20,7 +20,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   const {
     name, client_name, client_company, client_title, description, status,
     markup_pct_dp, markup_pct_no_dp, vat_exempt, no_markup, cost_exclusions, deliverables, payment_terms, notes,
-    shoot_date, shoot_end_date,
+    shoot_date, shoot_end_date, withholding_tax, withholding_rate,
   } = body;
 
   if (name !== undefined) db.prepare('UPDATE projects SET name = ? WHERE id = ?').run(name, id);
@@ -39,6 +39,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   if (notes !== undefined) db.prepare('UPDATE projects SET notes = ? WHERE id = ?').run(notes || null, id);
   if (shoot_date !== undefined) db.prepare('UPDATE projects SET shoot_date = ? WHERE id = ?').run(shoot_date || null, id);
   if (shoot_end_date !== undefined) db.prepare('UPDATE projects SET shoot_end_date = ? WHERE id = ?').run(shoot_end_date || null, id);
+  if (withholding_tax !== undefined) db.prepare('UPDATE projects SET withholding_tax = ? WHERE id = ?').run(withholding_tax ? 1 : 0, id);
+  if (withholding_rate !== undefined) db.prepare('UPDATE projects SET withholding_rate = ? WHERE id = ?').run(Number(withholding_rate) || 0, id);
 
   // A confirmed date on a Won project means the studio/equipment should actually be booked —
   // auto-sync whenever either of those two conditions could have just become true, and keep

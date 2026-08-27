@@ -66,6 +66,9 @@ export default function ProjectQuotePage({ params }: { params: Promise<{ id: str
   const clientTotal = costs.reduce((s, c) => s + c.client_cost, 0);
   // A single, definitive billing scenario — the standard (no down-payment) markup rate.
   const calc = calcScenario(clientTotal, noMarkup ? 0 : project.markup_pct_no_dp, vatExempt);
+  const withholding = !!project.withholding_tax;
+  const withholdingAmount = withholding ? calc.total * (project.withholding_rate / 100) : 0;
+  const netAfterWithholding = calc.total - withholdingAmount;
   // Regular (pre-discount) price per item, so the client can see exactly how much they're
   // saving — both per line and as a grand total — instead of only the already-discounted price.
   const regularTotal = costs.reduce((s, c) => s + calcListPriceFromNet(c.client_cost, c.discount_type, c.discount_value), 0);
@@ -269,6 +272,18 @@ export default function ProjectQuotePage({ params }: { params: Promise<{ id: str
               <td colSpan={4} style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 900, color: '#E32726' }}>{vatExempt ? 'GRAND TOTAL' : 'TOTAL WITH VAT'}</td>
               <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 900, color: '#E32726', fontSize: '15px' }}>{formatPHP(calc.total)}</td>
             </tr>
+            {withholding && (
+              <>
+                <tr style={{ borderBottom: '1px solid #eee' }}>
+                  <td colSpan={4} style={{ padding: '8px 12px', textAlign: 'right', color: '#7c3aed' }}>Less: Withholding Tax ({project.withholding_rate}%)</td>
+                  <td style={{ padding: '8px 12px', textAlign: 'right', color: '#7c3aed' }}>−{formatPHP(withholdingAmount)}</td>
+                </tr>
+                <tr>
+                  <td colSpan={4} style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 900 }}>Net Amount Due</td>
+                  <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 900, color: '#7c3aed', fontSize: '15px' }}>{formatPHP(netAfterWithholding)}</td>
+                </tr>
+              </>
+            )}
           </tbody>
         </table>
 

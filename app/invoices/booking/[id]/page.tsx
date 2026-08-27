@@ -182,6 +182,12 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
   const totalIncVAT = subtotalExVAT + vatAmount;
   const totalPaid = payments.reduce((s, p) => s + p.amount, 0);
   const balance = totalIncVAT - totalPaid;
+  // Withholding tax is the client's obligation to remit to BIR on our behalf — informational
+  // only here, it does not touch the stored booking total or the Payments/Balance tracking
+  // above (which must keep reflecting what Dogzilla actually collects).
+  const withholding = !!booking.withholding_tax;
+  const withholdingAmount = withholding ? totalIncVAT * (booking.withholding_rate / 100) : 0;
+  const netAfterWithholding = totalIncVAT - withholdingAmount;
 
   const invoiceNumber = invoice?.invoice_number || `DZI-${String(booking.id).padStart(4, '0')}`;
   const waLink = `https://wa.me/${STUDIO_WHATSAPP.replace(/\D/g, '')}`;
@@ -226,6 +232,8 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
       ['Subtotal (VAT-exclusive)', '', '', '', subtotalExVAT],
       vatExempt ? ['No VAT', '', '', '', 0] : ['VAT 12%', '', '', '', vatAmount],
       [vatExempt ? 'TOTAL (No VAT)' : 'TOTAL (VAT-inclusive)', '', '', '', totalIncVAT],
+      withholding ? [`Less: Withholding Tax (${booking.withholding_rate}%)`, '', '', '', -withholdingAmount] : null,
+      withholding ? ['Net Amount Due', '', '', '', netAfterWithholding] : null,
       ['', '', '', '', ''],
       totalPaid > 0 ? ['Total Paid', '', '', '', totalPaid] : null,
       totalPaid > 0 ? ['Balance Due', '', '', '', totalIncVAT - totalPaid] : null,
@@ -444,6 +452,18 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
               <td style={{ padding: '8px 10px', fontWeight: 700, fontSize: '15px' }}>{vatExempt ? 'TOTAL (No VAT)' : 'TOTAL (VAT-inclusive)'}</td>
               <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 900, fontSize: '15px', color: '#E32726' }}>{formatPHP(totalIncVAT)}</td>
             </tr>
+            {withholding && (
+              <>
+                <tr>
+                  <td style={{ padding: '4px 10px', color: '#7c3aed' }}>Less: Withholding Tax ({booking.withholding_rate}%)</td>
+                  <td style={{ padding: '4px 10px', textAlign: 'right', color: '#7c3aed' }}>−{formatPHP(withholdingAmount)}</td>
+                </tr>
+                <tr style={{ borderTop: '1px solid #e5e5e5' }}>
+                  <td style={{ padding: '6px 10px', fontWeight: 700 }}>Net Amount Due</td>
+                  <td style={{ padding: '6px 10px', textAlign: 'right', fontWeight: 900, color: '#7c3aed' }}>{formatPHP(netAfterWithholding)}</td>
+                </tr>
+              </>
+            )}
           </tbody>
         </table>
       </div>

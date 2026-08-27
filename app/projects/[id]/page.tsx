@@ -2,7 +2,7 @@
 import { use, useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { formatPHP, formatDateShort, calcDiscountAmount, calcListPriceFromNet, sortDeliverables } from '@/lib/utils';
-import { Project, ProjectCost, ProjectPayment, PROJECT_CATEGORIES, PROJECT_CATEGORY_LABELS, PROJECT_STATUSES, ProjectCategory, Contact, RATE_UNIT_LABELS, Equipment, STUDIO_RATES, CATEGORY_LABELS, PROJECT_CATEGORY_EQUIPMENT_CATALOG_CATS, PROJECT_CATEGORY_SHOWS_STUDIO, PROJECT_CATEGORY_ROLE_SUGGESTIONS, ADDON_ITEMS, DELIVERABLE_DURATIONS, DELIVERABLE_RATIOS, DELIVERABLE_CONTENT_TYPES } from '@/lib/types';
+import { Project, ProjectCost, ProjectPayment, PROJECT_CATEGORIES, PROJECT_CATEGORY_LABELS, PROJECT_STATUSES, ProjectCategory, Contact, RATE_UNIT_LABELS, Equipment, STUDIO_RATES, CATEGORY_LABELS, PROJECT_CATEGORY_EQUIPMENT_CATALOG_CATS, PROJECT_CATEGORY_SHOWS_STUDIO, PROJECT_CATEGORY_ROLE_SUGGESTIONS, ADDON_ITEMS, DELIVERABLE_DURATIONS, DELIVERABLE_RATIOS, DELIVERABLE_CONTENT_TYPES, WITHHOLDING_TAX_PRESETS } from '@/lib/types';
 import BackButton from '@/components/BackButton';
 
 const STATUS_LABELS: Record<string, string> = {
@@ -629,6 +629,23 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
               <input type="checkbox" checked={noMarkup} onChange={e => updateProject({ no_markup: e.target.checked ? 1 : 0 })} />
               No markup (bill at cost)
             </label>
+            <label className="flex items-center gap-1 cursor-pointer">
+              <input type="checkbox" checked={!!project.withholding_tax} onChange={e => updateProject({ withholding_tax: e.target.checked ? 1 : 0 })} />
+              Withholding tax
+            </label>
+            {!!project.withholding_tax && (
+              <div className="flex items-center gap-1 flex-wrap pl-4">
+                {WITHHOLDING_TAX_PRESETS.map(p => (
+                  <button key={p} onClick={() => updateProject({ withholding_rate: p })}
+                    className={`text-[10px] px-1.5 py-0.5 rounded border ${project.withholding_rate === p ? 'bg-purple-500/20 border-purple-500/40 text-purple-300' : 'border-[#2a2a2a] text-white/40 hover:border-white/30'}`}>
+                    {p}%
+                  </button>
+                ))}
+                <input type="number" min="0" step="0.5" value={project.withholding_rate}
+                  onChange={e => updateProject({ withholding_rate: Number(e.target.value) || 0 })}
+                  className="w-14 bg-[#0f0f0f] border border-[#2a2a2a] rounded px-1 py-0.5 text-[10px] text-white" title="Custom rate %" />
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -678,6 +695,18 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             <span className="text-sm font-semibold text-white">{vatExempt ? 'GRAND TOTAL' : 'TOTAL WITH VAT'}</span>
             <span className="text-lg font-black text-[#E32726]">{formatPHP(noDP.total)}</span>
           </div>
+          {!!project.withholding_tax && (
+            <>
+              <div className="flex items-center justify-between text-xs mt-2">
+                <span className="text-purple-400">Less: Withholding Tax ({project.withholding_rate}%)</span>
+                <span className="text-purple-400">−{formatPHP(noDP.total * (project.withholding_rate / 100))}</span>
+              </div>
+              <div className="flex items-center justify-between border-t border-[#2a2a2a] pt-2 mt-1">
+                <span className="text-sm font-semibold text-white">Net Amount Due</span>
+                <span className="text-lg font-black text-purple-400">{formatPHP(noDP.total - noDP.total * (project.withholding_rate / 100))}</span>
+              </div>
+            </>
+          )}
         </div>
       </div>
 

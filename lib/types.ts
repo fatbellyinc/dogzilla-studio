@@ -70,6 +70,9 @@ export interface Booking {
   notes: string | null;
   /** Freeform "not included" lines shown on the booking's Quotation/Invoice — customized per booking in the app. */
   not_included: string | null;
+  /** Expanded withholding tax (EWT) — when set, the client remits this % less and pays it to BIR on Dogzilla's behalf. Shown on Invoice/Quotation/BIR receipt. */
+  withholding_tax: number;
+  withholding_rate: number;
   created_at: string;
   equipment?: BookingEquipment[];
   /** Exact dates this booking occupies the studio (excludes equipment-only days/bookings). Set by GET /api/bookings. */
@@ -217,8 +220,15 @@ export interface Project {
   shoot_end_date: string | null;
   /** Studio booking created/kept in sync from this project's shoot date + equipment/studio cost lines, once status is Won and shoot_date is set. */
   booking_id: number | null;
+  /** Expanded withholding tax (EWT) — when set, the client remits this % less and pays it to BIR on Dogzilla's behalf. Shown on the Quotation/Invoice. */
+  withholding_tax: number;
+  withholding_rate: number;
   created_at: string;
 }
+
+// Standard Philippine expanded withholding tax (EWT) rates per BIR Form 2306/2307 — presets
+// only, the rate field itself still accepts any custom percentage.
+export const WITHHOLDING_TAX_PRESETS = [1, 2, 5, 10, 15] as const;
 
 // Quick-add checklist for the Deliverables section — duration x aspect-ratio combos plus
 // common content types, pulled from real Dogzilla quotations/ballpark costs. Longest duration

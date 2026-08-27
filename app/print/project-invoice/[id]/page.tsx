@@ -81,6 +81,9 @@ export default function ProjectInvoicePage({ params }: { params: Promise<{ id: s
   // An Invoice bills one definitive amount — the standard (no down-payment) markup rate is
   // used as the agreed billing basis, unlike the Quotation which shows both DP scenarios.
   const calc = calcScenario(clientTotal, noMarkup ? 0 : project.markup_pct_no_dp, vatExempt);
+  const withholding = !!project.withholding_tax;
+  const withholdingAmount = withholding ? calc.total * (project.withholding_rate / 100) : 0;
+  const netAfterWithholding = calc.total - withholdingAmount;
   const regularTotal = costs.reduce((s, c) => s + calcListPriceFromNet(c.client_cost, c.discount_type, c.discount_value), 0);
   const totalSavings = regularTotal - clientTotal;
   const totalPaid = payments.reduce((s, p) => s + p.amount, 0);
@@ -244,6 +247,18 @@ export default function ProjectInvoicePage({ params }: { params: Promise<{ id: s
               <td colSpan={4} style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 900, color: '#E32726' }}>TOTAL AMOUNT DUE</td>
               <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 900, color: '#E32726', fontSize: '15px' }}>{formatPHP(calc.total)}</td>
             </tr>
+            {withholding && (
+              <>
+                <tr style={{ borderBottom: '1px solid #eee' }}>
+                  <td colSpan={4} style={{ padding: '8px 12px', textAlign: 'right', color: '#7c3aed' }}>Less: Withholding Tax ({project.withholding_rate}%)</td>
+                  <td style={{ padding: '8px 12px', textAlign: 'right', color: '#7c3aed' }}>−{formatPHP(withholdingAmount)}</td>
+                </tr>
+                <tr>
+                  <td colSpan={4} style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 900 }}>Net Amount Due</td>
+                  <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 900, color: '#7c3aed', fontSize: '15px' }}>{formatPHP(netAfterWithholding)}</td>
+                </tr>
+              </>
+            )}
           </tbody>
         </table>
 

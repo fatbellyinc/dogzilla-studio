@@ -214,6 +214,11 @@ function DocView({ bookingId }: { bookingId: string }) {
   // the stored booking.deposit_amount, which is pre-VAT and excludes OT / per-item discounts
   const depositAmount = booking.no_deposit ? 0 : totalIncVAT * 0.5;
   const balanceDue = totalIncVAT - depositAmount;
+  // Withholding is the client's obligation to remit to BIR on our behalf at final settlement —
+  // shown informationally here, doesn't touch the deposit math above.
+  const withholding = !!booking.withholding_tax;
+  const withholdingAmount = withholding ? totalIncVAT * (booking.withholding_rate / 100) : 0;
+  const netAfterWithholding = totalIncVAT - withholdingAmount;
   // Regular price = full rate × qty (no per-item discounts, exclude the negative discount line)
   const regularPrice = lines.reduce((s, l) => s + (l.total >= 0 ? l.qty * l.unit : 0), 0);
   const totalSavings = regularPrice - subtotalExVAT;
@@ -257,6 +262,8 @@ function DocView({ bookingId }: { bookingId: string }) {
       ['Subtotal (VAT-exclusive)', '', '', '', subtotalExVAT],
       vatExempt ? ['No VAT', '', '', '', 0] : ['VAT 12%', '', '', '', vatAmount],
       [vatExempt ? 'TOTAL (No VAT)' : 'TOTAL (VAT-inclusive)', '', '', '', totalIncVAT],
+      withholding ? [`Less: Withholding Tax (${booking.withholding_rate}%)`, '', '', '', -withholdingAmount] : null,
+      withholding ? ['Net Amount Due', '', '', '', netAfterWithholding] : null,
       !booking.no_deposit ? ['50% Deposit Required', '', '', '', depositAmount] : null,
       !booking.no_deposit ? ['Balance Due on Shoot Day', '', '', '', balanceDue] : null,
     ].filter(Boolean) as (string | number)[][];
@@ -471,6 +478,18 @@ function DocView({ bookingId }: { bookingId: string }) {
               <td style={{ padding: '8px 10px', fontWeight: 700, fontSize: '15px' }}>{vatExempt ? 'TOTAL (No VAT)' : 'TOTAL (VAT-inclusive)'}</td>
               <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 900, fontSize: '15px', color: '#E32726' }}>{formatPHP(totalIncVAT)}</td>
             </tr>
+            {withholding && (
+              <>
+                <tr>
+                  <td style={{ padding: '4px 10px', color: '#7c3aed' }}>Less: Withholding Tax ({booking.withholding_rate}%)</td>
+                  <td style={{ padding: '4px 10px', textAlign: 'right', color: '#7c3aed' }}>−{formatPHP(withholdingAmount)}</td>
+                </tr>
+                <tr style={{ borderTop: '1px solid #e5e5e5' }}>
+                  <td style={{ padding: '6px 10px', fontWeight: 700 }}>Net Amount Due</td>
+                  <td style={{ padding: '6px 10px', textAlign: 'right', fontWeight: 900, color: '#7c3aed' }}>{formatPHP(netAfterWithholding)}</td>
+                </tr>
+              </>
+            )}
             {!booking.no_deposit && (
               <>
                 <tr style={{ borderTop: '1px solid #e5e5e5' }}>

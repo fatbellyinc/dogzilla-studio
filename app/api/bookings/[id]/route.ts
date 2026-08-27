@@ -29,7 +29,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   const db = getDb();
   const { id } = await params;
   const body = await req.json();
-  const { status, notes, not_included, deposit_paid, fully_paid, discount_type, discount_value, is_pencil, vat_exempt, no_deposit, call_time, wrap_time, overtime_hours, overtime_amount, client_id, project_name, shoot_type, production_house, date_tbd } = body;
+  const { status, notes, not_included, deposit_paid, fully_paid, discount_type, discount_value, is_pencil, vat_exempt, no_deposit, call_time, wrap_time, overtime_hours, overtime_amount, client_id, project_name, shoot_type, production_house, date_tbd, withholding_tax, withholding_rate } = body;
 
   // Revert a booking back to "no confirmed date yet" — clears all committed days and resets
   // to the sentinel date, mirroring how a date-TBD booking is created in the first place.
@@ -80,6 +80,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     }
   }
   if (vat_exempt !== undefined) db.prepare("UPDATE bookings SET vat_exempt = ? WHERE id = ?").run(vat_exempt ? 1 : 0, id);
+  if (withholding_tax !== undefined) db.prepare('UPDATE bookings SET withholding_tax = ? WHERE id = ?').run(withholding_tax ? 1 : 0, id);
+  if (withholding_rate !== undefined) db.prepare('UPDATE bookings SET withholding_rate = ? WHERE id = ?').run(Number(withholding_rate) || 0, id);
   if (no_deposit !== undefined) db.prepare("UPDATE bookings SET no_deposit = ? WHERE id = ?").run(no_deposit ? 1 : 0, id);
   if (is_pencil !== undefined) { db.prepare('UPDATE bookings SET is_pencil = ? WHERE id = ?').run(is_pencil ? 1 : 0, id); logActivity(Number(id), ACTIONS.PENCIL_TOGGLED, is_pencil ? 'Marked as pencil booking' : 'Pencil removed — confirmed'); }
   if (call_time !== undefined) db.prepare('UPDATE bookings SET call_time = ? WHERE id = ?').run(call_time || null, id);

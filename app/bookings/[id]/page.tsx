@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { formatPHP, formatDate, fmt24, calcOT, OT_RATE, SETUP_OT_RATE, groupByDayDate, groupByCategory, categoryLabel } from '@/lib/utils';
-import { Booking, BookingEquipment, Payment, Quotation, Invoice, BookingDay, STUDIO_RATES, VAT_RATE, SHOOT_TYPES, NO_DATE_SENTINEL } from '@/lib/types';
+import { Booking, BookingEquipment, Payment, Quotation, Invoice, BookingDay, STUDIO_RATES, VAT_RATE, SHOOT_TYPES, NO_DATE_SENTINEL, WITHHOLDING_TAX_PRESETS } from '@/lib/types';
 
 function shortDayLabel(date: string) {
   if (date === NO_DATE_SENTINEL) return '📌 No date yet';
@@ -1449,6 +1449,37 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                 className={`w-full text-sm py-2 rounded-lg border transition-colors ${booking.vat_exempt ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' : 'bg-[#2a2a2a] text-white/60 border-[#2a2a2a] hover:text-blue-400 hover:border-blue-500/30'}`}>
                 🔵 {booking.vat_exempt ? 'No VAT (excluded from docs)' : 'Mark as No VAT'}
               </button>
+              {/* Withholding tax toggle — client remits this % less and pays it to BIR on our behalf */}
+              <div className="rounded-lg border border-[#2a2a2a] bg-[#2a2a2a]/20 p-2">
+                <button onClick={async () => {
+                  setSaving(true);
+                  await fetch(`/api/bookings/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ withholding_tax: !booking.withholding_tax }) });
+                  await load(); setSaving(false);
+                }} disabled={saving}
+                  className={`w-full text-sm py-1.5 rounded-lg border transition-colors ${booking.withholding_tax ? 'bg-purple-500/20 text-purple-400 border-purple-500/30' : 'bg-[#2a2a2a] text-white/60 border-[#2a2a2a] hover:text-purple-400 hover:border-purple-500/30'}`}>
+                  🧾 {booking.withholding_tax ? `Withholding Tax ${booking.withholding_rate}% (on docs)` : 'Apply Withholding Tax'}
+                </button>
+                {!!booking.withholding_tax && (
+                  <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
+                    {WITHHOLDING_TAX_PRESETS.map(p => (
+                      <button key={p} onClick={async () => {
+                        setSaving(true);
+                        await fetch(`/api/bookings/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ withholding_rate: p }) });
+                        await load(); setSaving(false);
+                      }} className={`text-xs px-2 py-1 rounded border ${booking.withholding_rate === p ? 'bg-purple-500/20 border-purple-500/40 text-purple-300' : 'border-[#2a2a2a] text-white/40 hover:border-white/30'}`}>
+                        {p}%
+                      </button>
+                    ))}
+                    <input type="number" min="0" step="0.5" value={booking.withholding_rate}
+                      onChange={async e => {
+                        const v = Number(e.target.value) || 0;
+                        await fetch(`/api/bookings/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ withholding_rate: v }) });
+                        await load();
+                      }}
+                      className="w-16 bg-[#0f0f0f] border border-[#2a2a2a] rounded px-1.5 py-1 text-xs text-white" title="Custom rate %" />
+                  </div>
+                )}
+              </div>
               {booking.status !== 'cancelled' ? (
                 <button onClick={() => {
                   if (confirm('Cancel this booking? This cannot be undone.')) updateStatus('cancelled');

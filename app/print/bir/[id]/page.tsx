@@ -14,10 +14,10 @@ interface BIRData {
 
 // BIR-compliant computations
 // IMPORTANT: lineTotal is VAT-EXCLUSIVE (net of VAT). BIR form adds VAT on top.
-function birCalc(lineTotalVATExcl: number, vatExempt: boolean, scPwd: boolean, withholding: boolean) {
+function birCalc(lineTotalVATExcl: number, vatExempt: boolean, scPwd: boolean, withholdingRate: number) {
   if (vatExempt) {
     // VAT-exempt: no VAT applied
-    const whTax = withholding ? lineTotalVATExcl * 0.02 : 0;
+    const whTax = withholdingRate > 0 ? lineTotalVATExcl * (withholdingRate / 100) : 0;
     const scPwdAmt = scPwd ? lineTotalVATExcl * 0.20 : 0;
     const amountDue = lineTotalVATExcl - scPwdAmt - whTax;
     return {
@@ -46,8 +46,8 @@ function birCalc(lineTotalVATExcl: number, vatExempt: boolean, scPwd: boolean, w
   const scPwdAmt = scPwd ? vatableSales * 0.20 : 0;
   const afterScPwd = vatableSales - scPwdAmt;
 
-  // Withholding tax: 2% EWT on the VAT-inclusive total
-  const whTax = withholding ? totalSalesVATInclusive * 0.02 : 0;
+  // Withholding tax: EWT on the VAT-inclusive total, at whatever rate applies
+  const whTax = withholdingRate > 0 ? totalSalesVATInclusive * (withholdingRate / 100) : 0;
 
   // Amount Due = net after SC/PWD discount, before adding back VAT
   const amountDue = afterScPwd - whTax;
@@ -97,6 +97,7 @@ export default function BIRInvoicePage({ params }: { params: Promise<{ id: strin
   const [scPwdIdNo, setScPwdIdNo] = useState('');
   const [cardholderSig, setCardholderSig] = useState('');
   const [withholding, setWithholding] = useState(false);
+  const [withholdingRate, setWithholdingRate] = useState(2);
   const [paymentMethod, setPaymentMethod] = useState('');
   const [checkNo, setCheckNo] = useState('');
   const [bank, setBank] = useState('');
@@ -109,6 +110,10 @@ export default function BIRInvoicePage({ params }: { params: Promise<{ id: strin
     fetch(`/api/bookings/${id}`).then(r => r.json()).then((d: BIRData) => {
       setData(d);
       setVatExempt(!!d.booking.vat_exempt);
+      // Default from whatever's saved on the booking — still editable per-document below,
+      // since a specific print sometimes needs a different treatment than what's on file.
+      setWithholding(!!d.booking.withholding_tax);
+      setWithholdingRate(d.booking.withholding_rate || 2);
       // Build initial line items from booking (all amounts are VAT-exclusive)
       const eq = d.equipment || [];
       const initial = [];
@@ -167,7 +172,7 @@ export default function BIRInvoicePage({ params }: { params: Promise<{ id: strin
     return s + qty * uc;
   }, 0);
 
-  const calc = birCalc(grossTotal, vatExempt, scPwd, withholding);
+  const calc = birCalc(grossTotal, vatExempt, scPwd, withholding ? withholdingRate : 0);
   // Acknowledgement Receipt has no VAT breakdown table, but the headline total still needs to
   // be VAT-inclusive to match the Invoice/Quotation/booking page — grossTotal here is net of VAT.
   const ackTotal = vatExempt ? grossTotal : grossTotal * (1 + VAT_RATE);
@@ -214,8 +219,14 @@ export default function BIRInvoicePage({ params }: { params: Promise<{ id: strin
           <input type="checkbox" checked={scPwd} onChange={e => setScPwd(e.target.checked)} />
         </div>
         <div className="flex items-center gap-2">
-          <label className="text-xs font-semibold">Withholding Tax (2%):</label>
+          <label className="text-xs font-semibold">Withholding Tax:</label>
           <input type="checkbox" checked={withholding} onChange={e => setWithholding(e.target.checked)} />
+          {withholding && (
+            <select value={withholdingRate} onChange={e => setWithholdingRate(Number(e.target.value))} className="text-xs border border-gray-300 rounded px-1 py-0.5">
+              {[1, 2, 5, 10, 15].map(r => <option key={r} value={r}>{r}%</option>)}
+              {![1, 2, 5, 10, 15].includes(withholdingRate) && <option value={withholdingRate}>{withholdingRate}% (custom)</option>}
+            </select>
+          )}
         </div>
         <button onClick={() => window.print()} style={{ background: '#E32726', color: 'white', padding: '6px 16px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontWeight: 700 }}>
           🖨️ Print
@@ -485,7 +496,7 @@ export default function BIRInvoicePage({ params }: { params: Promise<{ id: strin
                       { label: 'Less: VAT', value: grossTotal > 0 ? php(calc.lessVAT) : '' },
                       { label: 'Amount Net of VAT', value: grossTotal > 0 ? php(calc.amountNetOfVAT) : '' },
                       { label: 'Less: SC/PWD Discount', value: scPwd && grossTotal > 0 ? php(calc.scPwdAmt) : '' },
-                      { label: 'Less: Withholding Tax', value: withholding && grossTotal > 0 ? php(calc.whTax) : '' },
+                      { label: `Less: Withholding Tax${withholding ? ` (${withholdingRate}%)` : ''}`, value: withholding && grossTotal > 0 ? php(calc.whTax) : '' },
                       { label: 'Amount Due', value: grossTotal > 0 ? php(calc.amountDue) : '' },
                       { label: 'Add VAT', value: scPwd && grossTotal > 0 ? php(calc.addVAT) : '' },
                       { label: 'TOTAL AMOUNT DUE', value: grossTotal > 0 ? php(calc.totalAmountDue) : '', bold: true, highlight: true },
