@@ -46,7 +46,9 @@ export default function ReceiptPage({ params }: { params: Promise<{ id: string }
   const receiptNo = `${receiptPrefix}-${new Date(payment.paid_at).getFullYear()}-${String(payment.id).padStart(5, '0')}`;
 
   return (
-    <div className="doc-page" style={{ background: 'white', color: '#111', fontFamily: 'Arial, sans-serif', fontSize: '13px', padding: '32px', maxWidth: '400px', margin: '40px auto', border: '1px solid #ddd', borderRadius: '8px' }}>
+    <>
+    <div className="doc-shell" style={{ background: '#d1d5db', minHeight: '100vh', padding: '32px 16px', display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
+    <div className="doc-page" style={{ background: 'white', color: '#111', fontFamily: 'Arial, sans-serif', fontSize: '13px', width: '100%', maxWidth: '794px', padding: '48px', boxShadow: '0 4px 24px rgba(0,0,0,0.18)' }}>
 
       {/* Header */}
       <div style={{ textAlign: 'center', borderBottom: '3px solid #E32726', paddingBottom: '16px', marginBottom: '16px' }}>
@@ -138,11 +140,14 @@ export default function ReceiptPage({ params }: { params: Promise<{ id: string }
         </div>
       </div>
 
+    </div>{/* end doc-page */}
+    </div>{/* end doc-shell */}
+
       <BackButton fallbackHref={`/bookings/${payment.booking_id}`} />
       <ShareDocBar bookingId={payment.booking_id} docType="receipt" clientName={booking.client_name || ''} clientPhone={booking.client_phone} clientEmail={booking.client_email} docNumber={receiptNo} />
       <button onClick={() => window.print()} className="no-print fixed bottom-0 left-0 right-0 md:bottom-6 md:left-auto md:right-6 bg-[#E32726] text-white px-5 py-2.5 md:rounded-lg font-semibold shadow-xl text-sm text-center z-50">
         🖨️ Print Receipt
       </button>
-    </div>
+    </>
   );
 }
