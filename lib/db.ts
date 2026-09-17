@@ -582,6 +582,7 @@ function initSchema(db: Database.Database) {
     ['TRP-007', 'Baby Tripod', 'tripod', 600, 1, '', 0],
     ['CRR-001', 'Full Car Turntable', 'car_rigging', 80000, 1, 'Package', 0],
     ['CRR-002', 'Motorcycle Turntable', 'car_rigging', 60000, 1, 'Package', 0],
+    ['GRP-031', 'Mini Maxistand', 'grip', 1500, 1, '', 0],
   ];
   for (const [code, name, category, daily_rate, quantity, description, wattage] of equipmentUpserts) {
     try {
@@ -854,6 +855,7 @@ function seedEquipment(db: Database.Database) {
     ['GRP-028', '12x12 Chroma Key Green/Blue with Bag', 'grip', 5000, 1, '', 0],
     ['GRP-029', 'Chroma Flexible', 'grip', 1500, 1, '', 0],
     ['GRP-030', '20x20 Green/Blue Screen — Back to Back', 'grip', 6000, 1, '', 0],
+    ['GRP-031', 'Mini Maxistand', 'grip', 1500, 1, '', 0],
 
     // TRIPODS — passive
     ['TRP-001', 'Smallrig Tripod', 'tripod', 1000, 2, '', 0],

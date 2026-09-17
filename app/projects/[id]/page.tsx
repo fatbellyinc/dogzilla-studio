@@ -43,7 +43,7 @@ const emptyItem = (category: ProjectCategory): EmptyItem => ({
 const CLIENT_MODES = ['sync', 'markup', 'custom'] as const;
 type ClientMode = typeof CLIENT_MODES[number];
 const DISCOUNT_TYPES: DiscountType[] = [null, 'percent', 'fixed'];
-const DISCOUNT_PRESETS = [5, 10, 15, 20, 25, 30, 50];
+const DISCOUNT_PRESETS = [5, 10, 15, 20, 25, 30, 40, 50];
 interface StagedItem extends EmptyItem {
   key: string;
   unit_internal: number; // per-unit rate — qty × this = internal cost, recomputed automatically
@@ -89,6 +89,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const [paymentForm, setPaymentForm] = useState({ amount: '', type: 'deposit', method: '', reference: '' });
   const [exclusionsText, setExclusionsText] = useState('');
   const [deliverablesText, setDeliverablesText] = useState('');
+  const [duplicating, setDuplicating] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState('');
   const [mealCalcOpen, setMealCalcOpen] = useState(false);
@@ -505,6 +506,14 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     window.location.href = '/projects';
   }
 
+  async function duplicateProject() {
+    if (!project) return;
+    setDuplicating(true);
+    const res = await fetch(`/api/projects/${id}/duplicate`, { method: 'POST' });
+    const copy = await res.json();
+    window.location.href = `/projects/${copy.id}`;
+  }
+
   function startEditHeader() {
     if (!project) return;
     setHeaderForm({
@@ -561,6 +570,10 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
               </select>
               <Link href={`/print/project-quote/${id}`} target="_blank" className="bg-[#E32726] text-white text-xs px-3 py-1.5 rounded-lg font-medium hover:bg-[#c41f1e] transition-colors">📄 Cost Estimate / Quotation</Link>
               <Link href={`/print/project-invoice/${id}`} target="_blank" className="bg-[#1a1a1a] border border-[#2a2a2a] text-white text-xs px-3 py-1.5 rounded-lg font-medium hover:border-white/30 transition-colors">🧾 Invoice</Link>
+              <button onClick={duplicateProject} disabled={duplicating} title="Duplicate this project's budget/settings into a new draft — handy for near-identical repeat jobs"
+                className="bg-[#1a1a1a] border border-[#2a2a2a] text-white text-xs px-3 py-1.5 rounded-lg font-medium hover:border-white/30 transition-colors disabled:opacity-50">
+                {duplicating ? 'Duplicating…' : '⧉ Duplicate'}
+              </button>
               <button onClick={deleteProject} className="text-white/20 hover:text-red-400 text-xs border border-white/10 hover:border-red-400/40 px-2 py-1.5 rounded">✕ Delete</button>
             </div>
           </div>
