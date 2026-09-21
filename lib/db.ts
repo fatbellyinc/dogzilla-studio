@@ -959,6 +959,34 @@ function seedHistoricalData(db: Database.Database) {
   // Rent fixed cost
   const hasRent = (db.prepare("SELECT COUNT(*) as c FROM fixed_costs WHERE name='Studio Space Rent'").get() as {c:number}).c;
   if (!hasRent) {
-    db.prepare("INSERT INTO fixed_costs (name,amount,category,frequency,active) VALUES ('Studio Space Rent',90000,'rent','monthly',1)").run();
+    db.prepare("INSERT INTO fixed_costs (name,amount,category,frequency,active) VALUES ('Studio Space Rent',100000,'rent','monthly',1)").run();
   }
+
+  // One-time correction: the seeded Studio Space Rent (90000) only reflected the net check
+  // amount actually issued — the lease's real monthly cost is 100000, the other 10000 being
+  // withholding tax remitted to BIR on the lessor's behalf rather than an amount Dogzilla
+  // keeps. Guarded by a settings flag so it only nudges the one still sitting at the old
+  // seeded value, and never overwrites a rate the user has since edited themselves.
+  try {
+    const rentFixApplied = db.prepare("SELECT value FROM settings WHERE key = 'rent_100k_fix_v1'").get();
+    if (!rentFixApplied) {
+      db.prepare("UPDATE fixed_costs SET amount = 100000 WHERE name = 'Studio Space Rent' AND amount = 90000").run();
+      db.prepare("INSERT INTO settings (key, value) VALUES ('rent_100k_fix_v1', '1')").run();
+    }
+  } catch { /* ignore */ }
+
+  // One-time: record the full lease renewal escalation schedule on the rent line for future
+  // reference — scheduled reminders bump the amount itself on each effective date, this note
+  // is just the paper trail so the numbers are traceable back to the signed renewal contract.
+  try {
+    const renewalNoteApplied = db.prepare("SELECT value FROM settings WHERE key = 'rent_renewal_schedule_note_v1'").get();
+    if (!renewalNoteApplied) {
+      db.prepare(`UPDATE fixed_costs SET notes = ? WHERE name = 'Studio Space Rent'`).run(
+        'Renewal Contract of Lease (Victoria K. Choa / Dogzilla Film Production), signed 2026. ' +
+        'Escalation schedule (gross/month): Oct 2023-Sep 2026 = 100,000 | Oct 2026-Sep 2028 = 107,000 | ' +
+        'Oct 2028-Sep 2030 = 115,000 | Oct 2030-Sep 2031 = 123,000. 5% withholding tax applies each period.'
+      );
+      db.prepare("INSERT INTO settings (key, value) VALUES ('rent_renewal_schedule_note_v1', '1')").run();
+    }
+  } catch { /* ignore */ }
 }
