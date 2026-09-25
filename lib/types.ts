@@ -141,8 +141,8 @@ export interface BookingCost {
 }
 
 export const PROJECT_CATEGORIES = [
-  'pre_production', 'production_personnel', 'raw_stock', 'equipment', 'set_props_location',
-  'talents', 'celebrity_entourage', 'food_transpo', 'sanitation', 'post_production', 'others',
+  'pre_production', 'production_personnel', 'raw_stock', 'storage_transmission', 'equipment', 'set_props_location',
+  'talents', 'celebrity_entourage', 'food_transpo', 'sanitation', 'post_production', 'soundtrack', 'others',
 ] as const;
 export type ProjectCategory = typeof PROJECT_CATEGORIES[number];
 
@@ -150,6 +150,7 @@ export const PROJECT_CATEGORY_LABELS: Record<ProjectCategory, string> = {
   pre_production: 'Pre-Production',
   production_personnel: 'Production Personnel',
   raw_stock: 'Raw Stock & Laboratory Charges',
+  storage_transmission: 'Storage & Transmission',
   equipment: 'Equipment Rental',
   set_props_location: 'Set, Props, Wardrobe & Location',
   talents: 'Talents',
@@ -157,6 +158,7 @@ export const PROJECT_CATEGORY_LABELS: Record<ProjectCategory, string> = {
   food_transpo: 'Food & Transportation',
   sanitation: 'Sanitation & Pre-Testing',
   post_production: 'Post Production',
+  soundtrack: 'Soundtrack',
   others: 'Others',
 };
 
@@ -188,13 +190,15 @@ export const PROJECT_CATEGORY_ROLE_SUGGESTIONS: Partial<Record<ProjectCategory, 
     'Runner', 'Utility', 'Set Medic', 'Security',
   ],
   raw_stock: ['Hard Drive (Shoot & Master Copy)', 'Memory Cards'],
+  storage_transmission: ['Hard Drive Copies (Agency/Client)', 'Data Wrangling', 'Cloud Transfer / Upload'],
   equipment: ['Camera & Lighting Rental Package', 'Livestream, VTR & PA System'],
   set_props_location: ['Production Design Package', 'Props', 'Wardrobe', 'Location Permit'],
   talents: ['Lead Talent', 'Supporting Talent', 'Extras', 'VO Talent'],
   celebrity_entourage: ['Celebrity Talent Fee', 'Manager / Handler', 'Personal Assistant', 'Security'],
   food_transpo: ['Food', 'Transportation', 'Groceries & Supplies'],
   sanitation: ['Sanitation Kit', 'COVID / Health Testing'],
-  post_production: ['Full Post Production', 'Network Music', 'Stock Photos / AI Generation', 'VO Talent'],
+  post_production: ['Full Post Production', 'Stock Photos / AI Generation', 'VO Talent'],
+  soundtrack: ['Original Music Score', 'Voice Over Talent', 'Sound Design', 'Studio Recording / Mixing / Mastering'],
   others: [],
 };
 
@@ -223,6 +227,18 @@ export interface Project {
   /** Expanded withholding tax (EWT) — when set, the client remits this % less and pays it to BIR on Dogzilla's behalf. Shown on the Quotation/Invoice. */
   withholding_tax: number;
   withholding_rate: number;
+  /** Agency handling the project on the client's behalf, distinct from the client/brand itself — shown in the Quotation's Project Details block. */
+  agency: string | null;
+  /** One-line shoot summary, e.g. "1-Day Studio Chroma Shoot" — shown alongside Deliverables. */
+  shoot_summary: string | null;
+  /** Concept/board names for a multi-board campaign, e.g. "Oh no (Life) | What if (Health)". */
+  boards: string | null;
+  /** Intended platforms/placements, e.g. "YouTube, Websites (16:9) | TikTok, Reels, Stories (9:16)". */
+  platforms: string | null;
+  /** Talent usage terms, e.g. "No lockout, OLV Digital only" or "12-month Digital Video and Print". */
+  talent_usage: string | null;
+  /** What the agency/client must supply (storyboards, artworks, logos, products) — shown on the Quotation, mirroring Cost Exclusions. */
+  client_provides: string | null;
   created_at: string;
 }
 

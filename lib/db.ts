@@ -180,6 +180,12 @@ function initSchema(db: Database.Database) {
       booking_id INTEGER REFERENCES bookings(id) ON DELETE SET NULL,
       withholding_tax INTEGER NOT NULL DEFAULT 0,
       withholding_rate REAL NOT NULL DEFAULT 2,
+      agency TEXT,
+      shoot_summary TEXT,
+      boards TEXT,
+      platforms TEXT,
+      talent_usage TEXT,
+      client_provides TEXT,
       created_at TEXT DEFAULT (datetime('now'))
     );
 
@@ -475,6 +481,12 @@ function initSchema(db: Database.Database) {
     `ALTER TABLE bookings ADD COLUMN withholding_rate REAL NOT NULL DEFAULT 2`,
     `ALTER TABLE projects ADD COLUMN withholding_tax INTEGER NOT NULL DEFAULT 0`,
     `ALTER TABLE projects ADD COLUMN withholding_rate REAL NOT NULL DEFAULT 2`,
+    `ALTER TABLE projects ADD COLUMN agency TEXT`,
+    `ALTER TABLE projects ADD COLUMN shoot_summary TEXT`,
+    `ALTER TABLE projects ADD COLUMN boards TEXT`,
+    `ALTER TABLE projects ADD COLUMN platforms TEXT`,
+    `ALTER TABLE projects ADD COLUMN talent_usage TEXT`,
+    `ALTER TABLE projects ADD COLUMN client_provides TEXT`,
   ];
   for (const sql of migrations) {
     try { db.exec(sql); } catch { /* column already exists */ }

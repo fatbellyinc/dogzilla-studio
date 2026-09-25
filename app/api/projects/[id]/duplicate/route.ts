@@ -19,12 +19,14 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
     INSERT INTO projects (
       quote_number, name, client_name, client_company, client_title, description, status,
       markup_pct_dp, markup_pct_no_dp, vat_exempt, no_markup, cost_exclusions, deliverables,
-      payment_terms, notes, withholding_tax, withholding_rate
-    ) VALUES (?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      payment_terms, notes, withholding_tax, withholding_rate,
+      agency, shoot_summary, boards, platforms, talent_usage, client_provides
+    ) VALUES (?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     quote_number, `${project.name} (Copy)`, project.client_name, project.client_company, project.client_title, project.description,
     project.markup_pct_dp, project.markup_pct_no_dp, project.vat_exempt, project.no_markup, project.cost_exclusions, project.deliverables,
     project.payment_terms, project.notes, project.withholding_tax, project.withholding_rate,
+    project.agency, project.shoot_summary, project.boards, project.platforms, project.talent_usage, project.client_provides,
   );
   const newProjectId = result.lastInsertRowid;
 

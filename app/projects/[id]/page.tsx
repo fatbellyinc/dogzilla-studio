@@ -84,7 +84,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editForm, setEditForm] = useState<EmptyItem>(emptyItem('pre_production'));
   const [editingHeader, setEditingHeader] = useState(false);
-  const [headerForm, setHeaderForm] = useState({ name: '', client_name: '', client_company: '', client_title: '', description: '' });
+  const [headerForm, setHeaderForm] = useState({ name: '', client_name: '', client_company: '', client_title: '', agency: '', description: '' });
+  const [clientProvidesText, setClientProvidesText] = useState('');
+  const CLIENT_PROVIDES_SUGGESTIONS = ['Storyboards', 'Artworks / Key Visuals', 'Logos', 'Products', 'Brand Guidelines', 'Approved Script / Copy'];
   const [saving, setSaving] = useState(false);
   const [paymentForm, setPaymentForm] = useState({ amount: '', type: 'deposit', method: '', reference: '' });
   const [exclusionsText, setExclusionsText] = useState('');
@@ -110,8 +112,23 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       setPayments(d.payments || []);
       setExclusionsText(d.project.cost_exclusions || '');
       setDeliverablesText(d.project.deliverables || '');
+      setClientProvidesText(d.project.client_provides || '');
     });
   }, [id]);
+
+  function toggleClientProvidesLine(line: string) {
+    setClientProvidesText(prev => {
+      const lines = prev.split('\n').map(l => l.trim()).filter(Boolean);
+      const next = lines.includes(line) ? lines.filter(l => l !== line) : [...lines, line];
+      const joined = next.join('\n');
+      fetch(`/api/projects/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ client_provides: joined }) });
+      return joined;
+    });
+  }
+
+  async function saveClientProvidesText() {
+    await fetch(`/api/projects/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ client_provides: clientProvidesText }) });
+  }
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => { fetch('/api/contacts').then(r => r.json()).then(setContacts); }, []);
@@ -518,7 +535,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     if (!project) return;
     setHeaderForm({
       name: project.name, client_name: project.client_name || '', client_company: project.client_company || '',
-      client_title: project.client_title || '', description: project.description || '',
+      client_title: project.client_title || '', agency: project.agency || '', description: project.description || '',
     });
     setEditingHeader(true);
   }
@@ -543,7 +560,10 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
               <input value={headerForm.client_name} onChange={e => setHeaderForm(f => ({ ...f, client_name: e.target.value }))} className={ic} placeholder="Client name" />
               <input value={headerForm.client_company} onChange={e => setHeaderForm(f => ({ ...f, client_company: e.target.value }))} className={ic} placeholder="Client company" />
             </div>
-            <input value={headerForm.client_title} onChange={e => setHeaderForm(f => ({ ...f, client_title: e.target.value }))} className={ic + ' w-full'} placeholder="Client title" />
+            <div className="grid grid-cols-2 gap-2">
+              <input value={headerForm.client_title} onChange={e => setHeaderForm(f => ({ ...f, client_title: e.target.value }))} className={ic} placeholder="Client title" />
+              <input value={headerForm.agency} onChange={e => setHeaderForm(f => ({ ...f, agency: e.target.value }))} className={ic} placeholder="Agency (optional)" />
+            </div>
             <textarea value={headerForm.description} onChange={e => setHeaderForm(f => ({ ...f, description: e.target.value }))} rows={3} className={ic + ' w-full'} placeholder="Description / creative brief" />
             <div className="flex gap-2 justify-end">
               <button onClick={() => setEditingHeader(false)} className="text-xs text-white/50 border border-[#2a2a2a] px-3 py-1.5 rounded">Cancel</button>
@@ -559,6 +579,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
               </div>
               <div className="text-xs text-white/40 mt-1">
                 {project.client_name || 'No client set'}{project.client_company ? ` — ${project.client_company}` : ''}
+                {project.agency ? ` · Agency: ${project.agency}` : ''}
                 {project.quote_number ? ` · ${project.quote_number}` : ''}
               </div>
               {project.description && <p className="text-xs text-white/50 mt-2 max-w-lg whitespace-pre-wrap">{project.description}</p>}
@@ -1240,6 +1261,35 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         </div>
       </div>
 
+      {/* Project Scope — free-text fields matching the fuller agency-brief style quotations
+          (Shoot summary, Boards/concepts, Platforms, Talent usage terms), shown as a Project
+          Details block on the Quotation right under the title/deliverables. */}
+      <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4 mt-4">
+        <h2 className="text-xs text-white/40 uppercase tracking-wider mb-3">Project Scope (shown on Quotation)</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-2">
+          <label className="text-xs text-white/50">
+            <div className="mb-1">Shoot Summary</div>
+            <input defaultValue={project.shoot_summary || ''} onBlur={e => updateProject({ shoot_summary: e.target.value })}
+              placeholder="e.g. 1-Day Studio Chroma Shoot" className={ic + ' w-full'} />
+          </label>
+          <label className="text-xs text-white/50">
+            <div className="mb-1">Platforms</div>
+            <input defaultValue={project.platforms || ''} onBlur={e => updateProject({ platforms: e.target.value })}
+              placeholder="e.g. YouTube, Websites (16:9) | TikTok, Reels (9:16)" className={ic + ' w-full'} />
+          </label>
+        </div>
+        <label className="text-xs text-white/50 block mb-2">
+          <div className="mb-1">Boards / Concepts (one per line)</div>
+          <textarea defaultValue={project.boards || ''} onBlur={e => updateProject({ boards: e.target.value })} rows={2}
+            placeholder={'e.g. "Oh no" (Life)\n"What if" (Health)'} className={ic + ' w-full'} />
+        </label>
+        <label className="text-xs text-white/50 block">
+          <div className="mb-1">Talent Usage</div>
+          <input defaultValue={project.talent_usage || ''} onBlur={e => updateProject({ talent_usage: e.target.value })}
+            placeholder="e.g. No lockout, OLV Digital only / 12-month Digital Video and Print" className={ic + ' w-full'} />
+        </label>
+      </div>
+
       {/* Deliverables — picked here in the app; shown as its own section on the Quotation and
           Invoice, right under the project title. */}
       <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4 mt-4">
@@ -1326,6 +1376,34 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         })()}
         <textarea value={exclusionsText} onChange={e => setExclusionsText(e.target.value)} onBlur={saveExclusionsText} rows={3}
           placeholder="Nothing excluded yet — click a suggestion above, or type your own line here"
+          className={ic + ' w-full'} />
+      </div>
+
+      {/* Client/Agency to Provide — what the agency/client must supply, shown on the Quotation
+          mirroring the Cost Exclusions pattern. */}
+      <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4 mt-4">
+        <h2 className="text-xs text-white/40 uppercase tracking-wider mb-3">Client / Agency to Provide (shown on Quotation)</h2>
+        {(() => {
+          const activeLines = clientProvidesText.split('\n').map(l => l.trim()).filter(Boolean);
+          return (
+            <div className="mb-3">
+              <div className="text-[10px] text-white/30 mb-1">Common items — click to add/remove</div>
+              <div className="flex flex-wrap gap-1.5">
+                {CLIENT_PROVIDES_SUGGESTIONS.map(line => {
+                  const active = activeLines.includes(line);
+                  return (
+                    <button key={line} onClick={() => toggleClientProvidesLine(line)}
+                      className={`text-xs px-2.5 py-1.5 rounded-lg border transition-all ${active ? 'bg-[#E32726] border-[#E32726] text-white' : 'bg-[#0f0f0f] border-[#2a2a2a] text-white/70 hover:border-white/30'}`}>
+                      {line}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
+        <textarea value={clientProvidesText} onChange={e => setClientProvidesText(e.target.value)} onBlur={saveClientProvidesText} rows={3}
+          placeholder="Nothing set yet — click a suggestion above, or type your own line here"
           className={ic + ' w-full'} />
       </div>
     </div>

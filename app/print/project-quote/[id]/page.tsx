@@ -34,6 +34,7 @@ export default function ProjectQuotePage({ params }: { params: Promise<{ id: str
   const [data, setData] = useState<Data | null>(null);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [costExclusions, setCostExclusions] = useState('');
+  const [clientProvides, setClientProvides] = useState('');
   const [paymentTerms, setPaymentTerms] = useState(DEFAULT_PAYMENT_TERMS);
   const [signerName, setSignerName] = useState('Alberto Monteras II');
   const [signerTitle, setSignerTitle] = useState('PROPRIETOR');
@@ -42,6 +43,7 @@ export default function ProjectQuotePage({ params }: { params: Promise<{ id: str
     fetch(`/api/projects/${id}`).then(r => r.json()).then((d: Data) => {
       setData(d);
       setCostExclusions(d.project.cost_exclusions || 'Stock footage or photos purchase, if needed\nAll products\nAgency boards and final copy');
+      setClientProvides(d.project.client_provides || '');
       setPaymentTerms(d.project.payment_terms || DEFAULT_PAYMENT_TERMS);
     });
   }, [id]);
@@ -133,6 +135,7 @@ export default function ProjectQuotePage({ params }: { params: Promise<{ id: str
             <input defaultValue={project.client_name || ''} placeholder="Name of client" style={{ border: 'none', outline: 'none', fontWeight: 700, fontSize: '13px', borderBottom: '1px solid #ccc', width: '220px' }} /><br />
             <input defaultValue={project.client_title || ''} placeholder="Title" style={{ border: 'none', outline: 'none', fontSize: '13px', borderBottom: '1px solid #ccc', width: '220px' }} /><br />
             <input defaultValue={project.client_company || ''} placeholder="Company" style={{ border: 'none', outline: 'none', fontSize: '13px', fontWeight: 600, color: '#333', borderBottom: '1px solid #ccc', width: '220px' }} />
+            {project.agency && <div style={{ fontSize: '12px', color: '#555', marginTop: '2px' }}>Agency: <strong>{project.agency}</strong></div>}
           </div>
           <div style={{ fontSize: '13px', fontWeight: 700 }}>
             {new Date().toLocaleDateString('en-PH', { day: 'numeric', month: 'long', year: 'numeric' })}
@@ -145,16 +148,23 @@ export default function ProjectQuotePage({ params }: { params: Promise<{ id: str
           {project.description && <div style={{ marginTop: '8px', whiteSpace: 'pre-wrap' }}>{project.description}</div>}
         </div>
 
-        {/* Project title + Deliverables — set from the app, not editable here */}
+        {/* Project Details — set from the app, not editable here. Only non-empty rows show,
+            so a simple 1-day location shoot stays a two-line block while a fuller agency
+            brief (boards, platforms, talent usage) gets the full picture. */}
         <div style={{ marginBottom: '20px' }}>
-          <div style={{ fontSize: '10px', fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '2px' }}>Project Title</div>
-          <div style={{ fontWeight: 700, fontSize: '15px', marginBottom: project.deliverables?.trim() ? '10px' : 0 }}>{project.name}</div>
-          {project.deliverables?.trim() && (
-            <>
-              <div style={{ fontSize: '10px', fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '2px' }}>Deliverables</div>
-              <div style={{ fontSize: '12px', whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>{sortDeliverables(project.deliverables.split('\n')).join('\n')}</div>
-            </>
-          )}
+          {([
+            ['Project Title', project.name],
+            ['Deliverables', project.deliverables?.trim() ? sortDeliverables(project.deliverables.split('\n')).join('\n') : ''],
+            ['Shoot Summary', project.shoot_summary],
+            ['Boards', project.boards],
+            ['Platforms', project.platforms],
+            ['Talent Usage', project.talent_usage],
+          ] as [string, string | null | undefined][]).filter(([, v]) => v?.trim()).map(([label, value], i, arr) => (
+            <div key={label} style={{ marginBottom: i < arr.length - 1 ? '10px' : 0 }}>
+              <div style={{ fontSize: '10px', fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '2px' }}>{label}</div>
+              <div style={{ fontWeight: label === 'Project Title' ? 700 : 400, fontSize: label === 'Project Title' ? '15px' : '12px', whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>{value}</div>
+            </div>
+          ))}
         </div>
 
         {/* Headline totals, styled like the standard Dogzilla quotation letter — the numbers a
@@ -295,6 +305,14 @@ export default function ProjectQuotePage({ params }: { params: Promise<{ id: str
           </div>
         )}
 
+        {/* Client/Agency to Provide — chosen in the app (project page), displayed as plain text */}
+        {clientProvides.trim() && (
+          <div style={{ marginBottom: '20px' }}>
+            <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '6px' }}>AGENCY/CLIENT TO PROVIDE:</div>
+            <div style={{ fontSize: '12px', whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>{clientProvides}</div>
+          </div>
+        )}
+
         {/* Terms of Payment — editable */}
         <div style={{ marginBottom: '20px' }}>
           <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '6px' }}>TERMS OF PAYMENT:</div>
@@ -319,14 +337,22 @@ export default function ProjectQuotePage({ params }: { params: Promise<{ id: str
         <div style={{ fontSize: '13px', marginBottom: '16px' }}>You may reach me anytime through my mobile 09399338732.</div>
         <div style={{ fontSize: '13px', marginBottom: '32px' }}>We look forward to being of service to you soon. Thank you!</div>
 
-        {/* Signature */}
-        <div className="doc-footer">
-          <div style={{ fontSize: '13px', marginBottom: '4px' }}>Regards,</div>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/signature.jpg" alt="Signature" style={{ height: '40px', objectFit: 'contain', display: 'block', marginBottom: '4px' }} />
-          <input value={signerName} onChange={e => setSignerName(e.target.value)} style={{ border: 'none', outline: 'none', fontSize: '13px', fontWeight: 700, borderBottom: '1px solid #ccc' }} />
-          <br />
-          <input value={signerTitle} onChange={e => setSignerTitle(e.target.value)} style={{ border: 'none', outline: 'none', fontSize: '11px', color: '#555', textTransform: 'uppercase', borderBottom: '1px solid #ccc' }} />
+        {/* Signature — Prepared By / Approved By, two columns */}
+        <div className="doc-footer" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '40px' }}>
+          <div>
+            <div style={{ fontSize: '10px', fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>Prepared By</div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/signature.jpg" alt="Signature" style={{ height: '40px', objectFit: 'contain', display: 'block', marginBottom: '4px' }} />
+            <input value={signerName} onChange={e => setSignerName(e.target.value)} style={{ border: 'none', outline: 'none', fontSize: '13px', fontWeight: 700, borderBottom: '1px solid #ccc', width: '100%' }} />
+            <br />
+            <input value={signerTitle} onChange={e => setSignerTitle(e.target.value)} style={{ border: 'none', outline: 'none', fontSize: '11px', color: '#555', textTransform: 'uppercase', borderBottom: '1px solid #ccc', width: '100%' }} />
+          </div>
+          <div>
+            <div style={{ fontSize: '10px', fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>Approved By</div>
+            <div style={{ borderBottom: '1px solid #333', height: '40px', marginBottom: '4px' }} />
+            <div style={{ fontSize: '13px', fontWeight: 700 }}>{project.client_name || 'Client Representative'}</div>
+            <div style={{ fontSize: '11px', color: '#555' }}>{project.client_company || project.agency || ''}</div>
+          </div>
         </div>
       </div>
 
