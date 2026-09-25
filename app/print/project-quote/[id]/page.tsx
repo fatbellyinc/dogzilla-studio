@@ -1,5 +1,6 @@
 'use client';
-import { Fragment, use, useEffect, useState } from 'react';
+import { Fragment, Suspense, use, useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { formatPHP, calcListPriceFromNet, sortDeliverables } from '@/lib/utils';
 import { Project, ProjectCost, PROJECT_CATEGORIES, PROJECT_CATEGORY_LABELS, Equipment, CATEGORY_LABELS } from '@/lib/types';
 import ShareDocBar from '@/components/ShareDocBar';
@@ -29,8 +30,11 @@ const CANCELLATION_POLICY = [
   'In the event that the actual expenses of the Production House at the time of work stoppage are higher than the above percentages, Production House will review actual expenses and charge accordingly.',
 ];
 
-export default function ProjectQuotePage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+function ProjectQuoteView({ id }: { id: string }) {
+  const searchParams = useSearchParams();
+  // Proposal = category-level summary only (no per-item breakdown) — a shorter document for
+  // early-stage client conversations, before the full itemized Quotation is needed.
+  const isProposal = searchParams.get('view') === 'proposal';
   const [data, setData] = useState<Data | null>(null);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [costExclusions, setCostExclusions] = useState('');
@@ -56,7 +60,7 @@ export default function ProjectQuotePage({ params }: { params: Promise<{ id: str
   const noMarkup = !!project.no_markup;
 
   if (typeof document !== 'undefined') {
-    document.title = `Dogzilla_CostEstimate_${(project.quote_number || 'DZCE').replace(/[^a-zA-Z0-9-]+/g, '')}_${(project.client_name || project.name).replace(/[^a-zA-Z0-9]+/g, '-')}`;
+    document.title = `Dogzilla_${isProposal ? 'Proposal' : 'CostEstimate'}_${(project.quote_number || 'DZCE').replace(/[^a-zA-Z0-9-]+/g, '')}_${(project.client_name || project.name).replace(/[^a-zA-Z0-9]+/g, '-')}`;
   }
 
   // Equipment catalog category (camera/lens/lighting/grip/...) for each cost item's description,
@@ -144,7 +148,7 @@ export default function ProjectQuotePage({ params }: { params: Promise<{ id: str
 
         <div style={{ marginBottom: '16px', fontSize: '13px' }}>Dear {(project.client_name || '').trim().split(/\s+/)[0] || 'Sir/Ma’am'},</div>
         <div style={{ marginBottom: '20px', fontSize: '13px', lineHeight: '1.6' }}>
-          Please see below quotation for <strong>Project {project.name}</strong>.
+          Please see below {isProposal ? 'proposal' : 'quotation'} for <strong>Project {project.name}</strong>.
           {project.description && <div style={{ marginTop: '8px', whiteSpace: 'pre-wrap' }}>{project.description}</div>}
         </div>
 
@@ -178,14 +182,30 @@ export default function ProjectQuotePage({ params }: { params: Promise<{ id: str
           <thead>
             <tr>
               <th style={{ background: '#555', color: 'white', textAlign: 'left', padding: '10px 12px', fontSize: '12px' }}>PARTICULAR</th>
-              <th style={{ background: '#555', color: 'white', textAlign: 'center', padding: '10px 12px', fontSize: '12px', width: '36px' }}>QTY</th>
-              <th style={{ background: '#555', color: 'white', textAlign: 'center', padding: '10px 12px', fontSize: '12px', width: '48px' }}>DAYS</th>
-              <th style={{ background: '#555', color: 'white', textAlign: 'right', padding: '10px 12px', fontSize: '12px', width: '90px' }}>UNIT PRICE</th>
+              {!isProposal && (
+                <>
+                  <th style={{ background: '#555', color: 'white', textAlign: 'center', padding: '10px 12px', fontSize: '12px', width: '36px' }}>QTY</th>
+                  <th style={{ background: '#555', color: 'white', textAlign: 'center', padding: '10px 12px', fontSize: '12px', width: '48px' }}>DAYS</th>
+                  <th style={{ background: '#555', color: 'white', textAlign: 'right', padding: '10px 12px', fontSize: '12px', width: '90px' }}>UNIT PRICE</th>
+                </>
+              )}
               <th style={{ background: '#555', color: 'white', textAlign: 'right', padding: '10px 12px', fontSize: '12px' }}>CE COST NET</th>
             </tr>
           </thead>
           <tbody>
-            {byCategory.map(g => {
+            {isProposal ? (
+              // Proposal — category-level summary only, no per-item breakdown. A shorter
+              // document for early client conversations before the full Quotation is needed.
+              byCategory.map(g => {
+                const catTotal = g.items.reduce((s, c) => s + c.client_cost, 0);
+                return (
+                  <tr key={g.category} style={{ borderBottom: '1px solid #eee' }}>
+                    <td style={{ padding: '8px 12px', fontWeight: 700 }}>{PROJECT_CATEGORY_LABELS[g.category]}</td>
+                    <td style={{ padding: '8px 12px', textAlign: 'right' }}>{formatPHP(catTotal)}</td>
+                  </tr>
+                );
+              })
+            ) : byCategory.map(g => {
               const catTotal = g.items.reduce((s, c) => s + c.client_cost, 0);
               // Equipment Rental gets a second level of grouping — camera/lens/lighting/grip/
               // audio/... — sourced from the equipment catalog; everything else (custom-typed
@@ -247,49 +267,49 @@ export default function ProjectQuotePage({ params }: { params: Promise<{ id: str
                 </Fragment>
               );
             })}
-            <tr><td colSpan={5} style={{ padding: '4px' }}></td></tr>
+            <tr><td colSpan={isProposal ? 2 : 5} style={{ padding: '4px' }}></td></tr>
             {totalSavings > 0 && (
               <>
                 <tr>
-                  <td colSpan={4} style={{ padding: '4px 12px', color: '#888', textAlign: 'right' }}>Regular Price</td>
+                  <td colSpan={isProposal ? 1 : 4} style={{ padding: '4px 12px', color: '#888', textAlign: 'right' }}>Regular Price</td>
                   <td style={{ padding: '4px 12px', textAlign: 'right', color: '#888', textDecoration: 'line-through' }}>{formatPHP(regularTotal)}</td>
                 </tr>
                 <tr style={{ background: '#fdeaea' }}>
-                  <td colSpan={4} style={{ padding: '4px 12px', color: '#E32726', fontWeight: 700, textAlign: 'right' }}>Total Discount</td>
+                  <td colSpan={isProposal ? 1 : 4} style={{ padding: '4px 12px', color: '#E32726', fontWeight: 700, textAlign: 'right' }}>Total Discount</td>
                   <td style={{ padding: '4px 12px', textAlign: 'right', color: '#E32726', fontWeight: 700 }}>−{formatPHP(totalSavings)}</td>
                 </tr>
               </>
             )}
             <tr style={{ background: '#111' }}>
-              <td colSpan={4} style={{ padding: '8px 12px', color: 'white', fontWeight: 700, textAlign: 'right' }}>SUB TOTAL</td>
+              <td colSpan={isProposal ? 1 : 4} style={{ padding: '8px 12px', color: 'white', fontWeight: 700, textAlign: 'right' }}>SUB TOTAL</td>
               <td style={{ padding: '8px 12px', color: 'white', fontWeight: 700, textAlign: 'right' }}>{formatPHP(clientTotal)}</td>
             </tr>
             {!noMarkup && (
               <tr style={{ borderBottom: '1px solid #eee' }}>
-                <td colSpan={4} style={{ padding: '8px 12px', textAlign: 'right' }}>MARK-UP ({project.markup_pct_no_dp}%)</td>
+                <td colSpan={isProposal ? 1 : 4} style={{ padding: '8px 12px', textAlign: 'right' }}>MARK-UP ({project.markup_pct_no_dp}%)</td>
                 <td style={{ padding: '8px 12px', textAlign: 'right' }}>{formatPHP(calc.markup)}</td>
               </tr>
             )}
             <tr style={{ borderBottom: '1px solid #eee' }}>
-              <td colSpan={4} style={{ padding: '8px 12px', textAlign: 'right' }}>SUB TOTAL 2</td>
+              <td colSpan={isProposal ? 1 : 4} style={{ padding: '8px 12px', textAlign: 'right' }}>SUB TOTAL 2</td>
               <td style={{ padding: '8px 12px', textAlign: 'right' }}>{formatPHP(calc.subtotal2)}</td>
             </tr>
             <tr style={{ borderBottom: '1px solid #eee' }}>
-              <td colSpan={4} style={{ padding: '8px 12px', textAlign: 'right' }}>{vatExempt ? 'NON-VAT' : '12% VAT'}</td>
+              <td colSpan={isProposal ? 1 : 4} style={{ padding: '8px 12px', textAlign: 'right' }}>{vatExempt ? 'NON-VAT' : '12% VAT'}</td>
               <td style={{ padding: '8px 12px', textAlign: 'right' }}>{formatPHP(calc.vat)}</td>
             </tr>
             <tr>
-              <td colSpan={4} style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 900, color: '#E32726' }}>{vatExempt ? 'GRAND TOTAL' : 'TOTAL WITH VAT'}</td>
+              <td colSpan={isProposal ? 1 : 4} style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 900, color: '#E32726' }}>{vatExempt ? 'GRAND TOTAL' : 'TOTAL WITH VAT'}</td>
               <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 900, color: '#E32726', fontSize: '15px' }}>{formatPHP(calc.total)}</td>
             </tr>
             {withholding && (
               <>
                 <tr style={{ borderBottom: '1px solid #eee' }}>
-                  <td colSpan={4} style={{ padding: '8px 12px', textAlign: 'right', color: '#7c3aed' }}>Less: Withholding Tax ({project.withholding_rate}%)</td>
+                  <td colSpan={isProposal ? 1 : 4} style={{ padding: '8px 12px', textAlign: 'right', color: '#7c3aed' }}>Less: Withholding Tax ({project.withholding_rate}%)</td>
                   <td style={{ padding: '8px 12px', textAlign: 'right', color: '#7c3aed' }}>−{formatPHP(withholdingAmount)}</td>
                 </tr>
                 <tr>
-                  <td colSpan={4} style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 900 }}>Net Amount Due</td>
+                  <td colSpan={isProposal ? 1 : 4} style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 900 }}>Net Amount Due</td>
                   <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 900, color: '#7c3aed', fontSize: '15px' }}>{formatPHP(netAfterWithholding)}</td>
                 </tr>
               </>
@@ -369,4 +389,9 @@ export default function ProjectQuotePage({ params }: { params: Promise<{ id: str
       </div>
     </div>
   );
+}
+
+export default function ProjectQuotePage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
+  return <Suspense fallback={<div className="p-8 text-gray-400">Loading...</div>}><ProjectQuoteView id={id} /></Suspense>;
 }

@@ -1,5 +1,6 @@
 'use client';
-import { Fragment, use, useEffect, useState, useCallback } from 'react';
+import { Fragment, Suspense, use, useEffect, useState, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { formatPHP, formatDate, calcListPriceFromNet, sortDeliverables } from '@/lib/utils';
 import { Project, ProjectCost, ProjectPayment, ProjectInvoice, PROJECT_CATEGORIES, PROJECT_CATEGORY_LABELS, PAYMENT_ACCOUNTS, Equipment, CATEGORY_LABELS } from '@/lib/types';
 import ShareDocBar from '@/components/ShareDocBar';
@@ -15,8 +16,11 @@ function calcScenario(subtotal: number, markupPct: number, vatExempt: boolean) {
   return { markup, subtotal2, vat, total };
 }
 
-export default function ProjectInvoicePage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+function ProjectInvoiceView({ id }: { id: string }) {
+  const searchParams = useSearchParams();
+  // Simplified = category-level summary only (no per-item breakdown) — a shorter invoice for
+  // clients who don't need the full itemized detail.
+  const isSimplified = searchParams.get('view') === 'summary';
   const [data, setData] = useState<Data | null>(null);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
 
@@ -31,8 +35,8 @@ export default function ProjectInvoicePage({ params }: { params: Promise<{ id: s
     if (!data) return;
     const num = data.invoices[data.invoices.length - 1]?.invoice_number || `DZPI-${String(data.project.id).padStart(4, '0')}`;
     const client = (data.project.client_name || data.project.name).replace(/[^a-zA-Z0-9]+/g, '-');
-    document.title = `Dogzilla_Invoice_${num}_${client}`;
-  }, [data]);
+    document.title = `Dogzilla_${isSimplified ? 'SimplifiedInvoice' : 'Invoice'}_${num}_${client}`;
+  }, [data, isSimplified]);
 
   async function generateInvoiceNumber() {
     await fetch('/api/project-invoices', {
@@ -146,14 +150,26 @@ export default function ProjectInvoicePage({ params }: { params: Promise<{ id: s
           <thead>
             <tr>
               <th style={{ background: '#555', color: 'white', textAlign: 'left', padding: '10px 12px', fontSize: '12px' }}>PARTICULAR</th>
-              <th style={{ background: '#555', color: 'white', textAlign: 'center', padding: '10px 12px', fontSize: '12px', width: '36px' }}>QTY</th>
-              <th style={{ background: '#555', color: 'white', textAlign: 'center', padding: '10px 12px', fontSize: '12px', width: '48px' }}>DAYS</th>
-              <th style={{ background: '#555', color: 'white', textAlign: 'right', padding: '10px 12px', fontSize: '12px', width: '90px' }}>UNIT PRICE</th>
+              {!isSimplified && (
+                <>
+                  <th style={{ background: '#555', color: 'white', textAlign: 'center', padding: '10px 12px', fontSize: '12px', width: '36px' }}>QTY</th>
+                  <th style={{ background: '#555', color: 'white', textAlign: 'center', padding: '10px 12px', fontSize: '12px', width: '48px' }}>DAYS</th>
+                  <th style={{ background: '#555', color: 'white', textAlign: 'right', padding: '10px 12px', fontSize: '12px', width: '90px' }}>UNIT PRICE</th>
+                </>
+              )}
               <th style={{ background: '#555', color: 'white', textAlign: 'right', padding: '10px 12px', fontSize: '12px' }}>AMOUNT</th>
             </tr>
           </thead>
           <tbody>
-            {byCategory.map(g => {
+            {isSimplified ? byCategory.map(g => {
+              const catTotal = g.items.reduce((s, c) => s + c.client_cost, 0);
+              return (
+                <tr key={g.category} style={{ borderBottom: '1px solid #eee' }}>
+                  <td style={{ padding: '8px 12px', fontWeight: 700 }}>{PROJECT_CATEGORY_LABELS[g.category]}</td>
+                  <td style={{ padding: '8px 12px', textAlign: 'right' }}>{formatPHP(catTotal)}</td>
+                </tr>
+              );
+            }) : byCategory.map(g => {
               const catTotal = g.items.reduce((s, c) => s + c.client_cost, 0);
               const subGroups = g.category === 'equipment'
                 ? (() => {
@@ -212,49 +228,49 @@ export default function ProjectInvoicePage({ params }: { params: Promise<{ id: s
                 </Fragment>
               );
             })}
-            <tr><td colSpan={5} style={{ padding: '4px' }}></td></tr>
+            <tr><td colSpan={isSimplified ? 2 : 5} style={{ padding: '4px' }}></td></tr>
             {totalSavings > 0 && (
               <>
                 <tr>
-                  <td colSpan={4} style={{ padding: '4px 12px', color: '#888', textAlign: 'right' }}>Regular Price</td>
+                  <td colSpan={isSimplified ? 1 : 4} style={{ padding: '4px 12px', color: '#888', textAlign: 'right' }}>Regular Price</td>
                   <td style={{ padding: '4px 12px', textAlign: 'right', color: '#888', textDecoration: 'line-through' }}>{formatPHP(regularTotal)}</td>
                 </tr>
                 <tr style={{ background: '#fdeaea' }}>
-                  <td colSpan={4} style={{ padding: '4px 12px', color: '#E32726', fontWeight: 700, textAlign: 'right' }}>Total Discount</td>
+                  <td colSpan={isSimplified ? 1 : 4} style={{ padding: '4px 12px', color: '#E32726', fontWeight: 700, textAlign: 'right' }}>Total Discount</td>
                   <td style={{ padding: '4px 12px', textAlign: 'right', color: '#E32726', fontWeight: 700 }}>−{formatPHP(totalSavings)}</td>
                 </tr>
               </>
             )}
             <tr style={{ background: '#111' }}>
-              <td colSpan={4} style={{ padding: '8px 12px', color: 'white', fontWeight: 700, textAlign: 'right' }}>SUB TOTAL</td>
+              <td colSpan={isSimplified ? 1 : 4} style={{ padding: '8px 12px', color: 'white', fontWeight: 700, textAlign: 'right' }}>SUB TOTAL</td>
               <td style={{ padding: '8px 12px', color: 'white', fontWeight: 700, textAlign: 'right' }}>{formatPHP(clientTotal)}</td>
             </tr>
             {!noMarkup && (
               <tr style={{ borderBottom: '1px solid #eee' }}>
-                <td colSpan={4} style={{ padding: '8px 12px', textAlign: 'right' }}>MARK-UP ({project.markup_pct_no_dp}%)</td>
+                <td colSpan={isSimplified ? 1 : 4} style={{ padding: '8px 12px', textAlign: 'right' }}>MARK-UP ({project.markup_pct_no_dp}%)</td>
                 <td style={{ padding: '8px 12px', textAlign: 'right' }}>{formatPHP(calc.markup)}</td>
               </tr>
             )}
             <tr style={{ borderBottom: '1px solid #eee' }}>
-              <td colSpan={4} style={{ padding: '8px 12px', textAlign: 'right' }}>SUB TOTAL 2</td>
+              <td colSpan={isSimplified ? 1 : 4} style={{ padding: '8px 12px', textAlign: 'right' }}>SUB TOTAL 2</td>
               <td style={{ padding: '8px 12px', textAlign: 'right' }}>{formatPHP(calc.subtotal2)}</td>
             </tr>
             <tr style={{ borderBottom: '1px solid #eee' }}>
-              <td colSpan={4} style={{ padding: '8px 12px', textAlign: 'right' }}>{vatExempt ? 'NON-VAT' : '12% VAT'}</td>
+              <td colSpan={isSimplified ? 1 : 4} style={{ padding: '8px 12px', textAlign: 'right' }}>{vatExempt ? 'NON-VAT' : '12% VAT'}</td>
               <td style={{ padding: '8px 12px', textAlign: 'right' }}>{formatPHP(calc.vat)}</td>
             </tr>
             <tr>
-              <td colSpan={4} style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 900, color: '#E32726' }}>TOTAL AMOUNT DUE</td>
+              <td colSpan={isSimplified ? 1 : 4} style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 900, color: '#E32726' }}>TOTAL AMOUNT DUE</td>
               <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 900, color: '#E32726', fontSize: '15px' }}>{formatPHP(calc.total)}</td>
             </tr>
             {withholding && (
               <>
                 <tr style={{ borderBottom: '1px solid #eee' }}>
-                  <td colSpan={4} style={{ padding: '8px 12px', textAlign: 'right', color: '#7c3aed' }}>Less: Withholding Tax ({project.withholding_rate}%)</td>
+                  <td colSpan={isSimplified ? 1 : 4} style={{ padding: '8px 12px', textAlign: 'right', color: '#7c3aed' }}>Less: Withholding Tax ({project.withholding_rate}%)</td>
                   <td style={{ padding: '8px 12px', textAlign: 'right', color: '#7c3aed' }}>−{formatPHP(withholdingAmount)}</td>
                 </tr>
                 <tr>
-                  <td colSpan={4} style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 900 }}>Net Amount Due</td>
+                  <td colSpan={isSimplified ? 1 : 4} style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 900 }}>Net Amount Due</td>
                   <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 900, color: '#7c3aed', fontSize: '15px' }}>{formatPHP(netAfterWithholding)}</td>
                 </tr>
               </>
@@ -347,4 +363,9 @@ export default function ProjectInvoicePage({ params }: { params: Promise<{ id: s
       </div>
     </div>
   );
+}
+
+export default function ProjectInvoicePage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
+  return <Suspense fallback={<div className="p-8 text-gray-400">Loading...</div>}><ProjectInvoiceView id={id} /></Suspense>;
 }

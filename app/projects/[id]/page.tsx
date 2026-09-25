@@ -589,8 +589,12 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                 className="bg-[#0f0f0f] border border-[#2a2a2a] rounded-lg px-2.5 py-1.5 text-xs text-white">
                 {PROJECT_STATUSES.map(s => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
               </select>
-              <Link href={`/print/project-quote/${id}`} target="_blank" className="bg-[#E32726] text-white text-xs px-3 py-1.5 rounded-lg font-medium hover:bg-[#c41f1e] transition-colors">📄 Cost Estimate / Quotation</Link>
+              <Link href={`/print/project-quote/${id}`} target="_blank" className="bg-[#E32726] text-white text-xs px-3 py-1.5 rounded-lg font-medium hover:bg-[#c41f1e] transition-colors">📄 Quotation</Link>
+              <Link href={`/print/project-quote/${id}?view=proposal`} target="_blank" title="Category-level summary, no per-item breakdown"
+                className="bg-[#1a1a1a] border border-[#2a2a2a] text-white text-xs px-3 py-1.5 rounded-lg font-medium hover:border-white/30 transition-colors">📋 Proposal</Link>
               <Link href={`/print/project-invoice/${id}`} target="_blank" className="bg-[#1a1a1a] border border-[#2a2a2a] text-white text-xs px-3 py-1.5 rounded-lg font-medium hover:border-white/30 transition-colors">🧾 Invoice</Link>
+              <Link href={`/print/project-invoice/${id}?view=summary`} target="_blank" title="Category-level summary, no per-item breakdown"
+                className="bg-[#1a1a1a] border border-[#2a2a2a] text-white text-xs px-3 py-1.5 rounded-lg font-medium hover:border-white/30 transition-colors">🧾 Invoice (Simple)</Link>
               <button onClick={duplicateProject} disabled={duplicating} title="Duplicate this project's budget/settings into a new draft — handy for near-identical repeat jobs"
                 className="bg-[#1a1a1a] border border-[#2a2a2a] text-white text-xs px-3 py-1.5 rounded-lg font-medium hover:border-white/30 transition-colors disabled:opacity-50">
                 {duplicating ? 'Duplicating…' : '⧉ Duplicate'}
