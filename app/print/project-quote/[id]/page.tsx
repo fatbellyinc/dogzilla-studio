@@ -117,7 +117,7 @@ function ProjectQuoteView({ id }: { id: string }) {
   return (
     <div className="doc-shell" style={{ background: '#d1d5db', minHeight: '100vh', padding: '32px 16px', display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
       <BackButton fallbackHref={`/projects/${id}`} />
-      <div className="doc-page" style={{ background: 'white', width: '100%', maxWidth: '794px', boxShadow: '0 4px 24px rgba(0,0,0,0.18)', padding: '48px', fontSize: '13px', fontFamily: 'Arial, sans-serif', color: '#111' }}>
+      <div className="doc-page" style={{ background: 'white', width: '100%', maxWidth: '794px', boxShadow: '0 4px 24px rgba(0,0,0,0.18)', padding: '48px', fontSize: '13px', fontFamily: 'Arial, Helvetica, sans-serif', color: '#111' }}>
 
         {/* Header */}
         <div className="doc-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '3px solid #E32726', paddingBottom: '16px', marginBottom: '20px' }}>
@@ -337,7 +337,7 @@ function ProjectQuoteView({ id }: { id: string }) {
         <div style={{ marginBottom: '20px' }}>
           <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '6px' }}>TERMS OF PAYMENT:</div>
           <textarea value={paymentTerms} onChange={e => setPaymentTerms(e.target.value)} onBlur={saveDoc} rows={4}
-            style={{ width: '100%', border: '1px solid #eee', outline: 'none', fontSize: '12px', padding: '6px', fontFamily: 'Arial' }} />
+            style={{ width: '100%', border: '1px solid #eee', outline: 'none', fontSize: '12px', padding: '6px', fontFamily: 'Arial, Helvetica, sans-serif' }} />
         </div>
 
         {/* Cancellation Policy — fixed boilerplate */}

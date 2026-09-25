@@ -29,7 +29,7 @@ export default function ReceiptPage({ params }: { params: Promise<{ id: string }
   }, [data]);
 
   if (!data) return (
-    <div style={{ background: 'white', padding: '40px', fontFamily: 'Arial, sans-serif', textAlign: 'center', color: '#888' }}>
+    <div style={{ background: 'white', padding: '40px', fontFamily: 'Arial, Helvetica, sans-serif', textAlign: 'center', color: '#888' }}>
       Loading receipt...
     </div>
   );
@@ -48,7 +48,7 @@ export default function ReceiptPage({ params }: { params: Promise<{ id: string }
   return (
     <>
     <div className="doc-shell" style={{ background: '#d1d5db', minHeight: '100vh', padding: '32px 16px', display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
-    <div className="doc-page" style={{ background: 'white', color: '#111', fontFamily: 'Arial, sans-serif', fontSize: '13px', width: '100%', maxWidth: '794px', padding: '48px', boxShadow: '0 4px 24px rgba(0,0,0,0.18)' }}>
+    <div className="doc-page" style={{ background: 'white', color: '#111', fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '13px', width: '100%', maxWidth: '794px', padding: '48px', boxShadow: '0 4px 24px rgba(0,0,0,0.18)' }}>
 
       {/* Header */}
       <div style={{ textAlign: 'center', borderBottom: '3px solid #E32726', paddingBottom: '16px', marginBottom: '16px' }}>

@@ -184,12 +184,12 @@ export default function BIRInvoicePage({ params }: { params: Promise<{ id: strin
   const fmtDate = booking.booking_date ? formatDate(booking.booking_date) : '';
 
   const cell: React.CSSProperties = { border: '1px solid #333', padding: '3px 6px', fontSize: '11px' };
-  const inp: React.CSSProperties = { background: 'transparent', border: 'none', outline: 'none', width: '100%', fontSize: '11px', fontFamily: 'Arial' };
+  const inp: React.CSSProperties = { background: 'transparent', border: 'none', outline: 'none', width: '100%', fontSize: '11px', fontFamily: 'Arial, Helvetica, sans-serif' };
 
   return (
     <div style={docType === 'ack'
-      ? { color: '#111', fontFamily: 'Arial, sans-serif' }
-      : { background: 'white', color: '#111', fontFamily: 'Arial, sans-serif', maxWidth: '794px', margin: '0 auto', padding: '20px', fontSize: '11px' }}>
+      ? { color: '#111', fontFamily: 'Arial, Helvetica, sans-serif' }
+      : { background: 'white', color: '#111', fontFamily: 'Arial, Helvetica, sans-serif', maxWidth: '794px', margin: '0 auto', padding: '20px', fontSize: '11px' }}>
 
       <BackButton fallbackHref={`/bookings/${id}`} />
 
@@ -241,7 +241,7 @@ export default function BIRInvoicePage({ params }: { params: Promise<{ id: strin
            matching the Invoice/Quotation page shell so print and Copy/Share Image
            behave the same way everywhere. ─── */
         <div className="doc-shell" style={{ background: '#d1d5db', minHeight: '100vh', padding: '32px 16px', display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
-          <div className="doc-page" style={{ background: 'white', width: '100%', maxWidth: '794px', boxShadow: '0 4px 24px rgba(0,0,0,0.18)', padding: '48px', fontSize: '13px', fontFamily: 'Arial, sans-serif', color: '#111' }}>
+          <div className="doc-page" style={{ background: 'white', width: '100%', maxWidth: '794px', boxShadow: '0 4px 24px rgba(0,0,0,0.18)', padding: '48px', fontSize: '13px', fontFamily: 'Arial, Helvetica, sans-serif', color: '#111' }}>
             {/* Header */}
             <div className="doc-header" style={{ textAlign: 'center', borderBottom: '3px solid #E32726', paddingBottom: '20px', marginBottom: '24px' }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}

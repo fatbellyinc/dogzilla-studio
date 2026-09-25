@@ -26,7 +26,7 @@ export default function PullSheetPage({ params }: { params: Promise<{ id: string
   const categories = [...new Set(equipment.map(e => e.item_type === 'package' ? 'package' : 'item'))];
 
   return (
-    <div style={{ background: 'white', color: '#111', fontFamily: 'Arial, sans-serif', fontSize: '12px', padding: '24px', maxWidth: '794px', margin: '0 auto' }}>
+    <div style={{ background: 'white', color: '#111', fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '12px', padding: '24px', maxWidth: '794px', margin: '0 auto' }}>
 
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '3px solid #E32726', paddingBottom: '12px', marginBottom: '16px' }}>
