@@ -582,7 +582,7 @@ function initSchema(db: Database.Database) {
 
   // Equipment upserts — add new items to existing databases
   const equipmentUpserts: [string, string, string, number, number, string, number][] = [
-    ['LED-032', 'Rectangular Softbox', 'lighting', 500, 2, 'Passive modifier', 0],
+    ['LED-032', 'Rectangular Softbox', 'lighting_modifiers', 500, 2, 'Passive modifier', 0],
     ['MON-011', 'Mars 400S Pro', 'monitor', 2000, 2, '', 0],
     ['RIG-001', 'Mofage Talos Damping Magic Arm', 'rigging', 500, 1, '', 0],
     ['RIG-002', 'iFootage Spider Crab Magic Arm with QR', 'rigging', 300, 1, '', 0],
@@ -595,12 +595,25 @@ function initSchema(db: Database.Database) {
     ['CRR-001', 'Full Car Turntable', 'car_rigging', 80000, 1, 'Package', 0],
     ['CRR-002', 'Motorcycle Turntable', 'car_rigging', 60000, 1, 'Package', 0],
     ['GRP-031', 'Mini Maxistand', 'grip', 1500, 1, '', 0],
+    ['STR-001', 'Godox AD600 Pro II', 'strobe', 3000, 1, 'Rent', 0],
+    ['STR-002', 'Godox AD400 Pro', 'strobe', 2250, 1, '', 0],
+    ['STR-003', 'Godox SK400', 'strobe', 500, 1, '', 0],
   ];
   for (const [code, name, category, daily_rate, quantity, description, wattage] of equipmentUpserts) {
     try {
       db.prepare(`INSERT INTO equipment (code, name, category, daily_rate, quantity, description, wattage) SELECT ?, ?, ?, ?, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM equipment WHERE code = ?)`).run(code, name, category, daily_rate, quantity, description, wattage, code);
     } catch { /* ignore */ }
   }
+
+  // Split LED light modifiers (softboxes, parabolics, fresnels, lanterns) out of the 'lighting'
+  // category into their own 'lighting_modifiers' category — a modifier isn't a light source,
+  // it's a rental accessory, and lumping them together made the LED section noisy. Unconditional
+  // and idempotent: just re-asserts the category for these specific codes every startup.
+  try {
+    const modifierCodes = ['LED-019', 'LED-020', 'LED-021', 'LED-022', 'LED-023', 'LED-024', 'LED-025', 'LED-026', 'LED-032'];
+    const updateCategory = db.prepare(`UPDATE equipment SET category = 'lighting_modifiers' WHERE code = ?`);
+    for (const code of modifierCodes) updateCategory.run(code);
+  } catch { /* ignore */ }
 
   // Price correction: Accsoon Cineview SE was seeded at 2000, correct rate is 2500
   try {
@@ -808,20 +821,31 @@ function seedEquipment(db: Database.Database) {
     ['LED-016', 'Aputure B7C 8-Bulb Kit', 'lighting', 3000, 1, 'Smart bulb kit, RGBWW', 56],
     ['LED-017', 'Aputure Spotlight/Projector 36°', 'lighting', 2000, 1, 'Spotlight attachment — no extra draw', 0],
     ['LED-018', 'Amaran Spotlight/Projector 19°', 'lighting', 1500, 1, 'Attachment — no extra draw', 0],
-    ['LED-019', 'Aputure Fresnel F10 with Barndoor', 'lighting', 500, 2, 'Modifier only', 0],
-    ['LED-020', 'Aputure Fresnel Lens', 'lighting', 800, 1, 'Modifier only', 0],
-    ['LED-021', 'Aputure Nova Softbox', 'lighting', 500, 2, 'Modifier only', 0],
-    ['LED-022', 'Aputure Lantern', 'lighting', 1000, 1, 'Modifier only', 0],
-    ['LED-023', 'Aputure Space Light', 'lighting', 500, 1, 'Modifier only', 0],
-    ['LED-024', 'Parabolic 90cm with Grid', 'lighting', 500, 2, 'Passive modifier', 0],
-    ['LED-025', 'Parabolic 120cm with Grid', 'lighting', 750, 2, 'Passive modifier', 0],
-    ['LED-026', 'Parabolic 150cm with Grid', 'lighting', 1000, 1, 'Passive modifier', 0],
     ['LED-027', '60W RGB Ambitful', 'lighting', 1000, 2, '', 60],
     ['LED-028', 'RAYZR MC RGB Panel 100W', 'lighting', 1200, 1, '', 100],
     ['LED-029', 'Dracast Yoga Bicolor 2-Panel', 'lighting', 750, 2, '', 100],
     ['LED-030', 'RGB Light Tube 4ft', 'lighting', 1000, 4, '', 30],
     ['LED-031', 'RGB Flex Lights LED', 'lighting', 3500, 2, '', 50],
-    ['LED-032', 'Rectangular Softbox', 'lighting', 500, 2, 'Passive modifier', 0],
+
+    // LIGHTING MODIFIERS — passive light-shaping accessories (softboxes, parabolics, fresnels,
+    // lanterns), split out from the LED fixtures themselves since they're a distinct rental
+    // line item, not a light source. Codes kept as originally assigned (LED-019 etc.) even
+    // though they're no longer filed under 'lighting' — only the category changes, matched by
+    // an UPDATE migration below for databases that already have these rows.
+    ['LED-019', 'Aputure Fresnel F10 with Barndoor', 'lighting_modifiers', 500, 2, 'Modifier only', 0],
+    ['LED-020', 'Aputure Fresnel Lens', 'lighting_modifiers', 800, 1, 'Modifier only', 0],
+    ['LED-021', 'Aputure Nova Softbox', 'lighting_modifiers', 500, 2, 'Modifier only', 0],
+    ['LED-022', 'Aputure Lantern', 'lighting_modifiers', 1000, 1, 'Modifier only', 0],
+    ['LED-023', 'Aputure Space Light', 'lighting_modifiers', 500, 1, 'Modifier only', 0],
+    ['LED-024', 'Parabolic 90cm with Grid', 'lighting_modifiers', 500, 2, 'Passive modifier', 0],
+    ['LED-025', 'Parabolic 120cm with Grid', 'lighting_modifiers', 750, 2, 'Passive modifier', 0],
+    ['LED-026', 'Parabolic 150cm with Grid', 'lighting_modifiers', 1000, 1, 'Passive modifier', 0],
+    ['LED-032', 'Rectangular Softbox', 'lighting_modifiers', 500, 2, 'Passive modifier', 0],
+
+    // STROBE & FLASH
+    ['STR-001', 'Godox AD600 Pro II', 'strobe', 3000, 1, 'Rent', 0],
+    ['STR-002', 'Godox AD400 Pro', 'strobe', 2250, 1, '', 0],
+    ['STR-003', 'Godox SK400', 'strobe', 500, 1, '', 0],
 
     // LIGHTS — OLD SCHOOL (tungsten/HMI draw more power)
     ['OLD-001', '2K Fresnel Strand', 'lighting_old', 650, 4, 'Tungsten 2,000W each', 2000],

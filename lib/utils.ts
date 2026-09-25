@@ -21,13 +21,14 @@ export function groupByDayDate<T extends { day_date?: string | null }>(items: T[
 // categories first (camera, lighting, etc.), then the pseudo-categories for things that were
 // never in the catalog (packages, add-ons, personnel, custom one-off items).
 const CATEGORY_ORDER = [
-  'camera', 'lens', 'lighting', 'lighting_old', 'grip', 'tripod', 'audio', 'monitor', 'rigging', 'misc', 'crew',
+  'camera', 'lens', 'lighting', 'lighting_modifiers', 'strobe', 'lighting_old', 'grip', 'tripod', 'audio', 'monitor', 'rigging', 'misc', 'crew',
   'package',
   'evt_venue', 'evt_audio', 'evt_lighting', 'evt_dj', 'evt_led', 'evt_crew', 'evt_logistics', 'evt_generator',
   'package_item', 'addon', 'manpower', 'custom', 'other',
 ];
 const CATEGORY_LABELS_ALL: Record<string, string> = {
-  camera: 'Camera Bodies', lens: 'Lenses', lighting: 'Lights — LED', lighting_old: 'Lights — Old School',
+  camera: 'Camera Bodies', lens: 'Lenses', lighting: 'Lights — LED', lighting_modifiers: 'Lighting Modifiers',
+  lighting_old: 'Lights — Old School', strobe: 'Strobe & Flash',
   grip: 'Grip', tripod: 'Tripods', audio: 'Audio', monitor: 'Monitors & Wireless', rigging: 'Camera/Rigging Accessories',
   misc: 'Miscellaneous', crew: 'Crew',
   package: 'Packages',

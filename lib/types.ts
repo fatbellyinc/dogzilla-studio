@@ -170,7 +170,7 @@ export type ProjectStatus = typeof PROJECT_STATUSES[number];
 // (Full Day Shoot, Event/Warehouse, etc.) applies for 'set_props_location'. Everything else
 // gets no equipment/studio picker at all, since none of that catalog is relevant there.
 export const PROJECT_CATEGORY_EQUIPMENT_CATALOG_CATS: Partial<Record<ProjectCategory, readonly string[]>> = {
-  equipment: ['camera', 'lens', 'lighting', 'lighting_old', 'grip', 'tripod', 'audio', 'monitor', 'rigging', 'car_rigging', 'misc'],
+  equipment: ['camera', 'lens', 'lighting', 'lighting_modifiers', 'strobe', 'lighting_old', 'grip', 'tripod', 'audio', 'monitor', 'rigging', 'car_rigging', 'misc'],
 };
 export const PROJECT_CATEGORY_SHOWS_STUDIO: Partial<Record<ProjectCategory, boolean>> = {
   set_props_location: true,
@@ -646,7 +646,9 @@ export const CATEGORY_LABELS: Record<string, string> = {
   camera: 'Camera Bodies',
   lens: 'Lenses',
   lighting: 'Lights — LED',
+  lighting_modifiers: 'Lighting Modifiers',
   lighting_old: 'Lights — Old School',
+  strobe: 'Strobe & Flash',
   grip: 'Grip',
   tripod: 'Tripods',
   audio: 'Audio',

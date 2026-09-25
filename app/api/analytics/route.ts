@@ -92,7 +92,7 @@ export async function GET() {
     ORDER BY times DESC
   `).all() as { category: string; name: string; times: number; revenue: number }[];
 
-  const CATEGORY_ORDER = ['camera', 'lens', 'lighting', 'lighting_old', 'grip', 'tripod', 'audio', 'monitor', 'rigging', 'misc', 'crew', 'package', 'addon', 'manpower', 'custom', 'other'];
+  const CATEGORY_ORDER = ['camera', 'lens', 'lighting', 'lighting_modifiers', 'strobe', 'lighting_old', 'grip', 'tripod', 'audio', 'monitor', 'rigging', 'misc', 'crew', 'package', 'addon', 'manpower', 'custom', 'other'];
   const catMap = new Map<string, { name: string; times: number; revenue: number }[]>();
   for (const row of equipmentRentalsRaw) {
     if (!catMap.has(row.category)) catMap.set(row.category, []);
