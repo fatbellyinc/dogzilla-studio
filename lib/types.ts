@@ -180,26 +180,47 @@ export const PROJECT_CATEGORY_SHOWS_STUDIO: Partial<Record<ProjectCategory, bool
 // producer click through the roles/line items a shoot of this type usually needs (so nothing
 // gets forgotten) without first having every one of them saved as a Contact.
 export const PROJECT_CATEGORY_ROLE_SUGGESTIONS: Partial<Record<ProjectCategory, readonly string[]>> = {
-  pre_production: ['Workshop / Casting', 'Communications', 'Storyboard Artist', 'Recce / Location Scout'],
+  pre_production: [
+    'Workshop / Casting', 'Communications', 'Storyboard Artist', 'Recce / Location Scout',
+    'Research Expenses', 'Script Writer', 'Animatics / Photomatics / Still-o-matics', 'Pre-Lighting Personnel',
+  ],
   production_personnel: [
-    'Director & DOP', 'Director', 'Cinematographer', 'Executive Producer', 'Line Producer', 'Production Manager',
+    'Director & DOP', 'Director', 'Cinematographer', 'Executive Producer', 'Broadcast Producer', 'Line Producer', 'Production Manager',
     'Assistant Director', '2nd Assistant Director', 'Production Designer', 'Art Director', 'Propsman',
     'Camera Operator', 'Assistant Camera (AC)', '2nd Assistant Camera (2nd AC)', 'DIT (Digital Imaging Technician)',
-    'Focus Puller', 'Gaffer', 'Best Boy Electric', 'Grip', 'Best Boy Grip', 'Sound Engineer', 'Boom Operator',
-    'Casting Director', 'Hair & Make-Up Artist', 'Stylist', 'Wardrobe Assistant', 'Production Assistant',
+    'Focus Puller', 'Gaffer', 'Best Boy Electric', 'Grip', 'Best Boy Grip', 'Sound Engineer', 'Boom Operator', 'Livesound Personnel',
+    'Casting Director', 'Caster', 'Hair & Make-Up Artist', 'Stylist', 'Wardrobe Assistant', 'Production Assistant',
+    'Location Manager', 'Choreographer', 'Baby Handler', 'Pediatrician', 'Food Stylist & Asst',
     'Runner', 'Utility', 'Set Medic', 'Security',
   ],
-  raw_stock: ['Hard Drive (Shoot & Master Copy)', 'Memory Cards'],
-  storage_transmission: ['Hard Drive Copies (Agency/Client)', 'Data Wrangling', 'Cloud Transfer / Upload'],
-  equipment: ['Camera & Lighting Rental Package', 'Livestream, VTR & PA System'],
-  set_props_location: ['Production Design Package', 'Props', 'Wardrobe', 'Location Permit'],
-  talents: ['Lead Talent', 'Supporting Talent', 'Extras', 'VO Talent'],
-  celebrity_entourage: ['Celebrity Talent Fee', 'Manager / Handler', 'Personal Assistant', 'Security'],
-  food_transpo: ['Food', 'Transportation', 'Groceries & Supplies'],
-  sanitation: ['Sanitation Kit', 'COVID / Health Testing'],
-  post_production: ['Full Post Production', 'Stock Photos / AI Generation', 'VO Talent'],
+  raw_stock: ['Hard Drive (Shoot & Master Copy)', 'Memory Cards', 'SD Cards', 'USB for Release'],
+  storage_transmission: [
+    'Hard Drive Copies (Agency/Client)', 'Data Wrangling', 'Cloud Transfer / Upload',
+    'TVCXpress Transmission', 'IMD Transmission', 'Adstream Transmission',
+  ],
+  equipment: [
+    'Camera & Lighting Rental Package', 'Livestream, VTR & PA System', 'Livesound Recording',
+    'Grip Rentals & Misc Equipment', 'Generator Rental', 'Pre-Light Equipment Rental',
+    'Special Equipment (Drone, Slider, etc.)', 'DIT Cart / Equipment',
+  ],
+  set_props_location: [
+    'Production Design Package', 'Props', 'Wardrobe', 'Location Permit',
+    'Set Construction (Materials & Labor)', 'Rigs, Gadgets & Special Effects', 'Costume',
+    'Product Label Mock-ups / Miniatures', 'Vehicle Props',
+  ],
+  talents: ['Lead Talent', 'Supporting Talent', 'Extras', 'VO Talent', 'Acting Supports', 'Background Talents', 'Hand Talent', 'Body Double', 'DOLE Permit'],
+  celebrity_entourage: [
+    'Celebrity Talent Fee', 'Manager / Handler', 'Personal Assistant', 'Security',
+    'Make-Up Artist', 'Hair Stylist', 'Wardrobe Stylist', 'Talent Coordinator', 'Body Double / Stand In', 'Wardrobe Budget',
+  ],
+  food_transpo: [
+    'Food', 'Transportation', 'Groceries & Supplies', 'Plane Fares', 'Accommodations',
+    'Handcarry / Per Diem', 'Freight / Excess Baggage / Terminal Fees', 'Other Government Fees', 'Contingency / Other Misc.',
+  ],
+  sanitation: ['Sanitation Kit', 'COVID / Health Testing', 'Antigen / PCR Testing', 'Ambulance', 'Safety Officer / Marshall', 'Medic'],
+  post_production: ['Full Post Production', 'Digitizing', 'Color Grading', 'Stock Photos / AI Generation', 'Stock Footage', 'Additional Presentations', 'Dub Out / Release of Materials', 'VO Talent'],
   soundtrack: ['Original Music Score', 'Voice Over Talent', 'Sound Design', 'Studio Recording / Mixing / Mastering'],
-  others: [],
+  others: ['Insurance', 'Portalets (incl. Caretakers)', 'Tents (incl. Caretakers)'],
 };
 
 export interface Project {
