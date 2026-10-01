@@ -6,7 +6,7 @@ import ShareDocBar from '@/components/ShareDocBar';
 import BackButton from '@/components/BackButton';
 
 interface BIRData {
-  booking: Booking & { client_tin?: string; client_company?: string; client_address?: string };
+  booking: Booking & { client_tin?: string; client_company?: string; client_address?: string; client_phone?: string; client_email?: string };
   equipment: BookingEquipment[];
   payments: { amount: number; type: string; method: string; reference: string; paid_at: string }[];
   invoice: { id: number; invoice_number: string; or_number: string | null } | null;
@@ -255,11 +255,28 @@ export default function BIRInvoicePage({ params }: { params: Promise<{ id: strin
             <div style={{ fontSize: '13px', textAlign: 'right', marginBottom: '16px' }}>
               Date: <input value={invoiceDate} onChange={e => setInvoiceDate(e.target.value)} style={{ border: 'none', borderBottom: '1px solid #666', outline: 'none', width: '140px', fontSize: '13px' }} />
             </div>
-            <div style={{ fontSize: '13px', marginBottom: '10px' }}>
-              Received from: <input style={{ border: 'none', borderBottom: '1px solid #666', outline: 'none', width: '320px', fontSize: '13px', fontWeight: 700 }} defaultValue={booking.client_name} />
-            </div>
-            <div style={{ fontSize: '13px', marginBottom: '16px' }}>
-              Address: <input style={{ border: 'none', borderBottom: '1px solid #666', outline: 'none', width: '420px', fontSize: '13px' }} defaultValue={data.booking.client_address || ''} />
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{ fontSize: '13px', marginBottom: '10px' }}>
+                Received from: <input style={{ border: 'none', borderBottom: '1px solid #666', outline: 'none', width: '320px', fontSize: '13px', fontWeight: 700 }} defaultValue={booking.client_name} />
+              </div>
+              {(booking.client_company || booking.production_house) && (
+                <div style={{ fontSize: '13px', marginBottom: '10px' }}>
+                  Company: <input style={{ border: 'none', borderBottom: '1px solid #666', outline: 'none', width: '420px', fontSize: '13px' }} defaultValue={booking.client_company || booking.production_house || ''} />
+                </div>
+              )}
+              <div style={{ fontSize: '13px', marginBottom: '10px' }}>
+                Address: <input style={{ border: 'none', borderBottom: '1px solid #666', outline: 'none', width: '420px', fontSize: '13px' }} defaultValue={data.booking.client_address || ''} />
+              </div>
+              {(booking.client_phone || booking.client_email) && (
+                <div style={{ fontSize: '13px', marginBottom: '10px' }}>
+                  Contact: <input style={{ border: 'none', borderBottom: '1px solid #666', outline: 'none', width: '320px', fontSize: '13px' }} defaultValue={[booking.client_phone, booking.client_email].filter(Boolean).join(' · ')} />
+                </div>
+              )}
+              {booking.client_tin && (
+                <div style={{ fontSize: '13px' }}>
+                  TIN: <input style={{ border: 'none', borderBottom: '1px solid #666', outline: 'none', width: '220px', fontSize: '13px' }} defaultValue={booking.client_tin} />
+                </div>
+              )}
             </div>
             {/* Line items */}
             <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '16px' }}>
