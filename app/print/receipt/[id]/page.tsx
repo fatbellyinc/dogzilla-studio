@@ -7,7 +7,11 @@ import BackButton from '@/components/BackButton';
 
 interface ReceiptData {
   payment: { id: number; booking_id: number; amount: number; type: string; method: string; reference: string; paid_at: string; };
-  booking: { booking_date: string; total: number; client_name: string; client_company?: string; project_name: string; client_phone?: string; client_email?: string; vat_exempt?: number; };
+  booking: {
+    booking_date: string; total: number; client_name: string; client_company?: string; project_name: string;
+    production_house?: string; client_phone?: string; client_email?: string; client_address?: string; client_tin?: string;
+    vat_exempt?: number;
+  };
   or_sequence: number;
 }
 
@@ -78,7 +82,13 @@ export default function ReceiptPage({ params }: { params: Promise<{ id: string }
       <div style={{ background: '#f5f5f5', borderRadius: '6px', padding: '12px', marginBottom: '16px' }}>
         <div style={{ fontSize: '10px', color: '#888', marginBottom: '4px' }}>Received from</div>
         <div style={{ fontWeight: 700, fontSize: '15px' }}>{booking.client_name}</div>
-        {booking.client_company && <div style={{ color: '#555' }}>{booking.client_company}</div>}
+        {booking.client_company && <div style={{ color: '#333', fontWeight: 600 }}>{booking.client_company}</div>}
+        {booking.production_house && <div style={{ color: '#555' }}>{booking.production_house}</div>}
+        {booking.client_address && <div style={{ color: '#555' }}>{booking.client_address}</div>}
+        {(booking.client_phone || booking.client_email) && (
+          <div style={{ color: '#555' }}>{[booking.client_phone, booking.client_email].filter(Boolean).join(' · ')}</div>
+        )}
+        {booking.client_tin && <div style={{ color: '#555' }}>TIN: {booking.client_tin}</div>}
       </div>
 
       {/* Payment details */}

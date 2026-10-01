@@ -67,7 +67,9 @@ export default function ProjectReceiptPage({ params }: { params: Promise<{ id: s
       <div style={{ background: '#f5f5f5', borderRadius: '6px', padding: '12px', marginBottom: '16px' }}>
         <div style={{ fontSize: '10px', color: '#888', marginBottom: '4px' }}>Received from</div>
         <div style={{ fontWeight: 700, fontSize: '15px' }}>{project.client_name || 'Client'}</div>
-        {project.client_company && <div style={{ color: '#555' }}>{project.client_company}</div>}
+        {project.client_company && <div style={{ color: '#333', fontWeight: 600 }}>{project.client_company}</div>}
+        {project.client_title && <div style={{ color: '#555' }}>{project.client_title}</div>}
+        {project.agency && <div style={{ color: '#555' }}>Agency: {project.agency}</div>}
       </div>
 
       {/* Payment details */}
