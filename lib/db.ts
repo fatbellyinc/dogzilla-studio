@@ -1011,6 +1011,14 @@ function seedHistoricalData(db: Database.Database) {
     }
   } catch { /* ignore */ }
 
+  // v1's guard flag got set even if the UPDATE matched zero rows, which would permanently
+  // block any retry — this v2 re-asserts unconditionally (keyed to amount, not a flag) so it
+  // keeps correcting on every boot until the row actually reads 100000, without clobbering a
+  // rate the user deliberately changed to something else later.
+  try {
+    db.prepare("UPDATE fixed_costs SET amount = 100000 WHERE name = 'Studio Space Rent' AND amount = 90000").run();
+  } catch { /* ignore */ }
+
   // One-time: record the full lease renewal escalation schedule on the rent line for future
   // reference — scheduled reminders bump the amount itself on each effective date, this note
   // is just the paper trail so the numbers are traceable back to the signed renewal contract.
